@@ -1,0 +1,26 @@
+# AITBASE VISION Plugin SDK
+
+> Build plugins with their own screens for AITBASE VISION camera robots. Plugins are C callbacks plus restricted LVGL-style XML screens; the device renders the UI and owns the two physical buttons. Preview (SDK 0.3, plugin API 1): only the "ui" capability exists, and running a plugin needs a development device.
+
+Start a project with `aitbase-plugin init <dir> --id <yourname.plugin>` and follow its AGENTS.md. Do not use features that are not listed in these documents.
+
+## Docs
+
+- [Project instructions for agents](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/template/AGENTS.md): rules, supported features, input model, the check/build/pack loop
+- [CLI reference](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/cli.md): commands, JSON output, every diagnostic code
+- [UI XML](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/ui-xml.md): accepted widgets, attributes, colors, actions and limits
+- [C API](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/include/aitbase_plugin.h): callbacks, calls and events
+- [Package format](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/package-format.md): .avp files and SD card layout (draft)
+
+## Skills
+
+- [create-plugin](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/template/.agents/skills/create-plugin/SKILL.md)
+- [plugin-ui-xml](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/template/.agents/skills/plugin-ui-xml/SKILL.md)
+- [debug-on-device](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/template/.agents/skills/debug-on-device/SKILL.md)
+
+## Optional
+
+- [Plugin protocol](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/plugin-protocol.md): device wire protocol; plugins never use it directly
+- [UI schema](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/schema/plugin_ui_registry.json)
+- [Manifest schema](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/schema/plugin.schema.json)
+- [Example plugins](https://github.com/Aitbase/aitbase-vision-plugins)

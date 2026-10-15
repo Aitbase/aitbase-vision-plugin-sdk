@@ -34,9 +34,6 @@
 #define AITBASE_IDLE_POLL_MS 200
 #define AITBASE_MIN_TIMER_MS 10u
 
-/* Optional plugin callback. */
-void aitbase_on_stop(aitbase_plugin_t *plugin) __attribute__((weak));
-
 struct aitbase_plugin {
     int fd;
     int ready;
@@ -385,7 +382,7 @@ int aitbase_plugin_run(int argc, char **argv) {
     }
 
     if (plugin->ready) (void)aitbase_ui_close(plugin);
-    if (aitbase_on_stop) aitbase_on_stop(plugin);
+    aitbase_on_stop(plugin); /* no-op default in aitbase_plugin_defaults.c */
     close(plugin->fd);
     free(plugin);
     return status;

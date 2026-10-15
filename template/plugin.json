@@ -1,0 +1,16 @@
+{
+  "id": "__PLUGIN_ID__",
+  "name": "__PLUGIN_NAME__",
+  "version": "0.1.0",
+  "api_version": 1,
+  "description": "Shows a counter that goes up each time you press RIGHT.",
+  "entry": "__TARGET__",
+  "ui": {
+    "screens": [
+      "main"
+    ]
+  },
+  "requested_capabilities": [
+    "ui"
+  ]
+}
