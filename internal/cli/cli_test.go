@@ -52,6 +52,32 @@ func TestInitThenCheck(t *testing.T) {
 	}
 }
 
+// Explicit --build-dir and --out are used as given, e.g. a monorepo build tree outside the project.
+func TestPackWithExternalBuildDir(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "plugins", "p")
+	if code, res := run(t, "init", dir, "--id", "alice.p"); code != 0 {
+		t.Fatalf("init: %v", res)
+	}
+	build := filepath.Join(root, "out", "plugins", "p")
+	if err := os.MkdirAll(build, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"p", "main.ui.json"} {
+		if err := os.WriteFile(filepath.Join(build, f), []byte(f), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dist := filepath.Join(root, "dist")
+	code, res := run(t, "pack", dir, "--build-dir", build, "--out", dist)
+	if code != 0 {
+		t.Fatalf("pack: %v", res)
+	}
+	if res["package"] != filepath.Join(dist, "alice.p-0.1.0.avp") {
+		t.Fatalf("package written to %v", res["package"])
+	}
+}
+
 func TestNotAvailableCommands(t *testing.T) {
 	for _, c := range []string{"devices", "pair", "dev", "logs", "screenshot", "press", "pack-sd"} {
 		code, res := run(t, c)

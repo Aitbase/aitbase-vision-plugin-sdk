@@ -178,6 +178,15 @@ func usageError(e env, asJSON bool, cmd, msg string) int {
 	return exitUsage
 }
 
+// pathFlag resolves a path option. A value the user gave is used as written, relative to the
+// current directory like any command-line path; an empty value means <dir>/<def>.
+func pathFlag(dir, value, def string) string {
+	if value != "" {
+		return value
+	}
+	return filepath.Join(dir, def)
+}
+
 func oneDir(positional []string) (string, error) {
 	switch len(positional) {
 	case 0:
@@ -244,10 +253,7 @@ func runCheck(e env, args []string) int {
 	if err != nil {
 		return usageError(e, *asJSON, "check", err.Error())
 	}
-	sdkDir := *sdk
-	if sdkDir == "" {
-		sdkDir = filepath.Join(dir, "sdk")
-	}
+	sdkDir := pathFlag(dir, *sdk, "sdk")
 	r := check.Project(dir, sdkDir, check.Options{AllowReservedID: *allowReserved, Python: *python, SkipUI: *skipUI})
 	ok := !r.HasErrors()
 	human := "check passed"
@@ -259,7 +265,7 @@ func runCheck(e env, args []string) int {
 
 func runBuild(e env, args []string) int {
 	fs, asJSON := newFlags(e, "build")
-	buildDir := fs.String("build-dir", "build", "CMake build directory, relative to the project")
+	buildDir := fs.String("build-dir", "", "CMake build directory (default: <dir>/build)")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return exitUsage
@@ -273,7 +279,7 @@ func runBuild(e env, args []string) int {
 		return e.finish(*asJSON, "build", false, []check.Diagnostic{{Severity: check.Error, Code: "CMAKE_NOT_FOUND",
 			Message: "cmake is not installed", Fix: "install CMake 3.13 or later and a C compiler"}}, nil, "")
 	}
-	out := filepath.Join(dir, *buildDir)
+	out := pathFlag(dir, *buildDir, "build")
 	// Build output goes to stderr so that --json keeps stdout to one object.
 	for _, step := range [][]string{{"-S", dir, "-B", out}, {"--build", out}} {
 		cmd := exec.Command(cmake, step...)
@@ -288,8 +294,8 @@ func runBuild(e env, args []string) int {
 
 func runPack(e env, args []string) int {
 	fs, asJSON := newFlags(e, "pack")
-	buildDir := fs.String("build-dir", "build", "build directory holding the program and <screen>.ui.json")
-	outDir := fs.String("out", "dist", "output directory, relative to the project")
+	buildDir := fs.String("build-dir", "", "build directory holding the program and <screen>.ui.json (default: <dir>/build)")
+	outDir := fs.String("out", "", "output directory (default: <dir>/dist)")
 	sdk, python, allowReserved, _ := checkFlags(fs)
 	pos, err := parse(fs, args)
 	if err != nil {
@@ -299,16 +305,13 @@ func runPack(e env, args []string) int {
 	if err != nil {
 		return usageError(e, *asJSON, "pack", err.Error())
 	}
-	sdkDir := *sdk
-	if sdkDir == "" {
-		sdkDir = filepath.Join(dir, "sdk")
-	}
+	sdkDir := pathFlag(dir, *sdk, "sdk")
 	r := check.Project(dir, sdkDir, check.Options{AllowReservedID: *allowReserved, Python: *python, SkipUI: true})
 	if r.HasErrors() {
 		return e.finish(*asJSON, "pack", false, r.Diagnostics, nil, "pack failed: fix the check errors first")
 	}
 	m := r.Manifest
-	build := filepath.Join(dir, *buildDir)
+	build := pathFlag(dir, *buildDir, "build")
 	manifest, err := os.ReadFile(filepath.Join(dir, "plugin.json"))
 	if err != nil {
 		return e.finish(*asJSON, "pack", false, []check.Diagnostic{{Severity: check.Error, Code: "MANIFEST_MISSING", Message: err.Error()}}, nil, "")
@@ -339,7 +342,7 @@ func runPack(e env, args []string) int {
 		code, msg, _ := strings.Cut(err.Error(), ": ")
 		return e.finish(*asJSON, "pack", false, append(diags, check.Diagnostic{Severity: check.Error, Code: code, Message: msg}), nil, "")
 	}
-	out := filepath.Join(dir, *outDir, pack.FileName(m.ID, m.Version))
+	out := filepath.Join(pathFlag(dir, *outDir, "dist"), pack.FileName(m.ID, m.Version))
 	if err := os.MkdirAll(filepath.Dir(out), 0o755); err == nil {
 		err = os.WriteFile(out, data, 0o644)
 	}
