@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Aitbase/aitbase-vision-plugin-sdk/schema/plugin.schema.json",
+  "title": "AITBASE VISION plugin manifest (plugin.json), draft",
+  "description": "aitbase-plugin check enforces these rules and more (source id match, file names, screens). Keep both in sync.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "api_version", "entry", "requested_capabilities"],
+  "properties": {
+    "id": {
+      "description": "Stable plugin id: two or more dot-separated lowercase parts. aitbase.* is reserved for official plugins. Must match AITBASE_PLUGIN_ID(...) in the source.",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$"
+    },
+    "name": {
+      "description": "Display name.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "version": {
+      "description": "Semantic version MAJOR.MINOR.PATCH[-prerelease].",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "api_version": {
+      "description": "Plugin API version the plugin is written against.",
+      "const": 1
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "entry": {
+      "description": "Build target name of the plugin program.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screens": {
+          "description": "Screens in ui/screens/<name>.xml, opened with aitbase_ui_open(p, \"<name>\", ...).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "maxLength": 32, "pattern": "^[a-z][a-z0-9_]*$"}
+        }
+      }
+    },
+    "requested_capabilities": {
+      "description": "Capabilities the plugin asks the device owner to approve. Only \"ui\" is available in this SDK version.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["ui"]}
+    }
+  }
+}

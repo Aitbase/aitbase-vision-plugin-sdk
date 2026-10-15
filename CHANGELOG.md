@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0 — unreleased
+
+Tooling for customers who build plugins with AI coding agents. The plugin API, protocol and UI schema are unchanged from 0.2.0.
+
+- **`aitbase-plugin` CLI** (Go, one binary for Windows, macOS and Linux):
+  - `init` creates a plugin project with a copy of the SDK;
+  - `check` validates the manifest, ids, file names and screens;
+  - `build` runs CMake;
+  - `pack` writes a deterministic `.avp`.
+
+  Every command has `--json` output with stable diagnostic codes ([docs/cli.md](docs/cli.md)). The device commands (`devices`, `pair`, `dev`, `logs`, `screenshot`, `press`, `pack-sd`) are reserved and return `NOT_AVAILABLE`.
+- **Agent-ready project template:** `AGENTS.md`, `CLAUDE.md`, and the `create-plugin`, `plugin-ui-xml` and `debug-on-device` skills.
+- **`llms.txt`** documentation index.
+- **`schema/plugin.schema.json`:** the draft manifest schema.
+- **`docs/package-format.md`:** draft `.avp` package format 0 and the `aitbase/plugins/` SD layout.
+
 ## 0.2.0 — unreleased
 
 This release breaks compatibility with 0.1.0.

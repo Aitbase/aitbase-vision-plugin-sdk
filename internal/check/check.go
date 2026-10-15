@@ -1,0 +1,372 @@
+// Package check validates a plugin project before it is built or packaged.
+//
+// Every finding has a stable Code so that people and coding agents can look it up in
+// docs/cli.md and fix it. Codes are never reused for a different meaning.
+package check
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+)
+
+type Severity string
+
+const (
+	Error   Severity = "error"
+	Warning Severity = "warning"
+)
+
+type Diagnostic struct {
+	Severity Severity `json:"severity"`
+	Code     string   `json:"code"`
+	Path     string   `json:"path,omitempty"`
+	Message  string   `json:"message"`
+	Fix      string   `json:"fix,omitempty"`
+}
+
+// Manifest is the draft plugin.json. Fields are optional here so that a missing field is a
+// diagnostic, not a decode failure.
+type Manifest struct {
+	ID                    string   `json:"id"`
+	Name                  string   `json:"name"`
+	Version               string   `json:"version"`
+	APIVersion            *int     `json:"api_version"`
+	Description           string   `json:"description"`
+	Entry                 string   `json:"entry"`
+	UI                    *UI      `json:"ui"`
+	RequestedCapabilities []string `json:"requested_capabilities"`
+}
+
+type UI struct {
+	Screens []string `json:"screens"`
+}
+
+type Options struct {
+	// AllowReservedID permits the aitbase.* namespace; only official plugins use it (D12).
+	AllowReservedID bool
+	// Python is the interpreter used to run the UI compiler. Empty means search PATH.
+	Python string
+	// SkipUI skips compiling screens.
+	SkipUI bool
+}
+
+type Result struct {
+	Manifest    *Manifest    `json:"-"`
+	Diagnostics []Diagnostic `json:"diagnostics"`
+}
+
+func (r *Result) HasErrors() bool {
+	for _, d := range r.Diagnostics {
+		if d.Severity == Error {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Result) add(sev Severity, code, p, msg, fix string) {
+	r.Diagnostics = append(r.Diagnostics, Diagnostic{sev, code, p, msg, fix})
+}
+
+const SupportedAPIVersion = 1
+
+// Capabilities the device accepts today, and ones that are planned but not available yet.
+var availableCapabilities = map[string]bool{"ui": true}
+var plannedCapabilities = map[string]bool{
+	"camera.capture": true, "camera.preview": true, "microphone.capture": true,
+	"audio.playback": true, "http": true, "mcp": true, "storage": true,
+}
+
+var (
+	idPattern      = regexp.MustCompile(`^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$`)
+	versionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$`)
+	namePattern    = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	sourceIDRegexp = regexp.MustCompile(`AITBASE_PLUGIN_ID\(\s*"([^"]*)"\s*\)`)
+	uiErrorPattern = regexp.MustCompile(`^(UI_[A-Z_]+) at (\S+): (.*)$`)
+	knownFields    = map[string]bool{"id": true, "name": true, "version": true, "api_version": true,
+		"description": true, "entry": true, "ui": true, "requested_capabilities": true}
+)
+
+// Project checks the plugin project rooted at dir. sdkDir is the SDK copy that holds the UI
+// compiler (tools/plugin_ui_compile.py).
+func Project(dir, sdkDir string, opt Options) *Result {
+	r := &Result{}
+	m := checkManifest(r, dir, opt)
+	checkPaths(r, dir, "ui")
+	if m != nil {
+		r.Manifest = m
+		checkSourceID(r, dir, m.ID)
+		if !opt.SkipUI && m.UI != nil {
+			compileScreens(r, dir, sdkDir, m.UI.Screens, opt.Python)
+		}
+	}
+	return r
+}
+
+func checkManifest(r *Result, dir string, opt Options) *Manifest {
+	const file = "plugin.json"
+	data, err := os.ReadFile(filepath.Join(dir, file))
+	if err != nil {
+		r.add(Error, "MANIFEST_MISSING", file, "plugin.json not found", "run the command in the plugin project directory, or create one with `aitbase-plugin init`")
+		return nil
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		r.add(Error, "MANIFEST_JSON", file, "plugin.json is not a JSON object: "+err.Error(), "fix the JSON syntax")
+		return nil
+	}
+	var m Manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		r.add(Error, "MANIFEST_FIELD", file, "a field has the wrong type: "+err.Error(), "compare with schema/plugin.schema.json")
+		return nil
+	}
+	unknown := make([]string, 0)
+	for k := range raw {
+		if !knownFields[k] {
+			unknown = append(unknown, k)
+		}
+	}
+	sort.Strings(unknown)
+	for _, k := range unknown {
+		r.add(Warning, "MANIFEST_UNKNOWN_FIELD", file+"#"+k, "unknown field "+k+" is ignored", "remove it, or check the spelling against schema/plugin.schema.json")
+	}
+
+	if m.ID == "" {
+		r.add(Error, "MANIFEST_FIELD", file+"#id", "id is required", `set "id" to a reverse-DNS name such as "yourname.weather"`)
+	} else if d := IDProblem(m.ID, opt.AllowReservedID); d != nil {
+		d.Path = file + "#id"
+		r.Diagnostics = append(r.Diagnostics, *d)
+	}
+	if m.Name == "" || len(m.Name) > 40 {
+		r.add(Error, "MANIFEST_FIELD", file+"#name", "name is required and must be at most 40 characters", `set "name" to a short display name`)
+	}
+	if !versionPattern.MatchString(m.Version) {
+		r.add(Error, "VERSION_FORMAT", file+"#version", fmt.Sprintf("version %q is not MAJOR.MINOR.PATCH", m.Version), `use semantic versioning, e.g. "1.0.0"`)
+	}
+	if m.APIVersion == nil {
+		r.add(Error, "MANIFEST_FIELD", file+"#api_version", "api_version is required", fmt.Sprintf(`set "api_version": %d`, SupportedAPIVersion))
+	} else if *m.APIVersion != SupportedAPIVersion {
+		r.add(Error, "API_VERSION_UNSUPPORTED", file+"#api_version", fmt.Sprintf("api_version %d is not supported by this SDK", *m.APIVersion), fmt.Sprintf(`set "api_version": %d`, SupportedAPIVersion))
+	}
+	if len(m.Description) > 200 {
+		r.add(Error, "MANIFEST_FIELD", file+"#description", "description must be at most 200 characters", "shorten it")
+	}
+	if !namePattern.MatchString(m.Entry) {
+		r.add(Error, "ENTRY_FORMAT", file+"#entry", fmt.Sprintf("entry %q is not valid", m.Entry), "use the build target name: lowercase letters, digits and '_'")
+	}
+
+	if m.UI != nil {
+		seen := map[string]bool{}
+		for _, s := range m.UI.Screens {
+			p := file + "#ui.screens"
+			switch {
+			case !namePattern.MatchString(s) || len(s) > 32:
+				r.add(Error, "SCREEN_NAME", p, fmt.Sprintf("screen name %q is not valid", s), "use lowercase letters, digits and '_', at most 32 characters")
+			case seen[s]:
+				r.add(Error, "SCREEN_NAME", p, fmt.Sprintf("screen %q is listed twice", s), "list each screen once")
+			default:
+				if _, err := os.Stat(filepath.Join(dir, "ui", "screens", s+".xml")); err != nil {
+					r.add(Error, "SCREEN_MISSING", "ui/screens/"+s+".xml", fmt.Sprintf("screen %q has no file", s), "create ui/screens/"+s+".xml or remove it from ui.screens")
+				}
+			}
+			seen[s] = true
+		}
+	}
+
+	hasUI := false
+	for _, c := range m.RequestedCapabilities {
+		p := file + "#requested_capabilities"
+		switch {
+		case availableCapabilities[c]:
+			hasUI = hasUI || c == "ui"
+		case plannedCapabilities[c]:
+			r.add(Error, "CAPABILITY_UNAVAILABLE", p, fmt.Sprintf("capability %q is planned but no device supports it yet", c), "remove it; this SDK version only supports \"ui\"")
+		default:
+			r.add(Error, "CAPABILITY_UNKNOWN", p, fmt.Sprintf("capability %q does not exist", c), "remove it; this SDK version only supports \"ui\"")
+		}
+	}
+	if m.UI != nil && len(m.UI.Screens) > 0 && !hasUI {
+		r.add(Error, "CAPABILITY_UI_MISSING", file+"#requested_capabilities", "the plugin has screens but does not request \"ui\"", `add "ui" to requested_capabilities`)
+	}
+	return &m
+}
+
+// IDProblem reports why id can't be a plugin id, or nil.
+func IDProblem(id string, allowReserved bool) *Diagnostic {
+	switch {
+	case len(id) > 64 || !idPattern.MatchString(id):
+		return &Diagnostic{Error, "ID_FORMAT", "", fmt.Sprintf("id %q is not valid", id),
+			"use at least two dot-separated parts of lowercase letters, digits, '-' or '_', at most 64 characters, e.g. \"yourname.weather\""}
+	case strings.HasPrefix(id, "aitbase.") && !allowReserved:
+		return &Diagnostic{Error, "ID_RESERVED", "", "the aitbase.* namespace is reserved for official plugins",
+			"use your own prefix, e.g. \"yourname." + strings.TrimPrefix(id, "aitbase.") + "\""}
+	}
+	return nil
+}
+
+// Windows device names, which can't be created as files on Windows.
+var reservedNames = map[string]bool{"con": true, "prn": true, "aux": true, "nul": true,
+	"com1": true, "com2": true, "com3": true, "com4": true, "com5": true, "com6": true, "com7": true, "com8": true, "com9": true,
+	"lpt1": true, "lpt2": true, "lpt3": true, "lpt4": true, "lpt5": true, "lpt6": true, "lpt7": true, "lpt8": true, "lpt9": true}
+
+// CheckPackagePath reports why rel (slash-separated) can't be stored in a package, or "".
+// Packages must unpack identically on Windows, macOS and Linux (D12).
+func CheckPackagePath(rel string) (code, msg string) {
+	for _, part := range strings.Split(rel, "/") {
+		if part == "" || part == "." || part == ".." {
+			return "PATH_CHARS", "empty, '.' or '..' path component"
+		}
+		for _, ch := range part {
+			ok := ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '.' || ch == '-' || ch == '_'
+			if !ok {
+				return "PATH_CHARS", "use ASCII letters, digits, '.', '-' and '_' only"
+			}
+		}
+		if strings.HasSuffix(part, ".") || strings.HasSuffix(part, " ") {
+			return "PATH_TRAILING", "a name ends with '.' or a space, which Windows drops"
+		}
+		base := strings.ToLower(part)
+		if i := strings.IndexByte(base, '.'); i >= 0 {
+			base = base[:i]
+		}
+		if reservedNames[base] {
+			return "PATH_RESERVED_NAME", fmt.Sprintf("%q is a reserved name on Windows", part)
+		}
+	}
+	return "", ""
+}
+
+// checkPaths walks dir/sub and reports names that would not survive packaging on every OS.
+func checkPaths(r *Result, dir, sub string) {
+	root := filepath.Join(dir, sub)
+	if _, err := os.Stat(root); err != nil {
+		return
+	}
+	lower := map[string]string{}
+	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(dir, p)
+		rel = filepath.ToSlash(rel)
+		if d.Type()&os.ModeSymlink != 0 {
+			r.add(Error, "FILE_SYMLINK", rel, "symbolic links are not allowed in a plugin", "replace the link with the file itself")
+			return nil
+		}
+		if code, msg := CheckPackagePath(rel); code != "" {
+			r.add(Error, code, rel, msg, "rename the file")
+		}
+		key := strings.ToLower(rel)
+		if other, ok := lower[key]; ok {
+			r.add(Error, "PATH_CASE_COLLISION", rel, "differs from "+other+" only by letter case", "rename one of them; Windows treats them as the same file")
+		} else {
+			lower[key] = rel
+		}
+		return nil
+	})
+}
+
+// checkSourceID verifies that AITBASE_PLUGIN_ID in src/ matches the manifest.
+func checkSourceID(r *Result, dir, id string) {
+	var found []string
+	_ = filepath.WalkDir(filepath.Join(dir, "src"), func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if ext := path.Ext(d.Name()); ext != ".c" && ext != ".h" {
+			return nil
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(dir, p)
+		for _, m := range sourceIDRegexp.FindAllSubmatch(data, -1) {
+			found = append(found, filepath.ToSlash(rel))
+			if string(m[1]) != id {
+				r.add(Error, "SOURCE_ID_MISMATCH", filepath.ToSlash(rel), fmt.Sprintf("AITBASE_PLUGIN_ID(%q) does not match id %q in plugin.json", m[1], id), "make them the same")
+			}
+		}
+		return nil
+	})
+	switch {
+	case len(found) == 0:
+		r.add(Error, "SOURCE_ID_MISSING", "src", "no AITBASE_PLUGIN_ID(...) in src/", fmt.Sprintf("add AITBASE_PLUGIN_ID(%q); once, at file scope", id))
+	case len(found) > 1:
+		r.add(Error, "SOURCE_ID_DUPLICATE", found[1], "AITBASE_PLUGIN_ID is used more than once", "keep a single AITBASE_PLUGIN_ID in one source file")
+	}
+}
+
+// FindPython returns a Python 3 interpreter on PATH, or "".
+func FindPython() string {
+	for _, name := range []string{"python3", "python", "py"} {
+		if p, err := exec.LookPath(name); err == nil {
+			out, err := exec.Command(p, "-c", "import sys; print(sys.version_info[0])").Output()
+			if err == nil && strings.TrimSpace(string(out)) == "3" {
+				return p
+			}
+		}
+	}
+	return ""
+}
+
+// compileScreens runs the SDK UI compiler on each screen and turns its UI_* errors into
+// diagnostics. TODO(D12): port the compiler into the CLI so Python is not needed.
+func compileScreens(r *Result, dir, sdkDir string, screens []string, python string) {
+	if len(screens) == 0 {
+		return
+	}
+	if python == "" {
+		python = FindPython()
+	}
+	compiler := filepath.Join(sdkDir, "tools", "plugin_ui_compile.py")
+	if python == "" {
+		r.add(Warning, "UI_COMPILER_UNAVAILABLE", "ui", "Python 3 not found, so screens were not compiled", "install Python 3.8 or later, or pass --python")
+		return
+	}
+	if _, err := os.Stat(compiler); err != nil {
+		r.add(Warning, "UI_COMPILER_UNAVAILABLE", "ui", "UI compiler not found at "+compiler, "pass --sdk with the SDK directory, or keep the sdk/ folder that `init` created")
+		return
+	}
+	tmp, err := os.MkdirTemp("", "aitbase-check-")
+	if err != nil {
+		r.add(Warning, "UI_COMPILER_UNAVAILABLE", "ui", "cannot create a temporary directory: "+err.Error(), "")
+		return
+	}
+	defer os.RemoveAll(tmp)
+	for _, s := range screens {
+		if !namePattern.MatchString(s) {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(dir, "ui", "screens", s+".xml")); err != nil {
+			continue // already reported as SCREEN_MISSING
+		}
+		var stderr bytes.Buffer
+		cmd := exec.Command(python, "-I", compiler, filepath.Join(dir, "ui"), s, filepath.Join(tmp, s+".ui.json"))
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err == nil {
+			continue
+		}
+		msg := strings.TrimSpace(stderr.String())
+		if m := uiErrorPattern.FindStringSubmatch(lastLine(msg)); m != nil {
+			r.add(Error, m[1], "ui/"+m[2], m[3], "see docs/ui-xml.md for what is accepted")
+		} else {
+			r.add(Error, "UI_COMPILE", "ui/screens/"+s+".xml", msg, "see docs/ui-xml.md for what is accepted")
+		}
+	}
+}
+
+func lastLine(s string) string {
+	if i := strings.LastIndexByte(s, '\n'); i >= 0 {
+		return s[i+1:]
+	}
+	return s
+}
