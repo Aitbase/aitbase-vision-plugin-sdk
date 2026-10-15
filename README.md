@@ -2,7 +2,30 @@
 
 Build plugins that put their own screen on an AITBASE VISION device.
 
-> **Status: 0.2.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Running plugins currently needs a device on development firmware, and release firmware does not load plugins yet.
+> **Status: 0.3.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Running plugins currently needs a device on development firmware, and release firmware does not load plugins yet.
+
+## Quick start
+
+```sh
+go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@latest   # until binaries are released
+aitbase-plugin init my-plugin --id yourname.my-plugin
+cd my-plugin
+aitbase-plugin check
+aitbase-plugin build
+aitbase-plugin pack       # dist/yourname.my-plugin-0.1.0.avp
+```
+
+The new project is ready for AI coding agents:
+- **`AGENTS.md` and `CLAUDE.md`:** what plugins can and cannot do, and the check/build loop.
+- **Task skills** in `.agents/skills/` and `.claude/skills/`.
+- **`--json` output** on every command, with stable [diagnostic codes](docs/cli.md#diagnostic-codes).
+
+The project also includes a copy of this SDK in `sdk/`, so it builds without git or network access.
+
+**Platforms:**
+- `init`, `check` and `pack` run on Windows, macOS and Linux.
+- `build` needs CMake, a C compiler and Python 3.8+.
+- The development runtime that runs a plugin is POSIX only until plugins move to WebAssembly.
 
 ## What is in the SDK
 
@@ -15,6 +38,11 @@ Build plugins that put their own screen on an AITBASE VISION device.
 | `tools/plugin_ui_compile.py` | The compiler from plugin UI XML (LVGL 9.4 conventions, [reference](docs/ui-xml.md)) to the device's `aitbase.plugin-ui` document. |
 | `tools/plugin_ui_registry.py` | Generates the device validator header and `aitbase_globals.xml` from the schema. |
 | `cmake/AitbasePluginUi.cmake` | `aitbase_plugin_add_ui()`, which compiles screens as part of a CMake build. |
+| `cmd/aitbase-plugin/` | The `aitbase-plugin` CLI ([reference](docs/cli.md)). |
+| `template/` | The project that `aitbase-plugin init` creates, including its agent instructions and skills. |
+| `schema/plugin.schema.json` | The `plugin.json` manifest schema (draft). |
+| `docs/package-format.md` | The `.avp` package format (draft) and SD card layout. |
+| `llms.txt` | An index of these docs for AI agents. |
 
 ## How a plugin works
 
@@ -80,17 +108,21 @@ For a device build, pass your device's cross toolchain file (`-DCMAKE_TOOLCHAIN_
 ## Building and testing the SDK
 
 ```bash
+go vet ./... && go test ./...
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+Contributors: see [AGENTS.md](AGENTS.md).
 
 ## Roadmap
 
 These items are planned, not implemented:
 - **WASM:** plugins compiled to WebAssembly, running sandboxed on the device, with the same callbacks and calls.
 - **More capabilities:** camera, audio, HTTP, storage and MCP tools, each behind explicit user permission.
-- **Packaging and installation:** a package format with a manifest, signing, installation from the device's web console, and the `aitbase-plugin` CLI (`init`, `build`, `check`, `dev`).
+- **Installation and device tools:** signed packages, installation from the SD card (`aitbase/plugins/`) and the device's web console, and the CLI device commands (`pair`, `dev`, `logs`, `screenshot`, `press`).
+- **No Python or C toolchain to install:** the UI compiler built into the CLI, and the WASM toolchain downloaded automatically.
 - **Richer UI:** a larger UI schema (more widgets, styles and bindings).
 
 ## License
