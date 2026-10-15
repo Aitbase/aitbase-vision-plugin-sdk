@@ -1,0 +1,83 @@
+# Publishes a GitHub release with CLI binaries when a version tag (v0.3.0) is pushed.
+#
+# Before tagging: set Version in sdkfiles.go and project(... VERSION) in CMakeLists.txt, and give
+# the version's CHANGELOG.md heading a date instead of "unreleased". The verify job refuses to
+# publish otherwise.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - id: version
+        name: Check the tag matches the SDK version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          go_version=$(sed -n 's/^const Version = "\(.*\)"$/\1/p' sdkfiles.go)
+          cmake_version=$(sed -n 's/^project(aitbase_vision_plugin_sdk VERSION \([^ ]*\) .*/\1/p' CMakeLists.txt)
+          heading=$(grep -m1 "^## ${version} " CHANGELOG.md || true)
+          echo "tag=$tag go=$go_version cmake=$cmake_version changelog='$heading'"
+          [ "$go_version" = "$version" ] || { echo "::error::sdkfiles.go Version is $go_version, tag is $tag"; exit 1; }
+          [ "$cmake_version" = "$version" ] || { echo "::error::CMakeLists.txt VERSION is $cmake_version, tag is $tag"; exit 1; }
+          [ -n "$heading" ] || { echo "::error::CHANGELOG.md has no '## $version' section"; exit 1; }
+          case "$heading" in *unreleased*) echo "::error::CHANGELOG.md still says $version is unreleased"; exit 1;; esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Test
+        run: |
+          go vet ./...
+          go test ./...
+
+  binaries:
+    needs: verify
+    uses: ./.github/workflows/cli-binaries.yml
+
+  publish:
+    needs: [verify, binaries]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: aitbase-plugin
+          path: dist
+      - name: Write release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## " v " " { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          cat >> notes.md <<'NOTES'
+
+          ## Install the CLI
+
+          Download the `aitbase-plugin` file for your system below, check it against `SHA256SUMS`, and put it on your `PATH`. See [docs/cli.md](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/cli.md#install).
+          NOTES
+          cat notes.md
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          prerelease=
+          case "$VERSION" in 0.*|*-*) prerelease=--prerelease;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag --title "SDK $VERSION" --notes-file notes.md $prerelease

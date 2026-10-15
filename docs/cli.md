@@ -6,7 +6,30 @@
 
 ## Install
 
-Until releases are published, build it with Go 1.22 or later:
+Download the file for your system from the [latest release](https://github.com/Aitbase/aitbase-vision-plugin-sdk/releases):
+
+| System | File |
+|---|---|
+| Windows | `aitbase-plugin-windows-amd64.exe` (`-arm64.exe` on ARM) |
+| macOS, Apple silicon | `aitbase-plugin-darwin-arm64` |
+| macOS, Intel | `aitbase-plugin-darwin-amd64` |
+| Linux | `aitbase-plugin-linux-amd64` (`-arm64` on ARM) |
+
+Then:
+1. **Check the download.** Compare its SHA-256 with the line in `SHA256SUMS`:
+   - Windows: `Get-FileHash <file>`;
+   - macOS: `shasum -a 256 <file>`;
+   - Linux: `sha256sum <file>`.
+2. **Rename it** to `aitbase-plugin` (`aitbase-plugin.exe` on Windows) and put it in a folder on your `PATH`.
+3. **macOS and Linux:** make it executable with `chmod +x aitbase-plugin`.
+4. **Allow the unsigned binary:**
+   - macOS blocks downloaded unsigned programs. Remove the quarantine flag with `xattr -d com.apple.quarantine aitbase-plugin`.
+   - Windows SmartScreen may warn on first run.
+
+   The binaries are not code-signed yet.
+5. **Confirm it works** with `aitbase-plugin version`.
+
+With Go 1.22 or later, you can instead build it from source:
 
 ```sh
 go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@latest
@@ -18,8 +41,8 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 |---|---|
 | `init <dir> --id <id> [--name <name>]` | Creates a plugin project: code, a screen, `AGENTS.md`, agent skills and a copy of the SDK in `sdk/`. |
 | `check [dir]` | Validates `plugin.json`, ids, file names and screens. |
-| `build [dir] [--build-dir build]` | Configures and builds with CMake. Build output goes to stderr. |
-| `pack [dir] [--build-dir build] [--out dist]` | Writes `dist/<id>-<version>.avp` and prints its SHA-256. |
+| `build [dir] [--build-dir <path>]` | Configures and builds with CMake (default build directory `<dir>/build`). Build output goes to stderr. |
+| `pack [dir] [--build-dir <path>] [--out <path>]` | Reads the program and compiled screens from the build directory (default `<dir>/build`), writes `<id>-<version>.avp` to the output directory (default `<dir>/dist`), and prints its SHA-256. |
 | `version` | Prints the SDK version. |
 
 `check` and `pack` also accept:
@@ -29,7 +52,7 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 
 `check` also accepts `--skip-ui`, which skips compiling screens.
 
-Flags may come before or after the directory.
+Flags may come before or after the directory. Paths given to `--sdk`, `--build-dir` and `--out` are relative to the current directory, or absolute; only the defaults are inside the project.
 
 ## JSON output
 
