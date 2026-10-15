@@ -2,19 +2,29 @@
 #define AITBASE_PLUGIN_H
 
 /*
- * AITBASE VISION plugin API (C), version 0 — experimental, will change before 1.0.
+ * AITBASE VISION plugin API (C), API version 1 — preview, may still change before SDK 1.0.
  *
- * A plugin owns one screen on the device. The device owns rendering, focus and the exit gesture:
- * the user moves focus with LEFT, activates with RIGHT and leaves with a LEFT long press. The
- * device may take the screen back at any time (voice assistant, settings...), which the plugin
- * sees as AITBASE_EVENT_PREEMPTED.
+ * A plugin is a set of callbacks. The runtime owns the loop: it starts the plugin, delivers one
+ * event at a time to aitbase_on_event() and returns when the plugin stops. Callbacks must return
+ * promptly; nothing in this API blocks. This is the model the WASM runtime uses, so plugins written
+ * against it run unchanged when they are compiled to WebAssembly.
  *
- * Plugins talk only to this API. In v0 it is implemented over the development bridge socket of a
- * developer-enabled device; the planned WASM runtime implements the same calls, so plugin code
- * written against this header does not depend on the transport.
+ * A plugin owns at most one screen. The device owns rendering, focus and the exit gesture: LEFT
+ * moves focus, RIGHT activates the focused widget, LEFT long press always leaves. The device may
+ * take the screen back at any time (voice assistant, settings...), reported as
+ * AITBASE_EVENT_PREEMPTED.
  *
- * Calls are asynchronous: a request returns once it is sent, and its outcome arrives as an event
- * from aitbase_plugin_next_event(). Functions return 0 on success or a negative aitbase_status_t.
+ * Requests return once they are queued; failures arrive later as AITBASE_EVENT_ERROR.
+ * Functions return 0 on success or a negative aitbase_status_t.
+ *
+ * Minimal plugin:
+ *
+ *   #include "aitbase_plugin.h"
+ *   AITBASE_PLUGIN_ID("example.hello");
+ *   int aitbase_on_start(aitbase_plugin_t *p) { return aitbase_ui_open(p, "hello", 0); }
+ *   void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
+ *       if (ev->kind == AITBASE_EVENT_PREEMPTED) aitbase_plugin_stop(p);
+ *   }
  */
 
 #include <stddef.h>
@@ -24,19 +34,19 @@
 extern "C" {
 #endif
 
-#define AITBASE_PLUGIN_API_VERSION 0
+#define AITBASE_PLUGIN_API_VERSION 1
 
-/* Longest wait accepted by aitbase_ui_open(); the device clamps larger values. */
+/* Longest wait accepted by aitbase_ui_open(); larger values are clamped. */
 #define AITBASE_UI_MAX_WAIT_MS 30000u
 
 typedef enum aitbase_status {
     AITBASE_OK = 0,
-    AITBASE_ERR_ARGUMENT = -1,   /* NULL or oversized argument */
-    AITBASE_ERR_CONNECT = -2,    /* device endpoint unavailable */
-    AITBASE_ERR_IO = -3,         /* connection lost */
-    AITBASE_ERR_PROTOCOL = -4,   /* malformed message from the device */
+    AITBASE_ERR_ARGUMENT = -1,  /* NULL, malformed or oversized argument */
+    AITBASE_ERR_CONNECT = -2,   /* the device is unavailable */
+    AITBASE_ERR_IO = -3,        /* connection to the device lost */
+    AITBASE_ERR_PROTOCOL = -4,  /* the device speaks an unsupported protocol */
     AITBASE_ERR_NO_MEMORY = -5,
-    AITBASE_ERR_FILE = -6,       /* cannot read the compiled UI file */
+    AITBASE_ERR_NOT_FOUND = -6, /* no compiled screen with that name in the plugin package */
 } aitbase_status_t;
 
 typedef enum aitbase_event_kind {
@@ -48,6 +58,7 @@ typedef enum aitbase_event_kind {
     AITBASE_EVENT_ACTION = 5,          /* the user activated node; action is its registered action */
     AITBASE_EVENT_UPDATE_REJECTED = 6, /* an update to node was refused; see detail */
     AITBASE_EVENT_ERROR = 7,           /* a request failed; op names it, status/detail say why */
+    AITBASE_EVENT_TIMER = 8,           /* the interval set with aitbase_timer_set() elapsed */
 } aitbase_event_kind_t;
 
 typedef struct aitbase_event {
@@ -59,30 +70,56 @@ typedef struct aitbase_event {
     char detail[65];
 } aitbase_event_t;
 
+typedef enum aitbase_log_level {
+    AITBASE_LOG_ERROR = 0,
+    AITBASE_LOG_WARN = 1,
+    AITBASE_LOG_INFO = 2,
+    AITBASE_LOG_DEBUG = 3,
+} aitbase_log_level_t;
+
 typedef struct aitbase_plugin aitbase_plugin_t;
 
-/* Connects to the device. endpoint is NULL for the default. Returns NULL on failure. */
-aitbase_plugin_t *aitbase_plugin_connect(const char *endpoint);
-/* Disconnects; the device closes this plugin's screen. Accepts NULL. */
-void aitbase_plugin_disconnect(aitbase_plugin_t *plugin);
+/* Plugin identity, matching "id" in plugin.json. Use once at file scope. */
+#define AITBASE_PLUGIN_ID(id) const char aitbase_plugin_id[] = id
+extern const char aitbase_plugin_id[];
 
-/* Opens the plugin screen from a compiled aitbase.plugin-ui JSON document.
- * wait_ms = 0 fails if the device is busy; a nonzero wait (max AITBASE_UI_MAX_WAIT_MS) lets the
- * open wait for the voice assistant to finish, which is what voice-started plugins should use. */
-int aitbase_ui_open(aitbase_plugin_t *plugin, const char *ui_json, size_t len, uint32_t wait_ms);
-/* Same as aitbase_ui_open() with the document read from a file (aitbase-plugin-ui compiler output). */
-int aitbase_ui_open_file(aitbase_plugin_t *plugin, const char *path, uint32_t wait_ms);
-/* Sets a bound value. node is the compiled node id (e.g. "status.title"), key the binding key. */
+/* --- Callbacks the plugin implements ---------------------------------------------------------- */
+
+/* Called once after the runtime connects. Open the screen here. Nonzero stops the plugin. */
+int aitbase_on_start(aitbase_plugin_t *plugin);
+/* Called for every event, one at a time. */
+void aitbase_on_event(aitbase_plugin_t *plugin, const aitbase_event_t *event);
+/* Optional: called once before the plugin exits, for any reason. */
+void aitbase_on_stop(aitbase_plugin_t *plugin);
+
+/* --- Screen ------------------------------------------------------------------------------------ */
+
+/* Opens a screen compiled from the plugin's ui/screens/<screen>.xml.
+ * wait_ms = 0 fails with REJECTED if the device is busy. A nonzero wait (up to
+ * AITBASE_UI_MAX_WAIT_MS) lets the open wait for the voice assistant to finish; voice-started
+ * plugins should use one. */
+int aitbase_ui_open(aitbase_plugin_t *plugin, const char *screen, uint32_t wait_ms);
+/* Sets a bound value. node is the widget's full name ("status.title" for <lv_label name="title">
+ * inside the component instance "status"); key is its bind_text subject. */
 int aitbase_ui_update(aitbase_plugin_t *plugin, const char *node, const char *key,
                       const char *type, const char *value);
-/* Convenience for string bindings: aitbase_ui_update(plugin, node, key, "string", text). */
+/* aitbase_ui_update(plugin, node, key, "string", text). */
 int aitbase_ui_set_text(aitbase_plugin_t *plugin, const char *node, const char *key,
                         const char *text);
 int aitbase_ui_close(aitbase_plugin_t *plugin);
 
-/* Waits up to timeout_ms (-1 = forever) for the next event.
- * Returns 1 with *out filled, 0 on timeout, or a negative aitbase_status_t. */
-int aitbase_plugin_next_event(aitbase_plugin_t *plugin, aitbase_event_t *out, int timeout_ms);
+/* --- Plugin ------------------------------------------------------------------------------------ */
+
+/* Delivers AITBASE_EVENT_TIMER every interval_ms (minimum 10). 0 stops the timer. */
+int aitbase_timer_set(aitbase_plugin_t *plugin, uint32_t interval_ms);
+/* Stops the plugin after the current callback returns; its screen is closed. */
+void aitbase_plugin_stop(aitbase_plugin_t *plugin);
+/* Writes a line to the plugin log on the device. */
+void aitbase_log(aitbase_plugin_t *plugin, aitbase_log_level_t level, const char *fmt, ...)
+#if defined(__GNUC__)
+    __attribute__((format(printf, 3, 4)))
+#endif
+    ;
 
 const char *aitbase_event_kind_name(aitbase_event_kind_t kind);
 

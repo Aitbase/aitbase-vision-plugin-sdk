@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.0 — unreleased
+
+This release breaks compatibility with 0.1.0.
+
+- **Plugin API version 1.** Plugins now implement callbacks (`aitbase_on_start`, `aitbase_on_event`, optional `aitbase_on_stop`) and declare `AITBASE_PLUGIN_ID`. The SDK owns the event loop and `main()`. This is the run-to-completion model the WASM runtime will use.
+- **Screens open by name:** `aitbase_ui_open(p, "<screen>", wait_ms)`. `aitbase_ui_open_file()`, `aitbase_plugin_connect()` and `aitbase_plugin_next_event()` were removed.
+- **New calls:** `aitbase_timer_set()`, `aitbase_plugin_stop()` and `aitbase_log()`.
+- **Protocol version 1:**
+  - a `system.hello` handshake with protocol and API versions;
+  - request `id`s with matching replies;
+  - a `{cap, op, args}` envelope;
+  - events as `{cap, event, data}`.
+
+  See `docs/plugin-protocol.md`.
+- **UI XML now follows LVGL 9.4 conventions:**
+  - `ui/screens/`, `ui/components/` and `globals.xml`;
+  - the widgets `lv_obj`, `lv_label`, `lv_button` and `lv_image`;
+  - `name=`, `style_bg_color`/`style_text_color`/`style_pad_all`, and `#token` colors;
+  - `bind_text`, `<event_cb … callback="aitbase_action" user_data="<action>">`, and component `<api><prop>` with `$prop`.
+
+  The compiled device document is unchanged (`aitbase.plugin-ui` v1).
+- **Registry:**
+  - named color tokens (`color_token_names`);
+  - `tools/plugin_ui_registry.py --globals` generates `schema/aitbase_globals.xml`.
+- **CMake:** `aitbase_plugin_add_ui(<target> SCREENS ...)` produces `<screen>.ui.json` next to the binary.
+
+
 ## 0.1.0 — unreleased
 
 The first public preview. It is experimental, and the API and UI schema will change before 1.0.
