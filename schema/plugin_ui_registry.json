@@ -1,0 +1,38 @@
+{
+  "format": "aitbase.plugin-ui",
+  "version": 1,
+  "limits": {
+    "max_representation_bytes": 16384,
+    "max_json_nesting": 32,
+    "max_nodes": 32,
+    "max_depth": 6,
+    "max_text": 80,
+    "max_id": 32,
+    "max_asset_path": 96,
+    "max_assets": 4,
+    "max_asset_bytes": 8192,
+    "max_image_dimension": 32,
+    "max_pending_updates": 16,
+    "max_events": 16
+  },
+  "int_props": {
+    "x": [-320, 320],
+    "y": [-320, 320],
+    "width": [1, 320],
+    "height": [1, 320],
+    "padding": [0, 320]
+  },
+  "color_props": ["background", "color"],
+  "color_tokens": ["#101820", "#ffffff", "#00e5ff", "#334455"],
+  "widgets": {
+    "container": {"props": [], "children": true, "requires_action": false},
+    "label": {"props": ["text"], "children": false, "requires_action": false},
+    "button": {"props": [], "children": true, "requires_action": true},
+    "image": {"props": ["src"], "children": false, "requires_action": false}
+  },
+  "events": ["activate"],
+  "actions": ["plugin.increment"],
+  "bindings": [
+    {"widget": "label", "property": "text", "key": "title", "type": "string"}
+  ]
+}
