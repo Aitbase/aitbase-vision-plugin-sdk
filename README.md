@@ -7,7 +7,7 @@ Build plugins that put their own screen on an AITBASE VISION device.
 ## Quick start
 
 ```sh
-go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@latest   # until binaries are released
+# Install aitbase-plugin from the releases page first: docs/cli.md#install
 aitbase-plugin init my-plugin --id yourname.my-plugin
 cd my-plugin
 aitbase-plugin check
