@@ -24,6 +24,7 @@
   },
   "color_props": ["background", "color"],
   "color_tokens": ["#101820", "#ffffff", "#00e5ff", "#334455"],
+  "color_token_names": {"surface": "#101820", "on_surface": "#ffffff", "accent": "#00e5ff", "control": "#334455"},
   "widgets": {
     "container": {"props": [], "children": true, "requires_action": false},
     "label": {"props": ["text"], "children": false, "requires_action": false},
