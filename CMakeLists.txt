@@ -8,6 +8,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/AitbasePluginUi.cmake)
 
 # Plugins link this and implement the callbacks in aitbase_plugin.h; the library provides main().
 add_library(aitbase_plugin STATIC
+  src/aitbase_plugin_defaults.c
   src/aitbase_plugin_dev.c
   src/aitbase_plugin_main.c
   third_party/cjson/cJSON.c

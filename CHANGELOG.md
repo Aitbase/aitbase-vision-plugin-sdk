@@ -15,6 +15,7 @@ Tooling for customers who build plugins with AI coding agents. The plugin API, p
 - **`llms.txt`** documentation index.
 - **`schema/plugin.schema.json`:** the draft manifest schema.
 - **`docs/package-format.md`:** draft `.avp` package format 0 and the `aitbase/plugins/` SD layout.
+- **Fix:** plugins that don't define the optional `aitbase_on_stop` now link on macOS. The runtime used a weak declaration, which Apple's linker rejects when unresolved; a no-op default now lives in its own library object (`src/aitbase_plugin_defaults.c`).
 
 ## 0.2.0 — unreleased
 
