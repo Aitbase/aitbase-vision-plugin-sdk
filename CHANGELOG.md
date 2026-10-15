@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.3.0 — unreleased
+## 0.3.0 — 2026-10-16
+
+The first public release.
 
 Tooling for customers who build plugins with AI coding agents. The plugin API, protocol and UI schema are unchanged from 0.2.0.
 
@@ -19,7 +21,7 @@ Tooling for customers who build plugins with AI coding agents. The plugin API, p
 - **Releases:** pushing a `v*` tag publishes the CLI binaries for six platforms with `SHA256SUMS` ([install](docs/cli.md#install)).
 - **Fix:** plugins that don't define the optional `aitbase_on_stop` now link on macOS. The runtime used a weak declaration, which Apple's linker rejects when unresolved; a no-op default now lives in its own library object (`src/aitbase_plugin_defaults.c`).
 
-## 0.2.0 — unreleased
+## 0.2.0 — not released separately; included in 0.3.0
 
 This release breaks compatibility with 0.1.0.
 
@@ -46,7 +48,7 @@ This release breaks compatibility with 0.1.0.
 - **CMake:** `aitbase_plugin_add_ui(<target> SCREENS ...)` produces `<screen>.ui.json` next to the binary.
 
 
-## 0.1.0 — unreleased
+## 0.1.0 — not released separately; included in 0.3.0
 
 The first public preview. It is experimental, and the API and UI schema will change before 1.0.
 
