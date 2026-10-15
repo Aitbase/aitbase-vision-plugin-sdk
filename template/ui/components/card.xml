@@ -1,0 +1,8 @@
+<component>
+  <api>
+    <prop name="title" type="string" default="__PLUGIN_NAME__"/>
+  </api>
+  <view style_bg_color="#surface" style_pad_all="8">
+    <lv_label name="title" text="$title" style_text_color="#on_surface" bind_text="title"/>
+  </view>
+</component>

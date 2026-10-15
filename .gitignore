@@ -1,3 +1,6 @@
 /build/
 __pycache__/
 *.pyc
+/dist/
+/aitbase-plugin
+/aitbase-plugin.exe

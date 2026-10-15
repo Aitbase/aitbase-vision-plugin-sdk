@@ -1,0 +1,72 @@
+# AITBASE VISION plugin: instructions for coding agents
+
+This project is a plugin for an AITBASE VISION camera robot. The person you are helping owns the device and may not be a programmer. Keep changes small, run the checks below after every change, and explain results in plain language.
+
+You do not have, and do not need, the device firmware source. Everything you need is in this project and in `sdk/` (SDK __SDK_VERSION__).
+
+## What a plugin is
+
+- A plugin is C code that implements callbacks, plus screens written in a restricted XML.
+- The device draws the screens itself. The plugin only opens a screen, sets bound values and reacts to events.
+- A plugin **cannot** use files, sockets, threads, `sleep`, `system()`, `/dev`, LVGL or any OS API. There is no workaround. If the user asks for something that needs one of these, say it is not possible with this SDK version.
+- Callbacks must return quickly. Never block or loop waiting. For periodic work, use `aitbase_timer_set()` and handle `AITBASE_EVENT_TIMER`.
+- Do not write `main()`. The SDK provides it.
+
+## What this SDK version supports
+
+Only what is listed here exists. Do not invent functions, widgets, colors, actions or capabilities.
+
+- **Capability:** only `"ui"`. Camera, microphone, audio, HTTP, storage and MCP tools are planned but not available. `aitbase-plugin check` rejects them.
+- **API:** `sdk/include/aitbase_plugin.h`. Read it before writing code. Functions: `aitbase_ui_open`, `aitbase_ui_update`, `aitbase_ui_set_text`, `aitbase_ui_close`, `aitbase_timer_set`, `aitbase_plugin_stop`, `aitbase_log`, `aitbase_event_kind_name`.
+- **UI:** widgets `lv_obj`, `lv_label`, `lv_button`, `lv_image`. Four colors: `#surface`, `#on_surface`, `#accent`, `#control`. One bindable subject: `title`. One action: `plugin.increment`. Full rules: the `plugin-ui-xml` skill and `sdk/schema/plugin_ui_registry.json`.
+- **Screen:** 240×320 pixels.
+
+## Input: two buttons, no touch
+
+The device has two physical buttons and no touchscreen.
+- LEFT moves focus to the next button on screen.
+- RIGHT activates the focused button. The plugin gets `AITBASE_EVENT_ACTION`.
+- A LEFT long press always leaves the plugin. The plugin gets `AITBASE_EVENT_PREEMPTED` and should stop.
+
+Design every screen for this: a few large buttons in a sensible order, no text input, no scrolling lists.
+
+## Project layout
+
+| Path | What it is |
+|---|---|
+| `plugin.json` | Manifest. `id` must match `AITBASE_PLUGIN_ID(...)` in `src/`. `ui.screens` must match `SCREENS` in `CMakeLists.txt`. |
+| `src/main.c` | Callbacks. |
+| `ui/screens/<name>.xml` | One file per screen, opened with `aitbase_ui_open(p, "<name>", ...)`. |
+| `ui/components/<name>.xml` | Reusable components. |
+| `ui/globals.xml`, `ui/assets/` | Optional images (RGB565, at most 32×32). |
+| `sdk/` | The SDK. Do not edit it. |
+
+## The loop: change, check, build
+
+Run these after every change, from the project directory. Use `--json` and read the `diagnostics`: each has a stable `code`, a `path` and a `fix`.
+
+```sh
+aitbase-plugin check --json     # manifest, ids, file names, screens
+aitbase-plugin build --json     # compiles C and screens with CMake
+aitbase-plugin pack --json      # writes dist/<id>-<version>.avp
+```
+
+Fix every `error` before continuing. Do not silence a check by removing the feature the user asked for without telling them.
+
+## Testing on a device
+
+There is no simulator, so a successful build does not prove the plugin works. Only the device shows that.
+
+In this SDK version, running a plugin needs a device with **development firmware** and a cross-compiled build. See `sdk/README.md`. The commands `dev`, `logs`, `screenshot` and `press` are planned and currently return `NOT_AVAILABLE`. Do not try to work around this. Tell the user what to check on the device and ask them what they see.
+
+## Security rules
+
+- Never ask the user for the device password, and never put it in a file, command or environment variable. When device pairing exists, the user runs `aitbase-plugin pair` themselves.
+- Do not use an id starting with `aitbase.`. It is reserved for official plugins.
+
+## Skills
+
+Task guides are in `.agents/skills/` (also in `.claude/skills/`):
+- `create-plugin`: turn a request into a working plugin.
+- `plugin-ui-xml`: write screens that pass validation.
+- `debug-on-device`: read errors and diagnose problems.
