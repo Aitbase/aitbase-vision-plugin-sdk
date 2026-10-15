@@ -63,3 +63,13 @@ go run <sdk>/cmd/aitbase-plugin check --json
 Then run `build --json` and `pack --json` the same way.
 
 Record changes in `CHANGELOG.md`.
+
+## Releasing
+
+1. In one pull request:
+   - set `Version` in `sdkfiles.go` and `project(... VERSION)` in `CMakeLists.txt`;
+   - replace `unreleased` in the version's `CHANGELOG.md` heading with the date.
+2. After it merges, tag the merge commit and push the tag: `git tag v0.3.0 && git push origin v0.3.0`.
+3. `release.yml` checks that the tag, both version numbers and the changelog agree, runs the tests, builds the CLI for six platforms and publishes a GitHub release with `SHA256SUMS`. Versions `0.x` and pre-release versions are marked pre-release.
+
+Releases are public. Create the tag only when the release should go out.
