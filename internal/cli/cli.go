@@ -340,8 +340,9 @@ func runBuild(e env, args []string) int {
 		if d != nil {
 			return e.finish(*asJSON, "build", false, []check.Diagnostic{*d}, nil, "")
 		}
-		configure = append(configure, "-DCMAKE_TOOLCHAIN_FILE="+wasisdk.ToolchainFile(root), "-DWASI_SDK_PREFIX="+root,
-			"-DCMAKE_BUILD_TYPE=MinSizeRel")
+		// Forward slashes: CMake reads backslashes in these values as escapes (C:\Users -> \U).
+		configure = append(configure, "-DCMAKE_TOOLCHAIN_FILE="+filepath.ToSlash(wasisdk.ToolchainFile(root)),
+			"-DWASI_SDK_PREFIX="+filepath.ToSlash(root), "-DCMAKE_BUILD_TYPE=MinSizeRel")
 		// Visual Studio generators can't use the wasi-sdk toolchain; Ninja can, on every system.
 		if runtime.GOOS == "windows" {
 			if _, err := exec.LookPath("ninja"); err != nil {

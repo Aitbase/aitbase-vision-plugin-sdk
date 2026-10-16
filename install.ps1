@@ -18,9 +18,13 @@ $asset = "aitbase-plugin-windows-$arch.exe"
 $version = $env:AITBASE_VERSION
 if (-not $version) {
     # Preview releases are GitHub prereleases, which releases/latest skips: ask for the newest one.
-    $releases = Invoke-RestMethod "https://api.github.com/repos/$repo/releases?per_page=1"
-    $version = $releases[0].tag_name
-    if (-not $version) { throw 'No release found; set AITBASE_VERSION, for example v0.4.0' }
+    # The API is rate limited per IP, so fall back to the releases feed, which lists them too.
+    try { $version = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases?per_page=1")[0].tag_name } catch { }
+    if (-not $version) {
+        $feed = (Invoke-WebRequest "https://github.com/$repo/releases.atom" -UseBasicParsing).Content
+        if ($feed -match 'releases/tag/([^"<]+)') { $version = $Matches[1] }
+    }
+    if (-not $version) { throw 'Could not find the newest release; set AITBASE_VERSION, for example v0.4.0' }
 }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("aitbase-" + [Guid]::NewGuid())

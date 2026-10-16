@@ -47,10 +47,14 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 version="${AITBASE_VERSION:-}"
 if [ -z "$version" ]; then
     # Preview releases are GitHub prereleases, which releases/latest skips: ask for the newest one.
-    fetch "https://api.github.com/repos/$REPO/releases?per_page=1" "$tmp/releases.json" ||
-        fail "could not look up the newest release; set AITBASE_VERSION, for example AITBASE_VERSION=v0.4.0"
-    version="$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' "$tmp/releases.json" | head -n 1)"
-    [ -n "$version" ] || fail "no release found; set AITBASE_VERSION"
+    # The API is rate limited per IP, so fall back to the releases feed, which lists them too.
+    if fetch "https://api.github.com/repos/$REPO/releases?per_page=1" "$tmp/releases.json" 2>/dev/null; then
+        version="$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' "$tmp/releases.json" | head -n 1)"
+    fi
+    if [ -z "$version" ] && fetch "https://github.com/$REPO/releases.atom" "$tmp/releases.atom"; then
+        version="$(grep -o 'releases/tag/[^"<]*' "$tmp/releases.atom" | head -n 1 | sed 's#releases/tag/##')"
+    fi
+    [ -n "$version" ] || fail "could not find the newest release; set AITBASE_VERSION, for example AITBASE_VERSION=v0.4.0"
 fi
 
 base="https://github.com/$REPO/releases/download/$version"
