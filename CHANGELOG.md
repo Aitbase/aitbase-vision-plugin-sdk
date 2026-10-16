@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Supervised plugins:** when the device's plugin supervisor sets `AITBASE_PLUGIN_FD`, the native runtime uses that inherited socket instead of connecting to the development socket, and makes the process non-dumpable (`PR_SET_DUMPABLE`). A value that isn't a connected socket is an error; the runtime never falls back to the path. See [docs/plugin-protocol.md](docs/plugin-protocol.md).
+- **Protocol docs:** the supervised transport, and the `identity_mismatch` error for a `hello` that claims another plugin's identity.
+
 ## 0.3.0 — 2026-10-16
 
 The first public release.
