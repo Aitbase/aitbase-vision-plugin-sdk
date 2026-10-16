@@ -2,12 +2,14 @@
 
 Build plugins that put their own screen on an AITBASE VISION device.
 
-> **Status: 0.3.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs WebAssembly plugins from the SD card while Developer mode is on, which it is by default. Signed packages and store distribution are not available yet.
+> **Status: 0.4.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs WebAssembly plugins from the SD card while Developer mode is on, which it is by default. Signed packages and store distribution are not available yet.
 
 ## Quick start
 
 ```sh
-# Install aitbase-plugin from the releases page first: docs/cli.md#install
+# Install the CLI and the WebAssembly toolchain (Windows: see docs/cli.md#install)
+curl -fsSL https://raw.githubusercontent.com/Aitbase/aitbase-vision-plugin-sdk/main/install.sh | sh
+
 aitbase-plugin init my-plugin --id yourname.my-plugin
 cd my-plugin
 aitbase-plugin check

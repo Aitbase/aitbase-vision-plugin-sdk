@@ -190,6 +190,31 @@ func pathFlag(dir, value, def string) string {
 	return filepath.Join(dir, def)
 }
 
+// sdkFlag resolves the SDK directory: --sdk as given, else the nearest sdk/ holding this SDK in
+// the project directory or one of its parents. A project from `init` has its own sdk/; a plugin
+// in a repository of plugins uses the repository's.
+func sdkFlag(dir, value string) string {
+	if value != "" {
+		return value
+	}
+	abs, err := filepath.Abs(dir)
+	if err == nil {
+		for d := abs; ; d = filepath.Dir(d) {
+			candidate := filepath.Join(d, "sdk")
+			if _, err := os.Stat(filepath.Join(candidate, "include", "aitbase_plugin.h")); err == nil {
+				if d == abs {
+					return filepath.Join(dir, "sdk")
+				}
+				return candidate
+			}
+			if filepath.Dir(d) == d {
+				break
+			}
+		}
+	}
+	return filepath.Join(dir, "sdk")
+}
+
 func oneDir(positional []string) (string, error) {
 	switch len(positional) {
 	case 0:
@@ -238,7 +263,7 @@ func runInit(e env, args []string) int {
 }
 
 func checkFlags(fs *flag.FlagSet) (sdk, python *string, allowReserved, skipUI *bool) {
-	sdk = fs.String("sdk", "", "SDK directory with the UI compiler (default: <dir>/sdk)")
+	sdk = fs.String("sdk", "", "SDK directory with the UI compiler (default: the nearest sdk/ in <dir> or a parent)")
 	python = fs.String("python", "", "Python 3 interpreter for the UI compiler (default: search PATH)")
 	allowReserved = fs.Bool("allow-reserved-id", false, "allow the aitbase.* id namespace (official plugins only)")
 	skipUI = fs.Bool("skip-ui", false, "do not compile screens")
@@ -256,7 +281,7 @@ func runCheck(e env, args []string) int {
 	if err != nil {
 		return usageError(e, *asJSON, "check", err.Error())
 	}
-	sdkDir := pathFlag(dir, *sdk, "sdk")
+	sdkDir := sdkFlag(dir, *sdk)
 	r := check.Project(dir, sdkDir, check.Options{AllowReservedID: *allowReserved, Python: *python, SkipUI: *skipUI})
 	ok := !r.HasErrors()
 	human := "check passed"
@@ -315,8 +340,9 @@ func runBuild(e env, args []string) int {
 		if d != nil {
 			return e.finish(*asJSON, "build", false, []check.Diagnostic{*d}, nil, "")
 		}
-		configure = append(configure, "-DCMAKE_TOOLCHAIN_FILE="+wasisdk.ToolchainFile(root), "-DWASI_SDK_PREFIX="+root,
-			"-DCMAKE_BUILD_TYPE=MinSizeRel")
+		// Forward slashes: CMake reads backslashes in these values as escapes (C:\Users -> \U).
+		configure = append(configure, "-DCMAKE_TOOLCHAIN_FILE="+filepath.ToSlash(wasisdk.ToolchainFile(root)),
+			"-DWASI_SDK_PREFIX="+filepath.ToSlash(root), "-DCMAKE_BUILD_TYPE=MinSizeRel")
 		// Visual Studio generators can't use the wasi-sdk toolchain; Ninja can, on every system.
 		if runtime.GOOS == "windows" {
 			if _, err := exec.LookPath("ninja"); err != nil {
@@ -360,7 +386,7 @@ func runPack(e env, args []string) int {
 	if err != nil {
 		return usageError(e, *asJSON, "pack", err.Error())
 	}
-	sdkDir := pathFlag(dir, *sdk, "sdk")
+	sdkDir := sdkFlag(dir, *sdk)
 	r := check.Project(dir, sdkDir, check.Options{AllowReservedID: *allowReserved, Python: *python, SkipUI: true})
 	if r.HasErrors() {
 		return e.finish(*asJSON, "pack", false, r.Diagnostics, nil, "pack failed: fix the check errors first")

@@ -1,10 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-10-16
 
+WebAssembly plugins that run on current device firmware, and a one-line install.
+
+- **One-line install:** `install.sh` (Linux, macOS) and `install.ps1` (Windows) download the newest CLI for the system, check it against `SHA256SUMS`, put it on the PATH and download the WebAssembly toolchain ([docs/cli.md](docs/cli.md#install)).
+- **Repositories of plugins:** without `--sdk`, `check` and `pack` use the nearest `sdk/` in the project directory or a parent.
 - **Supervised plugins:** when the device's plugin supervisor sets `AITBASE_PLUGIN_FD`, the native runtime uses that inherited socket instead of connecting to the development socket, and makes the process non-dumpable (`PR_SET_DUMPABLE`). A value that isn't a connected socket is an error; the runtime never falls back to the path. See [docs/plugin-protocol.md](docs/plugin-protocol.md).
 - **Protocol docs:** the supervised transport, and the `identity_mismatch` error for a `hello` that claims another plugin's identity.
-- **WASM runtime (preview):** with wasi-sdk 34 or later (`CMAKE_SYSTEM_NAME` `WASI`), `aitbase::plugin` builds the plugin as a WebAssembly reactor that speaks the device's WASM host ABI ([docs/wasm-abi.md](docs/wasm-abi.md)). Plugin code is unchanged. The native and WASM runtimes now share one protocol core (`src/aitbase_plugin_core.c`). `aitbase-plugin build` and `pack` don't produce WASM packages yet.
+- **WASM runtime (preview):** with wasi-sdk 34 or later (`CMAKE_SYSTEM_NAME` `WASI`), `aitbase::plugin` builds the plugin as a WebAssembly reactor that speaks the device's WASM host ABI ([docs/wasm-abi.md](docs/wasm-abi.md)). Plugin code is unchanged. The native and WASM runtimes now share one protocol core (`src/aitbase_plugin_core.c`). `aitbase-plugin build --wasm` and `pack --wasm` produce them (below).
 
 - **`aitbase-plugin build --wasm` and `pack --wasm`:** build a plugin as WebAssembly and write `dist/<id>-<version>-wasm.zip`, which unzips at the root of a device's SD card. The first `build --wasm` downloads wasi-sdk 34.0 into the user cache and checks it against a pinned SHA-256; set `AITBASE_WASI_SDK` to use your own. `pack --wasm` strips debug sections and refuses modules the device would refuse. New command `toolchain` prints the wasi-sdk path. The project template and skills now use the WASM loop. See [docs/cli.md](docs/cli.md#webassembly).
 
