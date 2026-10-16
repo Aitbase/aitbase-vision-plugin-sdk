@@ -6,6 +6,8 @@
 - **Protocol docs:** the supervised transport, and the `identity_mismatch` error for a `hello` that claims another plugin's identity.
 - **WASM runtime (preview):** with wasi-sdk 34 or later (`CMAKE_SYSTEM_NAME` `WASI`), `aitbase::plugin` builds the plugin as a WebAssembly reactor that speaks the device's WASM host ABI ([docs/wasm-abi.md](docs/wasm-abi.md)). Plugin code is unchanged. The native and WASM runtimes now share one protocol core (`src/aitbase_plugin_core.c`). `aitbase-plugin build` and `pack` don't produce WASM packages yet.
 
+- **`aitbase-plugin build --wasm` and `pack --wasm`:** build a plugin as WebAssembly and write `dist/<id>-<version>-wasm.zip`, which unzips at the root of a device's SD card. The first `build --wasm` downloads wasi-sdk 34.0 into the user cache and checks it against a pinned SHA-256; set `AITBASE_WASI_SDK` to use your own. `pack --wasm` strips debug sections and refuses modules the device would refuse. New command `toolchain` prints the wasi-sdk path. The project template and skills now use the WASM loop. See [docs/cli.md](docs/cli.md#webassembly).
+
 ## 0.3.0 — 2026-10-16
 
 The first public release.

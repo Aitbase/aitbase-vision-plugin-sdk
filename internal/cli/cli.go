@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/check"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/pack"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/project"
+	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/wasisdk"
 )
 
 const (
@@ -47,8 +49,9 @@ func commands() []command {
 	return []command{
 		{"init", "create a plugin project: init <dir> --id <id>", runInit},
 		{"check", "validate the plugin project: check [dir]", runCheck},
-		{"build", "build with CMake: build [dir]", runBuild},
-		{"pack", "write dist/<id>-<version>.avp: pack [dir]", runPack},
+		{"build", "build with CMake: build [dir] [--wasm]", runBuild},
+		{"pack", "write dist/<id>-<version>.avp, or with --wasm the SD card zip: pack [dir] [--wasm]", runPack},
+		{"toolchain", "download the WebAssembly toolchain (wasi-sdk) and print its path", runToolchain},
 		{"version", "print the SDK version", runVersion},
 		{"devices", "find devices on the network (not available yet)", notAvailable("devices")},
 		{"pair", "pair with a device (not available yet)", notAvailable("pair")},
@@ -263,9 +266,33 @@ func runCheck(e env, args []string) int {
 	return e.finish(*asJSON, "check", ok, r.Diagnostics, nil, human)
 }
 
+// ensureWasiSDK finds or downloads the pinned wasi-sdk; download progress goes to stderr.
+func ensureWasiSDK(e env) (string, *check.Diagnostic) {
+	root, err := wasisdk.Ensure(e.stderr)
+	if err != nil {
+		return "", &check.Diagnostic{Severity: check.Error, Code: "WASI_SDK_UNAVAILABLE", Message: err.Error(),
+			Fix: "check the network connection and retry, or set " + wasisdk.EnvOverride + " to a wasi-sdk " + wasisdk.Version + " installation"}
+	}
+	return root, nil
+}
+
+func runToolchain(e env, args []string) int {
+	fs, asJSON := newFlags(e, "toolchain")
+	if _, err := parse(fs, args); err != nil {
+		return exitUsage
+	}
+	root, d := ensureWasiSDK(e)
+	if d != nil {
+		return e.finish(*asJSON, "toolchain", false, []check.Diagnostic{*d}, nil, "")
+	}
+	return e.finish(*asJSON, "toolchain", true, nil,
+		result{"wasi_sdk": root, "wasi_sdk_version": wasisdk.Version, "toolchain_file": wasisdk.ToolchainFile(root)}, root)
+}
+
 func runBuild(e env, args []string) int {
 	fs, asJSON := newFlags(e, "build")
-	buildDir := fs.String("build-dir", "", "CMake build directory (default: <dir>/build)")
+	buildDir := fs.String("build-dir", "", "CMake build directory (default: <dir>/build, or <dir>/build-wasm with --wasm)")
+	wasm := fs.Bool("wasm", false, "build WebAssembly for the device; downloads wasi-sdk on first use")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return exitUsage
@@ -279,23 +306,51 @@ func runBuild(e env, args []string) int {
 		return e.finish(*asJSON, "build", false, []check.Diagnostic{{Severity: check.Error, Code: "CMAKE_NOT_FOUND",
 			Message: "cmake is not installed", Fix: "install CMake 3.13 or later and a C compiler"}}, nil, "")
 	}
+	configure := []string{"-S", dir}
 	out := pathFlag(dir, *buildDir, "build")
+	extra := result{}
+	if *wasm {
+		out = pathFlag(dir, *buildDir, "build-wasm")
+		root, d := ensureWasiSDK(e)
+		if d != nil {
+			return e.finish(*asJSON, "build", false, []check.Diagnostic{*d}, nil, "")
+		}
+		configure = append(configure, "-DCMAKE_TOOLCHAIN_FILE="+wasisdk.ToolchainFile(root), "-DWASI_SDK_PREFIX="+root,
+			"-DCMAKE_BUILD_TYPE=MinSizeRel")
+		// Visual Studio generators can't use the wasi-sdk toolchain; Ninja can, on every system.
+		if runtime.GOOS == "windows" {
+			if _, err := exec.LookPath("ninja"); err != nil {
+				return e.finish(*asJSON, "build", false, []check.Diagnostic{{Severity: check.Error, Code: "NINJA_NOT_FOUND",
+					Message: "building WebAssembly on Windows needs Ninja", Fix: "install Ninja (winget install Ninja-build.Ninja) and retry"}}, nil, "")
+			}
+			configure = append(configure, "-G", "Ninja")
+		}
+		extra["wasi_sdk"] = root
+	}
+	configure = append(configure, "-B", out)
 	// Build output goes to stderr so that --json keeps stdout to one object.
-	for _, step := range [][]string{{"-S", dir, "-B", out}, {"--build", out}} {
+	for _, step := range [][]string{configure, {"--build", out}} {
 		cmd := exec.Command(cmake, step...)
 		cmd.Stdout, cmd.Stderr = e.stderr, e.stderr
 		if err := cmd.Run(); err != nil {
+			fix := "read the compiler output above"
+			if *wasm {
+				fix += "; if the build directory was configured natively before, delete it or pass another --build-dir"
+			}
 			return e.finish(*asJSON, "build", false, []check.Diagnostic{{Severity: check.Error, Code: "BUILD_FAILED",
-				Message: "cmake " + strings.Join(step, " ") + " failed: " + err.Error(), Fix: "read the compiler output above"}}, nil, "")
+				Message: "cmake " + strings.Join(step, " ") + " failed: " + err.Error(), Fix: fix}}, nil, "")
 		}
 	}
-	return e.finish(*asJSON, "build", true, nil, result{"build_dir": out}, "build finished in "+out)
+	extra["build_dir"] = out
+	extra["wasm"] = *wasm
+	return e.finish(*asJSON, "build", true, nil, extra, "build finished in "+out)
 }
 
 func runPack(e env, args []string) int {
 	fs, asJSON := newFlags(e, "pack")
-	buildDir := fs.String("build-dir", "", "build directory holding the program and <screen>.ui.json (default: <dir>/build)")
+	buildDir := fs.String("build-dir", "", "build directory holding the program and <screen>.ui.json (default: <dir>/build, or <dir>/build-wasm with --wasm)")
 	outDir := fs.String("out", "", "output directory (default: <dir>/dist)")
+	wasm := fs.Bool("wasm", false, "package the WebAssembly build as <id>-<version>-wasm.zip for the device's SD card")
 	sdk, python, allowReserved, _ := checkFlags(fs)
 	pos, err := parse(fs, args)
 	if err != nil {
@@ -311,6 +366,9 @@ func runPack(e env, args []string) int {
 		return e.finish(*asJSON, "pack", false, r.Diagnostics, nil, "pack failed: fix the check errors first")
 	}
 	m := r.Manifest
+	if *wasm {
+		return packWasm(e, *asJSON, dir, pathFlag(dir, *buildDir, "build-wasm"), pathFlag(dir, *outDir, "dist"), r)
+	}
 	build := pathFlag(dir, *buildDir, "build")
 	manifest, err := os.ReadFile(filepath.Join(dir, "plugin.json"))
 	if err != nil {
@@ -351,6 +409,63 @@ func runPack(e env, args []string) int {
 	}
 	return e.finish(*asJSON, "pack", true, diags, result{"package": out, "sha256": digest, "bytes": len(data)},
 		fmt.Sprintf("wrote %s (%d bytes, sha256 %s)", out, len(data), digest))
+}
+
+// packWasm writes <out>/<id>-<version>-wasm.zip: aitbase/plugins/<id>/ with <entry>.wasm, the
+// compiled screens and plugin.json, which unzips at the root of the device's SD card. The module
+// is stripped of custom sections and checked against the device's host ABI first.
+func packWasm(e env, asJSON bool, dir, build, outDir string, r *check.Result) int {
+	m := r.Manifest
+	diags := r.Diagnostics
+	fail := func(d check.Diagnostic) int {
+		return e.finish(asJSON, "pack", false, append(diags, d), nil, "pack failed")
+	}
+	modulePath := filepath.Join(build, m.Entry)
+	module, err := os.ReadFile(modulePath)
+	if err != nil {
+		return fail(check.Diagnostic{Severity: check.Error, Code: "BUILD_OUTPUT_MISSING", Path: filepath.ToSlash(modulePath),
+			Message: "not found", Fix: "run `aitbase-plugin build --wasm` first"})
+	}
+	if module, err = pack.StripCustomSections(module); err != nil {
+		return fail(check.Diagnostic{Severity: check.Error, Code: "WASM_INVALID", Path: filepath.ToSlash(modulePath),
+			Message: err.Error() + "; is this a native build?", Fix: "run `aitbase-plugin build --wasm` first"})
+	}
+	if err := pack.CheckModule(module); err != nil {
+		code, msg, _ := strings.Cut(err.Error(), ": ")
+		return fail(check.Diagnostic{Severity: check.Error, Code: code, Path: filepath.ToSlash(modulePath), Message: msg})
+	}
+	manifest, err := os.ReadFile(filepath.Join(dir, "plugin.json"))
+	if err != nil {
+		return fail(check.Diagnostic{Severity: check.Error, Code: "MANIFEST_MISSING", Message: err.Error()})
+	}
+	prefix := pack.SDDir(m.ID) + "/"
+	files := []pack.File{{Name: prefix + m.Entry + ".wasm", Data: module}, {Name: prefix + "plugin.json", Data: manifest}}
+	if m.UI != nil {
+		for _, s := range m.UI.Screens {
+			p := filepath.Join(build, s+".ui.json")
+			data, err := os.ReadFile(p)
+			if err != nil {
+				return fail(check.Diagnostic{Severity: check.Error, Code: "BUILD_OUTPUT_MISSING", Path: filepath.ToSlash(p),
+					Message: "not found", Fix: "run `aitbase-plugin build --wasm` first"})
+			}
+			files = append(files, pack.File{Name: prefix + s + ".ui.json", Data: data})
+		}
+	}
+	data, digest, err := pack.Build(files)
+	if err != nil {
+		code, msg, _ := strings.Cut(err.Error(), ": ")
+		return fail(check.Diagnostic{Severity: check.Error, Code: code, Message: msg})
+	}
+	out := filepath.Join(outDir, pack.SDFileName(m.ID, m.Version))
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err == nil {
+		err = os.WriteFile(out, data, 0o644)
+	}
+	if err != nil {
+		return fail(check.Diagnostic{Severity: check.Error, Code: "WRITE_FAILED", Path: out, Message: err.Error()})
+	}
+	return e.finish(asJSON, "pack", true, diags,
+		result{"package": out, "sha256": digest, "bytes": len(data), "module_bytes": len(module), "sd_dir": pack.SDDir(m.ID)},
+		fmt.Sprintf("wrote %s (%d bytes, sha256 %s)\nUnzip it at the root of the device's SD card: it runs from %s/.", out, len(data), digest, pack.SDDir(m.ID)))
 }
 
 func notAvailable(cmd string) func(e env, args []string) int {

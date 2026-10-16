@@ -11,9 +11,11 @@ Build plugins that put their own screen on an AITBASE VISION device.
 aitbase-plugin init my-plugin --id yourname.my-plugin
 cd my-plugin
 aitbase-plugin check
-aitbase-plugin build
-aitbase-plugin pack       # dist/yourname.my-plugin-0.1.0.avp
+aitbase-plugin build --wasm   # downloads the WebAssembly toolchain the first time
+aitbase-plugin pack --wasm    # dist/yourname.my-plugin-0.1.0-wasm.zip
 ```
+
+Unzip the package at the root of a development device's SD card, and the device runs it. See [WebAssembly](docs/cli.md#webassembly).
 
 The new project is ready for AI coding agents:
 - **`AGENTS.md` and `CLAUDE.md`:** what plugins can and cannot do, and the check/build loop.
@@ -24,8 +26,8 @@ The project also includes a copy of this SDK in `sdk/`, so it builds without git
 
 **Platforms:**
 - `init`, `check` and `pack` run on Windows, macOS and Linux.
-- `build` needs CMake, a C compiler and Python 3.8+.
-- The development runtime that runs a plugin natively is POSIX only. The WASM runtime (preview) builds with [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) on any of the three.
+- `build --wasm` needs CMake and Python 3.8+ (and Ninja on Windows). It downloads its compiler, [wasi-sdk](https://github.com/WebAssembly/wasi-sdk), the first time.
+- A native `build`, for the development bridge, needs CMake, a C compiler and Python 3.8+. The native runtime is POSIX only.
 
 ## What is in the SDK
 
@@ -119,7 +121,7 @@ Contributors: see [AGENTS.md](AGENTS.md).
 ## Roadmap
 
 These items are planned, not implemented:
-- **WASM in the CLI and packages:** `aitbase-plugin build` and `pack` for WebAssembly. The runtime itself is in preview ([WASM host ABI](docs/wasm-abi.md)).
+- **Signed WASM packages:** a `.avp` with the module, verified by the device before it runs. Until then, `pack --wasm` writes a zip for the SD card.
 - **More capabilities:** camera, audio, HTTP, storage and MCP tools, each behind explicit user permission.
 - **Installation and device tools:** signed packages, installation from the SD card (`aitbase/plugins/`) and the device's web console, and the CLI device commands (`pair`, `dev`, `logs`, `screenshot`, `press`).
 - **No Python or C toolchain to install:** the UI compiler built into the CLI, and the WASM toolchain downloaded automatically.

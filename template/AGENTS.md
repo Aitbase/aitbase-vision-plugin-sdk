@@ -46,10 +46,12 @@ Design every screen for this: a few large buttons in a sensible order, no text i
 Run these after every change, from the project directory. Use `--json` and read the `diagnostics`: each has a stable `code`, a `path` and a `fix`.
 
 ```sh
-aitbase-plugin check --json     # manifest, ids, file names, screens
-aitbase-plugin build --json     # compiles C and screens with CMake
-aitbase-plugin pack --json      # writes dist/<id>-<version>.avp
+aitbase-plugin check --json          # manifest, ids, file names, screens
+aitbase-plugin build --wasm --json   # compiles C to WebAssembly, and the screens
+aitbase-plugin pack --wasm --json    # writes dist/<id>-<version>-wasm.zip for the device
 ```
+
+The first `build --wasm` downloads the WebAssembly toolchain (about 200 MB) and can take a few minutes; later builds reuse it. If the download fails, tell the user, and don't install another compiler instead. `pack --wasm` also refuses code the device can't run, for example files or sockets: use only the calls in `sdk/include/aitbase_plugin.h`.
 
 Fix every `error` before continuing. Do not silence a check by removing the feature the user asked for without telling them.
 
@@ -57,7 +59,12 @@ Fix every `error` before continuing. Do not silence a check by removing the feat
 
 There is no simulator, so a successful build does not prove the plugin works. Only the device shows that.
 
-In this SDK version, running a plugin needs a device with **development firmware** and a cross-compiled build. See `sdk/README.md`. The commands `dev`, `logs`, `screenshot` and `press` are planned and currently return `NOT_AVAILABLE`. Do not try to work around this. Tell the user what to check on the device and ask them what they see.
+In this SDK version, running a plugin needs a device with **development firmware**. To try it:
+1. The user unzips `dist/<id>-<version>-wasm.zip` at the root of the device's SD card.
+2. The device runs the newest plugin on the card by itself, within a few seconds. A newer copy replaces the running one.
+3. The plugin's log is on the card, in `aitbase/logs/<id>.log`.
+
+The commands `dev`, `logs`, `screenshot` and `press` are planned and currently return `NOT_AVAILABLE`. Do not try to work around this. Tell the user what to check on the device, and ask them what they see and what the log says.
 
 ## Security rules
 

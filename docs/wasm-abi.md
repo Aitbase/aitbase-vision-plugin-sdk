@@ -12,7 +12,7 @@ Inside the plugin the messages are the same JSON lines as [protocol v1](plugin-p
 
 ## Building
 
-Build with [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) 34 or later as a **reactor** (no `main`); the SDK's CMake does this when `CMAKE_SYSTEM_NAME` is `WASI`:
+`aitbase-plugin build --wasm` and `pack --wasm` do all of this ([CLI](cli.md#webassembly)). By hand: build with [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) 34 or later as a **reactor** (no `main`); the SDK's CMake does this when `CMAKE_SYSTEM_NAME` is `WASI`:
 
 ```sh
 cmake -S . -B build-wasm \
@@ -21,9 +21,7 @@ cmake -S . -B build-wasm \
 cmake --build build-wasm
 ```
 
-The module is written as `build-wasm/<entry>`. A device package names it `<entry>.wasm`. Not yet supported:
-- `aitbase-plugin build` and `pack` for WASM;
-- `.avp` packages with a module.
+The module is written as `build-wasm/<entry>`. A device package names it `<entry>.wasm`. `.avp` packages with a module are not supported yet.
 
 ## Exports (plugin → device)
 
