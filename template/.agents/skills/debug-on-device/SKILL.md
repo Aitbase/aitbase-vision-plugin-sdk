@@ -7,7 +7,7 @@ description: Diagnose AITBASE VISION plugin problems from check/build diagnostic
 
 ## 1. Static problems: check and build
 
-Run `aitbase-plugin check --json`, then `aitbase-plugin build --json`. Each diagnostic has `severity`, `code`, `path`, `message` and `fix`. Apply the fix, then run the command again. The full code list is in `sdk/docs/cli.md`.
+Run `aitbase-plugin check --json`, then `aitbase-plugin build --wasm --json`, then `aitbase-plugin pack --wasm --json`. Each diagnostic has `severity`, `code`, `path`, `message` and `fix`. Apply the fix, then run the command again. The full code list is in `sdk/docs/cli.md`.
 
 A command that returns `NOT_AVAILABLE` (exit code 3) needs device support that doesn't exist yet. Don't retry it or look for another way. Tell the user.
 
@@ -24,11 +24,18 @@ The device reports problems as events. Make sure `aitbase_on_event` logs these, 
 
 `AITBASE_ERR_NOT_FOUND` from `aitbase_ui_open` means there is no compiled `<screen>.ui.json` next to the program. Check `SCREENS` in `CMakeLists.txt`.
 
-## 3. Asking the user
+## 3. Nothing runs on the device
+
+Ask the user to open the Device Console's **Advanced → Plugins** page:
+- **Developer mode off:** they turn it on there; nothing on the SD card runs until then.
+- **The package is listed as skipped:** the reason says why, for example no `<entry>.wasm` because the build was native. Run `aitbase-plugin build --wasm` and `pack --wasm` again.
+- **"Last run ... ended":** the reason is also at the end of the log, for example `exit 121` (the device refused the module) or `exit 122` (a trap, or a callback ran too long).
+
+## 4. Asking the user
 
 There is no simulator, and this SDK version cannot read logs or take screenshots remotely. Ask specific questions:
 - What is on the screen? Does the text change when you press RIGHT?
 - Does LEFT move the highlight between buttons?
-- What lines starting with `[<plugin id>]` did the program print?
+- What does `aitbase/logs/<id>.log` on the SD card say? It has the plugin's own lines, starting with `[<plugin id>]`, and the device's `started`/`ended` lines with the reason, for example a refused module or a trap.
 
 Never ask for the device password.
