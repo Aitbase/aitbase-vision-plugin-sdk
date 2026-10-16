@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -216,6 +217,59 @@ int main(void) {
     close(dev);
     close(srv);
     unlink(endpoint);
+
+    /* Supervised: the device's plugin supervisor hands the plugin an inherited socket. */
+    int sv[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) return 2;
+    child = fork();
+    if (child == 0) {
+        char fd_text[16];
+        close(sv[0]);
+        snprintf(fd_text, sizeof(fd_text), "%d", sv[1]);
+        unsetenv("AITBASE_PLUGIN_ENDPOINT");
+        setenv("AITBASE_PLUGIN_FD", fd_text, 1);
+        setenv("AITBASE_PLUGIN_UI_DIR", dir, 1);
+        char *args[] = {"plugin", NULL};
+        _exit(aitbase_plugin_run(1, args));
+    }
+    close(sv[1]);
+    g_used = 0;
+    req = next_request(sv[0], 2000);
+    EXPECT(req && strcmp(str(req, "op"), "hello") == 0, "supervised plugin says hello on the inherited socket");
+#ifdef __linux__
+    {
+        /* A non-dumpable process's /proc files belong to root. */
+        char proc_path[64];
+        struct stat st;
+        snprintf(proc_path, sizeof(proc_path), "/proc/%d/environ", (int)child);
+        EXPECT(getuid() == 0 || (stat(proc_path, &st) == 0 && st.st_uid == 0), "supervised plugin is not dumpable");
+    }
+#endif
+    if (req) device_send(sv[0], "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"protocol\":1}}", num(req, "id"));
+    cJSON_Delete(req);
+    req = next_request(sv[0], 2000);
+    EXPECT(req && strcmp(str(req, "op"), "open") == 0, "supervised plugin opens its screen");
+    if (req) reply_ok(sv[0], req);
+    cJSON_Delete(req);
+    device_send(sv[0], "{\"cap\":\"ui\",\"event\":\"preempted\",\"data\":{\"node\":\"\",\"action\":\"\",\"detail\":\"\"}}");
+    req = next_request(sv[0], 2000);
+    EXPECT(req && strcmp(str(req, "op"), "close") == 0, "supervised plugin closes on stop");
+    cJSON_Delete(req);
+    waitpid(child, &status, 0);
+    EXPECT(WIFEXITED(status) && WEXITSTATUS(status) == 0, "supervised plugin exits 0");
+    close(sv[0]);
+
+    /* A descriptor that isn't a socket is refused; the plugin doesn't fall back to the path. */
+    child = fork();
+    if (child == 0) {
+        setenv("AITBASE_PLUGIN_FD", "0", 1);
+        setenv("AITBASE_PLUGIN_ENDPOINT", "/nonexistent/should-not-be-used.sock", 1);
+        char *args[] = {"plugin", NULL};
+        _exit(aitbase_plugin_run(1, args));
+    }
+    waitpid(child, &status, 0);
+    EXPECT(WIFEXITED(status) && WEXITSTATUS(status) == 1, "non-socket AITBASE_PLUGIN_FD is refused");
+
     unlink(ui_path);
     rmdir(dir);
     if (g_failed) {
