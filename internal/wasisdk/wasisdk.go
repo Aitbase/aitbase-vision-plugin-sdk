@@ -227,10 +227,10 @@ func extract(archive, dest, top string) error {
 				return err
 			}
 		case tar.TypeSymlink:
-			target := filepath.Join(filepath.Dir(path), filepath.FromSlash(hdr.Linkname))
-			if filepath.IsAbs(hdr.Linkname) {
+			if rooted(hdr.Linkname) {
 				return fmt.Errorf("absolute link %s", hdr.Name)
 			}
+			target := filepath.Join(filepath.Dir(path), filepath.FromSlash(hdr.Linkname))
 			if _, err := inside(dest, mustRel(dest, target)); err != nil {
 				return fmt.Errorf("link %s points outside the toolchain", hdr.Name)
 			}
@@ -259,8 +259,18 @@ func mustRel(base, target string) string {
 	return filepath.ToSlash(rel)
 }
 
+// rooted reports a path that names a root or drive on any system. filepath.IsAbs alone misses
+// "/etc" on Windows, which resolves against the current drive.
+func rooted(p string) bool {
+	return strings.HasPrefix(p, "/") || strings.HasPrefix(p, "\\") || filepath.IsAbs(p) ||
+		filepath.VolumeName(filepath.FromSlash(p)) != "" || (len(p) >= 2 && p[1] == ':')
+}
+
 // inside joins dest and a slash path, refusing anything that escapes dest.
 func inside(dest, rel string) (string, error) {
+	if rooted(rel) {
+		return "", fmt.Errorf("unsafe path %q in archive", rel)
+	}
 	clean := filepath.Clean(filepath.FromSlash(rel))
 	if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("unsafe path %q in archive", rel)
