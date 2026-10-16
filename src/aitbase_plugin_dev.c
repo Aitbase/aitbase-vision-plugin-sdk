@@ -17,9 +17,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 
 #include "cJSON.h"
 
@@ -27,6 +31,8 @@
 #define AITBASE_DEFAULT_ENDPOINT "/tmp/aitbase_plugin_dev.sock"
 #define AITBASE_ENDPOINT_ENV "AITBASE_PLUGIN_ENDPOINT"
 #define AITBASE_UI_DIR_ENV "AITBASE_PLUGIN_UI_DIR"
+/* Set by the device's plugin supervisor: the inherited connection descriptor. */
+#define AITBASE_CHANNEL_FD_ENV "AITBASE_PLUGIN_FD"
 #define AITBASE_MAX_UI_BYTES 16384u
 #define AITBASE_RX_BUFFER 4096u
 #define AITBASE_PENDING 32u
@@ -296,6 +302,22 @@ static int connect_endpoint(const char *endpoint) {
     return fd;
 }
 
+/* Under the device's plugin supervisor the connection is an inherited socket, not a path. */
+static int inherited_channel(void) {
+    const char *value = getenv(AITBASE_CHANNEL_FD_ENV);
+    char *end = NULL;
+    struct stat st;
+    long fd;
+    if (!value || !*value) return -2;
+    fd = strtol(value, &end, 10);
+    if (*end || fd < 0 || fd > 1024 || fstat((int)fd, &st) != 0 || !S_ISSOCK(st.st_mode)) return -1;
+#ifdef __linux__
+    /* exec reset this; a supervised plugin must not be traceable by its own UID. */
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+#endif
+    return (int)fd;
+}
+
 static void set_ui_dir(aitbase_plugin_t *plugin, const char *argv0) {
     const char *dir = getenv(AITBASE_UI_DIR_ENV);
     if (dir && *dir) {
@@ -320,8 +342,18 @@ int aitbase_plugin_run(int argc, char **argv) {
     aitbase_plugin_t *plugin = (aitbase_plugin_t *)calloc(1, sizeof(*plugin));
     if (!plugin) return 1;
     set_ui_dir(plugin, argv ? argv[0] : NULL);
-    const char *endpoint = getenv(AITBASE_ENDPOINT_ENV);
-    plugin->fd = connect_endpoint(endpoint && *endpoint ? endpoint : AITBASE_DEFAULT_ENDPOINT);
+    const int inherited = inherited_channel();
+    if (inherited == -1) {
+        aitbase_log(plugin, AITBASE_LOG_ERROR, AITBASE_CHANNEL_FD_ENV " is not a connected socket");
+        free(plugin);
+        return 1;
+    }
+    if (inherited >= 0) {
+        plugin->fd = inherited;
+    } else {
+        const char *endpoint = getenv(AITBASE_ENDPOINT_ENV);
+        plugin->fd = connect_endpoint(endpoint && *endpoint ? endpoint : AITBASE_DEFAULT_ENDPOINT);
+    }
     if (plugin->fd < 0) {
         aitbase_log(plugin, AITBASE_LOG_ERROR, "cannot reach the device plugin endpoint "
                     "(developer firmware with the plugin bridge required)");
