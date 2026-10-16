@@ -73,6 +73,8 @@ func TestExtractRefusesEscapes(t *testing.T) {
 		{{name: "top/../../evil", data: "x"}},
 		{{name: "top/bin/evil", link: "../../../etc/passwd"}},
 		{{name: "top/bin/evil", link: "/etc/passwd"}},
+		{{name: "top/bin/evil", link: "C:/Windows/system.ini"}},
+		{{name: "top/bin/evil", link: "\\\\server\\share\\x"}},
 	} {
 		if err := extract(tarGz(t, bad), t.TempDir(), "top"); err == nil {
 			t.Errorf("%s was accepted", bad[0].name+bad[0].link)
