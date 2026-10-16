@@ -24,7 +24,14 @@ The device reports problems as events. Make sure `aitbase_on_event` logs these, 
 
 `AITBASE_ERR_NOT_FOUND` from `aitbase_ui_open` means there is no compiled `<screen>.ui.json` next to the program. Check `SCREENS` in `CMakeLists.txt`.
 
-## 3. Asking the user
+## 3. Nothing runs on the device
+
+Ask the user to open the Device Console's **Advanced → Plugins** page:
+- **Developer mode off:** they turn it on there; nothing on the SD card runs until then.
+- **The package is listed as skipped:** the reason says why, for example no `<entry>.wasm` because the build was native. Run `aitbase-plugin build --wasm` and `pack --wasm` again.
+- **"Last run ... ended":** the reason is also at the end of the log, for example `exit 121` (the device refused the module) or `exit 122` (a trap, or a callback ran too long).
+
+## 4. Asking the user
 
 There is no simulator, and this SDK version cannot read logs or take screenshots remotely. Ask specific questions:
 - What is on the screen? Does the text change when you press RIGHT?

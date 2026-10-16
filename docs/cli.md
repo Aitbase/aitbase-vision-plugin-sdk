@@ -67,7 +67,7 @@ aitbase-plugin pack --wasm     # dist/<id>-<version>-wasm.zip
 - **Toolchain:** `build --wasm` uses [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) 34.0. The first time, it downloads it, about 200 MB, into your user cache folder (`aitbase-plugin/` there). It checks the download against the SHA-256 pinned in the SDK before using it; a mismatch stops the build. Every later build reuses it. To use a wasi-sdk you already have, set `AITBASE_WASI_SDK` to its directory.
 - **Systems:** wasi-sdk is published for Linux, macOS and Windows on x86-64 and ARM64. On Windows, `build --wasm` also needs [Ninja](https://ninja-build.org/).
 - **What `pack --wasm` checks:** it strips debug information from the module, then refuses it if the device would: imports the device does not provide (for example files or sockets through WASI), missing exports, a start section, or more than 4 MiB.
-- **On the device:** unzip the package at the root of the SD card. It creates `aitbase/plugins/<id>/` with `<entry>.wasm`, the compiled screens and `plugin.json`, and a development device runs the newest plugin there by itself.
+- **On the device:** the owner turns on **Developer mode** once, in the Device Console under **Advanced → Plugins**. Then unzip the package at the root of the SD card. It creates `aitbase/plugins/<id>/` with `<entry>.wasm`, the compiled screens and `plugin.json`, and the device runs the newest plugin there by itself. The log is in `aitbase/logs/<id>.log` on the card and on the Plugins page.
 
 The zip is an interim format: the planned community package is a signed `.avp` that the device verifies before running it ([package format](package-format.md)).
 

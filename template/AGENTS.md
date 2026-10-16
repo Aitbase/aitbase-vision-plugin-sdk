@@ -59,10 +59,13 @@ Fix every `error` before continuing. Do not silence a check by removing the feat
 
 There is no simulator, so a successful build does not prove the plugin works. Only the device shows that.
 
-In this SDK version, running a plugin needs a device with **development firmware**. To try it:
-1. The user unzips `dist/<id>-<version>-wasm.zip` at the root of the device's SD card.
-2. The device runs the newest plugin on the card by itself, within a few seconds. A newer copy replaces the running one.
-3. The plugin's log is on the card, in `aitbase/logs/<id>.log`.
+To try it on the user's device:
+1. **Once:** the user turns on **Developer mode** in the device's Device Console (**Advanced → Plugins**), with their Device Console password. It is off by default. Only the user can do this: never ask for the password.
+2. The user unzips `dist/<id>-<version>-wasm.zip` at the root of the device's SD card.
+3. Within a few seconds the device runs the newest plugin on the card, with a **DEV** badge on its screen. A newer copy replaces the running one.
+4. The plugin's log is on the card, in `aitbase/logs/<id>.log`, and on the Device Console's Plugins page.
+
+If nothing runs, ask the user whether Developer mode is on and what the Plugins page shows: it lists packages it skipped, with the reason.
 
 The commands `dev`, `logs`, `screenshot` and `press` are planned and currently return `NOT_AVAILABLE`. Do not try to work around this. Tell the user what to check on the device, and ask them what they see and what the log says.
 
