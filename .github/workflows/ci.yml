@@ -58,5 +58,50 @@ jobs:
           rm -rf dist && ../aitbase-plugin pack --json > second.json
           python3 -c 'import json,sys; a,b=(json.load(open(f))["sha256"] for f in sys.argv[1:]); sys.exit(a!=b)' first.json second.json
 
+      # The same commands customers run; the first one downloads wasi-sdk (cached between runs).
+      - name: Cache the WebAssembly toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/aitbase-plugin
+            ~/Library/Caches/aitbase-plugin
+            ~/AppData/Local/aitbase-plugin
+          key: wasi-sdk-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('internal/wasisdk/wasisdk.go') }}
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: command -v ninja || choco install ninja --no-progress -y
+      - name: Build and pack WebAssembly
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/demo"
+          ../aitbase-plugin build --wasm --json
+          ../aitbase-plugin pack --wasm --json > wasm.json
+          python3 -c 'import json,sys,zipfile; r=json.load(open(sys.argv[1])); names=zipfile.ZipFile(r["package"]).namelist(); print(names); sys.exit(not any(n.endswith(".wasm") for n in names))' wasm.json
+
+  # The one-line installers, against a published release.
+  installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    env:
+      AITBASE_SKIP_TOOLCHAIN: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh
+        if: runner.os != 'Windows'
+        run: |
+          AITBASE_INSTALL_DIR="$RUNNER_TEMP/bin" sh install.sh
+          "$RUNNER_TEMP/bin/aitbase-plugin" version
+      - name: install.ps1
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:AITBASE_INSTALL_DIR = "$env:RUNNER_TEMP\bin"
+          ./install.ps1
+          & "$env:RUNNER_TEMP\bin\aitbase-plugin.exe" version
+
   release-binaries:
     uses: ./.github/workflows/cli-binaries.yml
