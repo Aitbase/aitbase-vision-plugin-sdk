@@ -25,14 +25,14 @@ The project also includes a copy of this SDK in `sdk/`, so it builds without git
 **Platforms:**
 - `init`, `check` and `pack` run on Windows, macOS and Linux.
 - `build` needs CMake, a C compiler and Python 3.8+.
-- The development runtime that runs a plugin is POSIX only until plugins move to WebAssembly.
+- The development runtime that runs a plugin natively is POSIX only. The WASM runtime (preview) builds with [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) on any of the three.
 
 ## What is in the SDK
 
 | Path | Contents |
 |---|---|
 | `include/aitbase_plugin.h` | The C plugin API: callbacks (`aitbase_on_start`, `aitbase_on_event`, `aitbase_on_stop`) plus calls to open a screen, update bound values, set a timer and log. |
-| `src/` | The development runtime. It runs a plugin as a native process connected to a developer device ([protocol](docs/plugin-protocol.md)). |
+| `src/` | The runtimes. The development runtime runs a plugin as a native process connected to a developer device ([protocol](docs/plugin-protocol.md)). The WASM runtime (preview) builds the same plugin as WebAssembly for the device's sandbox ([WASM host ABI](docs/wasm-abi.md)). |
 | `schema/plugin_ui_registry.json` | UI schema v1: allowed widgets, properties, colors, actions, bindings and limits. This file is the source of truth for both the compiler and the device validator. |
 | `schema/aitbase_globals.xml` | Platform color tokens and subjects, in LVGL `globals.xml` form. |
 | `tools/plugin_ui_compile.py` | The compiler from plugin UI XML (LVGL 9.4 conventions, [reference](docs/ui-xml.md)) to the device's `aitbase.plugin-ui` document. |
@@ -46,7 +46,7 @@ The project also includes a copy of this SDK in `sdk/`, so it builds without git
 
 ## How a plugin works
 
-A plugin is a set of callbacks. The runtime connects to the device, calls `aitbase_on_start()`, then delivers events one at a time until the plugin stops. Nothing blocks. This is the same model the planned WASM runtime uses, so plugin code doesn't change when plugins move to WebAssembly.
+A plugin is a set of callbacks. The runtime connects to the device, calls `aitbase_on_start()`, then delivers events one at a time until the plugin stops. Nothing blocks. The WASM runtime uses the same model, so the same plugin code builds natively or as WebAssembly.
 
 The device owns the screen:
 - **Rendering:** it validates and draws the plugin's UI itself.
@@ -119,7 +119,7 @@ Contributors: see [AGENTS.md](AGENTS.md).
 ## Roadmap
 
 These items are planned, not implemented:
-- **WASM:** plugins compiled to WebAssembly, running sandboxed on the device, with the same callbacks and calls.
+- **WASM in the CLI and packages:** `aitbase-plugin build` and `pack` for WebAssembly. The runtime itself is in preview ([WASM host ABI](docs/wasm-abi.md)).
 - **More capabilities:** camera, audio, HTTP, storage and MCP tools, each behind explicit user permission.
 - **Installation and device tools:** signed packages, installation from the SD card (`aitbase/plugins/`) and the device's web console, and the CLI device commands (`pair`, `dev`, `logs`, `screenshot`, `press`).
 - **No Python or C toolchain to install:** the UI compiler built into the CLI, and the WASM toolchain downloaded automatically.

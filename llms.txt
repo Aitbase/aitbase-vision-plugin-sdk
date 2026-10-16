@@ -21,6 +21,7 @@ Start a project with `aitbase-plugin init <dir> --id <yourname.plugin>` and foll
 ## Optional
 
 - [Plugin protocol](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/plugin-protocol.md): device wire protocol; plugins never use it directly
+- [WASM host ABI](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/wasm-abi.md): how a plugin compiled to WebAssembly talks to the device (preview); plugins never use it directly
 - [UI schema](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/schema/plugin_ui_registry.json)
 - [Manifest schema](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/schema/plugin.schema.json)
 - [Example plugins](https://github.com/Aitbase/aitbase-vision-plugins)

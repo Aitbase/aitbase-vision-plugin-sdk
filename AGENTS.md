@@ -19,14 +19,14 @@ The public SDK for AITBASE VISION plugins. Its readers are customers who own a d
 | Path | Contents |
 |---|---|
 | `include/aitbase_plugin.h` | Plugin C API (API version 1). |
-| `src/` | Development runtime: runs a plugin as a native process connected to a development device. POSIX only. |
+| `src/` | Runtimes. `aitbase_plugin_core.c` speaks the protocol; `aitbase_plugin_dev.c` runs a plugin as a native process (POSIX only); `aitbase_plugin_wasm.c` implements the [WASM host ABI](docs/wasm-abi.md). |
 | `schema/plugin_ui_registry.json` | UI schema v1. Source of truth for the UI compiler and the device validator. |
 | `schema/plugin.schema.json` | Manifest schema (draft). |
 | `tools/plugin_ui_compile.py` | UI XML compiler. |
 | `cmd/aitbase-plugin/`, `internal/` | The `aitbase-plugin` CLI (Go, standard library only). |
 | `template/` | The project `init` creates. `template/.agents/skills/` is the only copy of the plugin skills; `init` also writes them to `.claude/skills/`. |
 | `sdkfiles.go` | Embeds `template/` and the files vendored into a project's `sdk/`. |
-| `docs/` | Customer-facing reference: [CLI](docs/cli.md), [UI XML](docs/ui-xml.md), [protocol](docs/plugin-protocol.md), [package format](docs/package-format.md). |
+| `docs/` | Customer-facing reference: [CLI](docs/cli.md), [UI XML](docs/ui-xml.md), [protocol](docs/plugin-protocol.md), [WASM host ABI](docs/wasm-abi.md), [package format](docs/package-format.md). |
 | `llms.txt` | Index of the docs for agents. |
 
 ## Rules
