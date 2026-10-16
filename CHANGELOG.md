@@ -4,6 +4,7 @@
 
 - **Supervised plugins:** when the device's plugin supervisor sets `AITBASE_PLUGIN_FD`, the native runtime uses that inherited socket instead of connecting to the development socket, and makes the process non-dumpable (`PR_SET_DUMPABLE`). A value that isn't a connected socket is an error; the runtime never falls back to the path. See [docs/plugin-protocol.md](docs/plugin-protocol.md).
 - **Protocol docs:** the supervised transport, and the `identity_mismatch` error for a `hello` that claims another plugin's identity.
+- **WASM runtime (preview):** with wasi-sdk 34 or later (`CMAKE_SYSTEM_NAME` `WASI`), `aitbase::plugin` builds the plugin as a WebAssembly reactor that speaks the device's WASM host ABI ([docs/wasm-abi.md](docs/wasm-abi.md)). Plugin code is unchanged. The native and WASM runtimes now share one protocol core (`src/aitbase_plugin_core.c`). `aitbase-plugin build` and `pack` don't produce WASM packages yet.
 
 ## 0.3.0 — 2026-10-16
 
