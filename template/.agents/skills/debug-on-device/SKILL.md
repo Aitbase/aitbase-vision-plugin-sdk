@@ -27,7 +27,7 @@ The device reports problems as events. Make sure `aitbase_on_event` logs these, 
 ## 3. Nothing runs on the device
 
 Ask the user to open the Device Console's **Advanced → Plugins** page:
-- **Developer mode off:** they turn it on there; nothing on the SD card runs until then.
+- **Developer mode off:** it is on by default, so the user turned it off; they turn it back on there. Nothing on the SD card runs while it is off.
 - **The package is listed as skipped:** the reason says why, for example no `<entry>.wasm` because the build was native. Run `aitbase-plugin build --wasm` and `pack --wasm` again.
 - **"Last run ... ended":** the reason is also at the end of the log, for example `exit 121` (the device refused the module) or `exit 122` (a trap, or a callback ran too long).
 
