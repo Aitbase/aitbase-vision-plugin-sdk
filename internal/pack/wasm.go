@@ -21,6 +21,10 @@ var requiredExports = []string{"memory", "aitbase_abi_version", "aitbase_rx_buff
 // MaxModuleBytes is the largest module the device accepts.
 const MaxModuleBytes = 4 << 20
 
+// MaxMemoryPages is the device's linear-memory cap, in 64 KiB pages (2 MiB). memory.grow past it
+// returns -1, and the device refuses a module whose initial memory is already larger.
+const MaxMemoryPages = 32
+
 var wasmHeader = []byte{0, 'a', 's', 'm', 1, 0, 0, 0}
 
 type section struct {
@@ -124,6 +128,29 @@ func CheckModule(data []byte) error {
 				}
 				_, pos, err = readULEB(body, pos+1)
 				exports[name] = true
+			}
+			if err != nil {
+				return fmt.Errorf("WASM_INVALID: %v", err)
+			}
+		case 5: // memories: flags, initial pages, optional maximum
+			count, pos, err := readULEB(body, s.start)
+			for i := uint32(0); err == nil && i < count; i++ {
+				if pos >= len(body) {
+					err = fmt.Errorf("malformed memory section")
+					break
+				}
+				flags := body[pos]
+				var initial uint32
+				if initial, pos, err = readULEB(body, pos+1); err != nil {
+					break
+				}
+				if flags&1 != 0 {
+					_, pos, err = readULEB(body, pos)
+				}
+				if err == nil && initial > MaxMemoryPages {
+					return fmt.Errorf("WASM_MEMORY_TOO_LARGE: the module starts with %d pages (%d KiB) of memory, the device allows %d (%d KiB); make large static arrays smaller, or allocate them with malloc",
+						initial, initial*64, MaxMemoryPages, MaxMemoryPages*64)
+				}
 			}
 			if err != nil {
 				return fmt.Errorf("WASM_INVALID: %v", err)
