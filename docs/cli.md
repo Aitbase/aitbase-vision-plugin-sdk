@@ -2,7 +2,7 @@
 
 `aitbase-plugin` creates, checks, builds and packages plugins. It is one program with no runtime dependencies, built for Windows, macOS and Linux.
 
-> **Preview.** `init`, `check`, `build`, `pack` and `version` work today. `build` still needs CMake and a C compiler, and `check` uses Python 3.8+ to compile screens. The device commands (`devices`, `pair`, `dev`, `logs`, `screenshot`, `press`, `pack-sd`) are reserved names that return `NOT_AVAILABLE` until device firmware supports them.
+> **Preview.** `init`, `check`, `build`, `pack`, `toolchain` and `version` work today. `build` needs CMake. A native build also needs a C compiler; `build --wasm` downloads its own. `check` uses Python 3.8+ to compile screens. The device commands (`devices`, `pair`, `dev`, `logs`, `screenshot`, `press`, `pack-sd`) are reserved names that return `NOT_AVAILABLE` until device firmware supports them.
 
 ## Install
 
@@ -41,8 +41,9 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 |---|---|
 | `init <dir> --id <id> [--name <name>]` | Creates a plugin project: code, a screen, `AGENTS.md`, agent skills and a copy of the SDK in `sdk/`. |
 | `check [dir]` | Validates `plugin.json`, ids, file names and screens. |
-| `build [dir] [--build-dir <path>]` | Configures and builds with CMake (default build directory `<dir>/build`). Build output goes to stderr. |
-| `pack [dir] [--build-dir <path>] [--out <path>]` | Reads the program and compiled screens from the build directory (default `<dir>/build`), writes `<id>-<version>.avp` to the output directory (default `<dir>/dist`), and prints its SHA-256. |
+| `build [dir] [--wasm] [--build-dir <path>]` | Configures and builds with CMake. Build output goes to stderr. Without `--wasm`: a native build for the development bridge, in `<dir>/build`. With `--wasm`: WebAssembly for the device, in `<dir>/build-wasm`; see [WebAssembly](#webassembly). |
+| `pack [dir] [--wasm] [--build-dir <path>] [--out <path>]` | Without `--wasm`: reads the program and compiled screens from `<dir>/build` and writes `<id>-<version>.avp`. With `--wasm`: reads `<dir>/build-wasm` and writes `<id>-<version>-wasm.zip` for the device's SD card. Both go to the output directory (default `<dir>/dist`) and print their SHA-256. |
+| `toolchain` | Downloads wasi-sdk if needed and prints its path, for running CMake yourself or setting up an editor. |
 | `version` | Prints the SDK version. |
 
 `check` and `pack` also accept:
@@ -53,6 +54,22 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 `check` also accepts `--skip-ui`, which skips compiling screens.
 
 Flags may come before or after the directory. Paths given to `--sdk`, `--build-dir` and `--out` are relative to the current directory, or absolute; only the defaults are inside the project.
+
+## WebAssembly
+
+Devices run community plugins as WebAssembly. Two commands build one and package it:
+
+```sh
+aitbase-plugin build --wasm
+aitbase-plugin pack --wasm     # dist/<id>-<version>-wasm.zip
+```
+
+- **Toolchain:** `build --wasm` uses [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) 34.0. The first time, it downloads it, about 200 MB, into your user cache folder (`aitbase-plugin/` there). It checks the download against the SHA-256 pinned in the SDK before using it; a mismatch stops the build. Every later build reuses it. To use a wasi-sdk you already have, set `AITBASE_WASI_SDK` to its directory.
+- **Systems:** wasi-sdk is published for Linux, macOS and Windows on x86-64 and ARM64. On Windows, `build --wasm` also needs [Ninja](https://ninja-build.org/).
+- **What `pack --wasm` checks:** it strips debug information from the module, then refuses it if the device would: imports the device does not provide (for example files or sockets through WASI), missing exports, a start section, or more than 4 MiB.
+- **On the device:** the owner turns on **Developer mode** once, in the Device Console under **Advanced → Plugins**. Then unzip the package at the root of the SD card. It creates `aitbase/plugins/<id>/` with `<entry>.wasm`, the compiled screens and `plugin.json`, and the device runs the newest plugin there by itself. The log is in `aitbase/logs/<id>.log` on the card and on the Plugins page.
+
+The zip is an interim format: the planned community package is a signed `.avp` that the device verifies before running it ([package format](package-format.md)).
 
 ## JSON output
 
@@ -75,9 +92,10 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 }
 ```
 
-- `pack` adds `package`, `sha256` and `bytes`.
+- `pack` adds `package`, `sha256` and `bytes`; with `--wasm` also `module_bytes` and `sd_dir`.
+- `toolchain` adds `wasi_sdk`, `wasi_sdk_version` and `toolchain_file`.
 - `init` adds `dir`, `id` and `files`.
-- `build` adds `build_dir`.
+- `build` adds `build_dir` and `wasm`, and with `--wasm` also `wasi_sdk`.
 
 Exit codes:
 
@@ -123,7 +141,14 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `INIT_FAILED` | `init` could not create the project, for example because the directory is not empty. |
 | `CMAKE_NOT_FOUND` | CMake is not installed. |
 | `BUILD_FAILED` | CMake configure or build failed; the compiler output is on stderr. |
-| `BUILD_OUTPUT_MISSING` | `pack` could not find the program or a compiled screen. Run `build` first. |
+| `BUILD_OUTPUT_MISSING` | `pack` could not find the program or a compiled screen. Run `build` first (`build --wasm` for `pack --wasm`). |
+| `WASI_SDK_UNAVAILABLE` | `build --wasm` or `toolchain` could not download or find wasi-sdk, or the download did not match its pinned SHA-256. |
+| `NINJA_NOT_FOUND` | `build --wasm` on Windows needs Ninja. |
+| `WASM_INVALID` | `pack --wasm` found no valid WebAssembly module: a native build, or a damaged file. |
+| `WASM_TOO_LARGE` | The module is over the device's 4 MiB limit. |
+| `WASM_IMPORT_REFUSED` | The module imports something the device does not provide, for example a file or socket call through WASI. |
+| `WASM_EXPORT_MISSING` | The module lacks the exports the device calls; it was not linked with `aitbase::plugin` for WebAssembly. |
+| `WASM_START_SECTION` | The module has a start section, which the device refuses; build it with the SDK's CMake. |
 | `PACKAGE_TOO_LARGE` | The package is over the 4 MB limit. |
 | `WRITE_FAILED` | The package could not be written. |
 | `NOT_AVAILABLE` | The command needs device support that does not exist yet. |

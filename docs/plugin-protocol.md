@@ -8,9 +8,9 @@ Two runtimes speak this protocol:
 
 | Runtime | Connection | Status |
 |---|---|---|
-| Development | A native plugin process connects to `/tmp/aitbase_plugin_dev.sock`, mode `0600`, root only. Set `AITBASE_PLUGIN_ENDPOINT` to override the path. | Available on developer firmware (`CC_ENABLE_PLUGIN_UI=ON`, `CC_ENABLE_PLUGIN_DEV_BRIDGE=ON`). |
-| Supervised (native) | The device's plugin supervisor starts the plugin in a sandbox and hands it a connected socket as an inherited descriptor, named by `AITBASE_PLUGIN_FD`. The SDK runtime uses it instead of the path and makes the process non-dumpable. The device binds the connection to the plugin identity it assigned. | Official native plugins on developer firmware with `CC_ENABLE_PLUGIN_SUPERVISOR=ON`. |
-| Supervised (WASM) | The same supervisor starts a sandboxed WASM runner, which hosts the plugin module and passes the same messages through the [WASM host ABI](wasm-abi.md). | Preview, on developer firmware with `CC_ENABLE_PLUGIN_SUPERVISOR=ON`. |
+| Development socket | A native plugin process connects to `/tmp/aitbase_plugin_dev.sock`. Set `AITBASE_PLUGIN_ENDPOINT` to override the path. | Removed from device firmware; the SDK's native runtime still supports it for older developer firmware. |
+| Supervised (native) | The device's plugin supervisor starts the plugin in a sandbox and hands it a connected socket as an inherited descriptor, named by `AITBASE_PLUGIN_FD`. The SDK runtime uses it instead of the path and makes the process non-dumpable. The device binds the connection to the plugin identity it assigned. | Official native plugins, shipped in firmware. |
+| Supervised (WASM) | The same supervisor starts a sandboxed WASM runner, which hosts the plugin module and passes the same messages through the [WASM host ABI](wasm-abi.md). | Preview, in current firmware. Community plugins on the SD card run while the owner's Developer mode is on. |
 | Production (WASM) | As supervised WASM, plus permission checks, package verification and installation from SD. | Planned. |
 
 The device serves one plugin connection at a time. When a plugin disconnects, the device closes that plugin's screen.
