@@ -39,7 +39,7 @@ The public SDK for AITBASE VISION plugins. Its readers are customers who own a d
   - when the API, UI schema or capabilities change, update `template/AGENTS.md` and the skills in the same change.
 - **Windows must keep working** for everything that doesn't need the POSIX runtime:
   - no symlinks in the repository;
-  - no shell scripts on the customer path;
+  - no shell scripts on the customer path, except `install.sh`, which must keep an equivalent `install.ps1` for Windows;
   - use `filepath` for disk paths and slash paths inside packages.
 - **The CLI uses only the Go standard library,** so it ships as one binary.
 - **Diagnostic codes are stable.** Never reuse a code for a different meaning.

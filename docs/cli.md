@@ -6,6 +6,35 @@
 
 ## Install
 
+One command installs the CLI and the WebAssembly toolchain it builds plugins with:
+
+```sh
+# Linux and macOS
+curl -fsSL https://raw.githubusercontent.com/Aitbase/aitbase-vision-plugin-sdk/main/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/Aitbase/aitbase-vision-plugin-sdk/main/install.ps1 | iex
+```
+
+The installer:
+- downloads the newest release for your system;
+- checks it against the release's `SHA256SUMS`;
+- installs it in `~/.local/bin`, or `%LOCALAPPDATA%\aitbase\bin` on Windows, which it adds to your PATH;
+- runs `aitbase-plugin toolchain`, which downloads wasi-sdk, about 200 MB, once.
+
+It then lists anything else you need: CMake and Python 3, plus Ninja on Windows.
+
+To change what it does, set these environment variables:
+- `AITBASE_VERSION=v0.4.0` pins a release;
+- `AITBASE_INSTALL_DIR` picks the folder;
+- `AITBASE_SKIP_TOOLCHAIN=1` leaves the toolchain for the first `build --wasm`.
+
+Read the script before you pipe it to a shell if you prefer: [install.sh](../install.sh), [install.ps1](../install.ps1).
+
+### Manual install
+
 Download the file for your system from the [latest release](https://github.com/Aitbase/aitbase-vision-plugin-sdk/releases):
 
 | System | File |
@@ -47,7 +76,7 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 | `version` | Prints the SDK version. |
 
 `check` and `pack` also accept:
-- `--sdk <dir>`: the SDK holding the UI compiler (default `<dir>/sdk`);
+- `--sdk <dir>`: the SDK holding the UI compiler. The default is the nearest `sdk/` in the project directory or a parent, so a plugin in a repository of plugins uses the repository's SDK;
 - `--python <path>`: the Python 3 interpreter;
 - `--allow-reserved-id`: allow the `aitbase.*` id namespace (official plugins only).
 
@@ -79,7 +108,7 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 {
   "ok": false,
   "command": "check",
-  "sdk_version": "0.3.0",
+  "sdk_version": "0.4.0",
   "diagnostics": [
     {
       "severity": "error",

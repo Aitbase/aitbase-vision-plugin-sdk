@@ -217,3 +217,25 @@ func fmtDiags(res map[string]any) string {
 	data, _ := json.Marshal(res["diagnostics"])
 	return string(data)
 }
+
+// A plugin inside a repository of plugins uses the repository's sdk/ without --sdk.
+func TestSDKFoundInParent(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "sdk", "include"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(root, "sdk", "include", "aitbase_plugin.h"), []byte("/* sdk */"), 0o644)
+	plugin := filepath.Join(root, "plugins", "p")
+	os.MkdirAll(plugin, 0o755)
+	if got := sdkFlag(plugin, ""); got != filepath.Join(root, "sdk") {
+		t.Fatalf("sdkFlag = %q, want the repository's sdk", got)
+	}
+	if got := sdkFlag(plugin, "custom"); got != "custom" {
+		t.Fatalf("--sdk not used as given: %q", got)
+	}
+	os.MkdirAll(filepath.Join(plugin, "sdk", "include"), 0o755)
+	os.WriteFile(filepath.Join(plugin, "sdk", "include", "aitbase_plugin.h"), []byte("/* own */"), 0o644)
+	if got := sdkFlag(plugin, ""); got != filepath.Join(plugin, "sdk") {
+		t.Fatalf("a project's own sdk/ comes first: %q", got)
+	}
+}
