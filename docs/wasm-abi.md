@@ -69,7 +69,7 @@ Module `wasi_snapshot_preview1`: wasi-libc links these into any program that use
 | | |
 |---|---|
 | Module size | 4 MiB |
-| Linear memory | 4 MiB (64 pages); `memory.grow` past it returns -1 |
+| Linear memory | 2 MiB (32 pages), including static data and the stack. `memory.grow` past it returns -1, so `malloc` returns `NULL`; a module that starts with more is refused. |
 | Instructions per call | Provisional: 50 million counted WebAssembly instructions, to be calibrated per device |
 | Threads | None |
 | Message to the device | 20480 bytes |
