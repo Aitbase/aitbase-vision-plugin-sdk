@@ -13,8 +13,8 @@ description: Turn a user's idea into a working AITBASE VISION plugin in this pro
    - `aitbase_on_event`: on `AITBASE_EVENT_OPENED` set the initial values; on `AITBASE_EVENT_ACTION` compare `event->action` and update state; on `PREEMPTED`, `REJECTED` and `CLOSED` call `aitbase_plugin_stop`.
    - Keep state in `static` variables. Format text with `snprintf` into a fixed buffer; labels hold at most 80 bytes.
    - Update a label with `aitbase_ui_set_text(p, "<instance>.<label>", "title", text)`. The node name is the component instance name, a dot, then the label name.
-5. **Check and build** with `aitbase-plugin check --json` and `aitbase-plugin build --json`. Fix each diagnostic using its `fix` field, and repeat until both pass.
-6. **Package** with `aitbase-plugin pack --json` when the user wants a file to share.
+5. **Check and build** with `aitbase-plugin check --json` and `aitbase-plugin build --wasm --json`. Fix each diagnostic using its `fix` field, and repeat until both pass.
+6. **Package** with `aitbase-plugin pack --wasm --json`. The user unzips `dist/<id>-<version>-wasm.zip` at the root of the device's SD card to try it.
 7. **Tell the user** what you changed, what the screen should look like, which buttons do what, and what they need to check on the device. Be clear that a build passing is not the same as working on the device.
 
 ## Common mistakes

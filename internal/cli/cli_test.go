@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"os"
@@ -127,8 +128,10 @@ func TestCodesDocumented(t *testing.T) {
 			used[string(m[1])] = true
 		}
 	}
-	// pack.go reports codes inside error strings.
+	// pack.go and wasm.go report codes inside error strings.
 	src, _ := os.ReadFile("../pack/pack.go")
+	wasmSrc, _ := os.ReadFile("../pack/wasm.go")
+	src = append(src, wasmSrc...)
 	for _, m := range regexp.MustCompile(`"([A-Z_]{4,}):`).FindAllSubmatch(src, -1) {
 		used[string(m[1])] = true
 	}
@@ -142,4 +145,75 @@ func TestCodesDocumented(t *testing.T) {
 			t.Errorf("docs/cli.md documents %s, which the code never reports", c)
 		}
 	}
+}
+
+// wasmModule is the smallest module pack --wasm accepts: the required exports, plus imports.
+func wasmModule(imports ...string) []byte {
+	str := func(s string) []byte { return append([]byte{byte(len(s))}, s...) }
+	sec := func(id byte, body []byte) []byte { return append([]byte{id, byte(len(body))}, body...) }
+	out := []byte{0, 'a', 's', 'm', 1, 0, 0, 0}
+	if len(imports) > 0 {
+		body := []byte{byte(len(imports))}
+		for _, imp := range imports {
+			m, f, _ := strings.Cut(imp, ".")
+			body = append(append(append(body, str(m)...), str(f)...), 0, 0)
+		}
+		out = append(out, sec(2, body)...)
+	}
+	exports := []string{"memory", "aitbase_abi_version", "aitbase_rx_buffer", "aitbase_start", "aitbase_message", "aitbase_timer", "aitbase_stop"}
+	body := []byte{byte(len(exports))}
+	for i, e := range exports {
+		body = append(append(body, str(e)...), 0, byte(i))
+	}
+	out = append(out, sec(7, body)...)
+	return append(out, sec(0, append(str("producers"), "clang"...))...)
+}
+
+func TestPackWasm(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "p")
+	if code, res := run(t, "init", dir, "--id", "alice.p"); code != 0 {
+		t.Fatalf("init: %v", res)
+	}
+	build := filepath.Join(dir, "build-wasm")
+	os.MkdirAll(build, 0o755)
+	os.WriteFile(filepath.Join(build, "main.ui.json"), []byte(`{"screen":"main"}`), 0o644)
+
+	os.WriteFile(filepath.Join(build, "p"), []byte("\x7fELF native"), 0o755)
+	if code, res := run(t, "pack", dir, "--wasm", "--skip-ui"); code == 0 || !strings.Contains(fmtDiags(res), "WASM_INVALID") {
+		t.Fatalf("a native program was packed: %v", res)
+	}
+	os.WriteFile(filepath.Join(build, "p"), wasmModule("aitbase.send", "wasi_snapshot_preview1.path_open"), 0o644)
+	if code, res := run(t, "pack", dir, "--wasm"); code == 0 || !strings.Contains(fmtDiags(res), "WASM_IMPORT_REFUSED") {
+		t.Fatalf("a module importing path_open was packed: %v", res)
+	}
+	os.WriteFile(filepath.Join(build, "p"), wasmModule("aitbase.send"), 0o644)
+	code, res := run(t, "pack", dir, "--wasm")
+	if code != 0 {
+		t.Fatalf("pack --wasm: %v", res)
+	}
+	pkg, _ := res["package"].(string)
+	if filepath.Base(pkg) != "alice.p-0.1.0-wasm.zip" || res["sd_dir"] != "aitbase/plugins/alice.p" {
+		t.Fatalf("unexpected result: %v", res)
+	}
+	zr, err := zip.OpenReader(pkg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	var names []string
+	for _, f := range zr.File {
+		names = append(names, f.Name)
+	}
+	want := []string{"aitbase/plugins/alice.p/main.ui.json", "aitbase/plugins/alice.p/p.wasm", "aitbase/plugins/alice.p/plugin.json"}
+	if strings.Join(names, ",") != strings.Join(want, ",") {
+		t.Fatalf("zip holds %v, want %v", names, want)
+	}
+	if int(res["module_bytes"].(float64)) >= len(wasmModule("aitbase.send")) {
+		t.Fatal("custom sections were not stripped")
+	}
+}
+
+func fmtDiags(res map[string]any) string {
+	data, _ := json.Marshal(res["diagnostics"])
+	return string(data)
 }
