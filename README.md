@@ -2,7 +2,7 @@
 
 Build plugins that put their own screen on an AITBASE VISION device.
 
-> **Status: 0.3.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Running plugins currently needs a device on development firmware, and release firmware does not load plugins yet.
+> **Status: 0.3.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs WebAssembly plugins from the SD card once the owner turns on Developer mode in the Device Console. Signed packages and store distribution are not available yet.
 
 ## Quick start
 
@@ -15,7 +15,7 @@ aitbase-plugin build --wasm   # downloads the WebAssembly toolchain the first ti
 aitbase-plugin pack --wasm    # dist/yourname.my-plugin-0.1.0-wasm.zip
 ```
 
-Unzip the package at the root of a development device's SD card, and the device runs it. See [WebAssembly](docs/cli.md#webassembly).
+Turn on **Developer mode** once in the device's Device Console (Advanced → Plugins), then unzip the package at the root of its SD card, and the device runs it. See [WebAssembly](docs/cli.md#webassembly).
 
 The new project is ready for AI coding agents:
 - **`AGENTS.md` and `CLAUDE.md`:** what plugins can and cannot do, and the check/build loop.
