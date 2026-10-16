@@ -57,6 +57,11 @@ func TestCheckModule(t *testing.T) {
 	if err := CheckModule(good); err != nil {
 		t.Fatalf("valid module refused: %v", err)
 	}
+	// Memory at the cap, with a larger maximum: the device caps growth, so that is fine.
+	atCap := testModule(abiImports, requiredExports, sec(5, append(leb(1), append(append([]byte{1}, leb(MaxMemoryPages)...), leb(65536)...)...)))
+	if err := CheckModule(atCap); err != nil {
+		t.Fatalf("memory at the cap refused: %v", err)
+	}
 	cases := []struct {
 		name, code string
 		data       []byte
@@ -67,6 +72,7 @@ func TestCheckModule(t *testing.T) {
 		{"start section", "WASM_START_SECTION", testModule(abiImports, requiredExports, sec(8, leb(0)))},
 		{"not wasm", "WASM_INVALID", []byte("\x7fELF native binary")},
 		{"truncated", "WASM_INVALID", good[:len(good)-3]},
+		{"initial memory over the cap", "WASM_MEMORY_TOO_LARGE", testModule(abiImports, requiredExports, sec(5, append(leb(1), append([]byte{0}, leb(MaxMemoryPages+1)...)...)))},
 		{"too large", "WASM_TOO_LARGE", append(append([]byte(nil), good...), make([]byte, MaxModuleBytes)...)},
 	}
 	for _, c := range cases {
