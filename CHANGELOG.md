@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — unreleased
+
+Storage, HTTP and sound through the device's capability broker. Needs device firmware with the broker (D4); older firmware answers these requests with `unknown_op`.
+
+- **Capabilities:** `storage`, `http` and `audio.output` join `ui`. Request them in `plugin.json`. While Developer mode is on, the device grants what a plugin requests. [docs/capabilities.md](docs/capabilities.md) lists every operation, limit and error code; it, `include/aitbase_capabilities.h` and `schema/plugin_capability_registry.json` are generated from the device's capability registry.
+- **API:** `aitbase_storage_get`, `_set`, `_delete`, `_keys`; `aitbase_http_get`, `aitbase_http_request`; `aitbase_audio_tone`, `_play`, `_stop`. They return a request id. Results arrive as the new `AITBASE_EVENT_RESULT` and `AITBASE_EVENT_SOUND_DONE`, and errors as `AITBASE_EVENT_ERROR`, all with the id in the new `event->request`. New event fields: `request`, `text`, `text_len`, `code`, `truncated`, `location`. Rebuild plugins: the event struct grew.
+- **Sounds:** `sounds/<name>.wav` (16 kHz, mono, 16-bit PCM, at most 10 s), listed in the manifest's new `sounds` field. `check` validates them (`SOUND_NAME`, `SOUND_MISSING`, `SOUND_FORMAT`, `CAPABILITY_AUDIO_MISSING`) and `pack` includes them.
+- **Larger messages from the device:** the receive buffer is 16 KiB. `hello` sends `rx_max`, and WASM modules export `aitbase_rx_capacity`; devices without them keep sending at most 4 KiB.
+
 ## 0.4.0 — 2026-10-16
 
 WebAssembly plugins that run on current device firmware, and a one-line install.

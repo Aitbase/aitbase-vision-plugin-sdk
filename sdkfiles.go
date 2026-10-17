@@ -4,7 +4,7 @@ package aitbasesdk
 import "embed"
 
 // Version is the SDK release. It must match project(... VERSION) in CMakeLists.txt.
-const Version = "0.4.0"
+const Version = "0.5.0"
 
 // Template is the plugin project that `aitbase-plugin init` creates.
 //
@@ -17,3 +17,9 @@ var Template embed.FS
 //go:embed CMakeLists.txt README.md CHANGELOG.md docs include src cmake schema third_party
 //go:embed tools/plugin_ui_compile.py tools/plugin_ui_registry.py
 var Runtime embed.FS
+
+// CapabilityRegistry is the device's capability registry (D4), generated from the device app: the
+// capabilities a plugin can request, the operations behind them and their limits.
+//
+//go:embed schema/plugin_capability_registry.json
+var CapabilityRegistry []byte

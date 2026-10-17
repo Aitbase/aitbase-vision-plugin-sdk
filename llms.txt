@@ -1,6 +1,6 @@
 # AITBASE VISION Plugin SDK
 
-> Build plugins with their own screens for AITBASE VISION camera robots. Plugins are C callbacks plus restricted LVGL-style XML screens; the device renders the UI and owns the two physical buttons. Preview (SDK 0.4, plugin API 1): only the "ui" capability exists, and the device runs plugins from its SD card (Developer mode, on by default).
+> Build plugins with their own screens for AITBASE VISION camera robots. Plugins are C callbacks plus restricted LVGL-style XML screens; the device renders the UI and owns the two physical buttons. Preview (SDK 0.5, plugin API 1): capabilities ui, storage, http and audio.output; the device runs plugins from its SD card (Developer mode, on by default).
 
 Start a project with `aitbase-plugin init <dir> --id <yourname.plugin>` and follow its AGENTS.md. Do not use features that are not listed in these documents.
 
@@ -10,6 +10,7 @@ Start a project with `aitbase-plugin init <dir> --id <yourname.plugin>` and foll
 - [CLI reference](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/cli.md): commands, JSON output, every diagnostic code
 - [UI XML](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/ui-xml.md): accepted widgets, attributes, colors, actions and limits
 - [C API](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/include/aitbase_plugin.h): callbacks, calls and events
+- [Capabilities](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/capabilities.md): storage, HTTP and sound; limits, status and error codes (generated from the device)
 - [Package format](https://github.com/Aitbase/aitbase-vision-plugin-sdk/blob/main/docs/package-format.md): .avp files and SD card layout (draft)
 
 ## Skills

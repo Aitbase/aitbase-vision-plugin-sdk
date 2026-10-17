@@ -15,6 +15,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	aitbasesdk "github.com/Aitbase/aitbase-vision-plugin-sdk"
 )
 
 type Severity string
@@ -43,6 +45,7 @@ type Manifest struct {
 	Entry                 string   `json:"entry"`
 	UI                    *UI      `json:"ui"`
 	RequestedCapabilities []string `json:"requested_capabilities"`
+	Sounds                []string `json:"sounds"`
 }
 
 type UI struct {
@@ -78,11 +81,47 @@ func (r *Result) add(sev Severity, code, p, msg, fix string) {
 
 const SupportedAPIVersion = 1
 
-// Capabilities the device accepts today, and ones that are planned but not available yet.
-var availableCapabilities = map[string]bool{"ui": true}
+// Capabilities the device accepts today come from its capability registry (D4); these are
+// planned but not available yet.
+var availableCapabilities = registryCapabilities()
 var plannedCapabilities = map[string]bool{
-	"camera.capture": true, "camera.preview": true, "microphone.capture": true,
-	"audio.playback": true, "http": true, "mcp": true, "storage": true,
+	"camera.capture": true, "camera.preview": true, "microphone.capture": true, "mcp": true,
+}
+
+// Limits from the registry that check enforces before a package reaches a device.
+var registryLimits = struct {
+	SoundBytesMax int `json:"audio_sound_bytes_max"`
+	SampleRate    int `json:"audio_sample_rate"`
+}{}
+
+func registryCapabilities() map[string]bool {
+	var reg struct {
+		Grants []struct {
+			Name string `json:"name"`
+		} `json:"grants"`
+		Limits json.RawMessage `json:"limits"`
+	}
+	if err := json.Unmarshal(aitbasesdk.CapabilityRegistry, &reg); err != nil {
+		panic("schema/plugin_capability_registry.json: " + err.Error())
+	}
+	if err := json.Unmarshal(reg.Limits, &registryLimits); err != nil {
+		panic("schema/plugin_capability_registry.json limits: " + err.Error())
+	}
+	caps := map[string]bool{}
+	for _, g := range reg.Grants {
+		caps[g.Name] = true
+	}
+	return caps
+}
+
+// AvailableCapabilities lists what a plugin can request, sorted.
+func AvailableCapabilities() []string {
+	names := make([]string, 0, len(availableCapabilities))
+	for c := range availableCapabilities {
+		names = append(names, c)
+	}
+	sort.Strings(names)
+	return names
 }
 
 var (
@@ -92,7 +131,7 @@ var (
 	sourceIDRegexp = regexp.MustCompile(`AITBASE_PLUGIN_ID\(\s*"([^"]*)"\s*\)`)
 	uiErrorPattern = regexp.MustCompile(`^(UI_[A-Z_]+) at (\S+): (.*)$`)
 	knownFields    = map[string]bool{"id": true, "name": true, "version": true, "api_version": true,
-		"description": true, "entry": true, "ui": true, "requested_capabilities": true}
+		"description": true, "entry": true, "ui": true, "requested_capabilities": true, "sounds": true}
 )
 
 // Project checks the plugin project rooted at dir. sdkDir is the SDK copy that holds the UI
@@ -181,17 +220,42 @@ func checkManifest(r *Result, dir string, opt Options) *Manifest {
 		}
 	}
 
-	hasUI := false
+	seenSound := map[string]bool{}
+	for _, s := range m.Sounds {
+		p := file + "#sounds"
+		switch {
+		case !namePattern.MatchString(s) || len(s) > 32:
+			r.add(Error, "SOUND_NAME", p, fmt.Sprintf("sound name %q is not valid", s), "use lowercase letters, digits and '_', at most 32 characters")
+		case seenSound[s]:
+			r.add(Error, "SOUND_NAME", p, fmt.Sprintf("sound %q is listed twice", s), "list each sound once")
+		default:
+			wav := "sounds/" + s + ".wav"
+			data, err := os.ReadFile(filepath.Join(dir, "sounds", s+".wav"))
+			if err != nil {
+				r.add(Error, "SOUND_MISSING", wav, fmt.Sprintf("sound %q has no file", s), "add "+wav+" or remove it from sounds")
+			} else if problem := WavProblem(data); problem != "" {
+				r.add(Error, "SOUND_FORMAT", wav, problem, "convert it, e.g. `ffmpeg -i in.mp3 -ac 1 -ar 16000 -sample_fmt s16 "+wav+"`")
+			}
+		}
+		seenSound[s] = true
+	}
+
+	hasUI, hasAudio := false, false
+	supported := strings.Join(AvailableCapabilities(), ", ")
 	for _, c := range m.RequestedCapabilities {
 		p := file + "#requested_capabilities"
 		switch {
 		case availableCapabilities[c]:
 			hasUI = hasUI || c == "ui"
+			hasAudio = hasAudio || c == "audio.output"
 		case plannedCapabilities[c]:
-			r.add(Error, "CAPABILITY_UNAVAILABLE", p, fmt.Sprintf("capability %q is planned but no device supports it yet", c), "remove it; this SDK version only supports \"ui\"")
+			r.add(Error, "CAPABILITY_UNAVAILABLE", p, fmt.Sprintf("capability %q is planned but no device supports it yet", c), "remove it; this SDK version supports: "+supported)
 		default:
-			r.add(Error, "CAPABILITY_UNKNOWN", p, fmt.Sprintf("capability %q does not exist", c), "remove it; this SDK version only supports \"ui\"")
+			r.add(Error, "CAPABILITY_UNKNOWN", p, fmt.Sprintf("capability %q does not exist", c), "remove it; this SDK version supports: "+supported)
 		}
+	}
+	if len(m.Sounds) > 0 && !hasAudio {
+		r.add(Error, "CAPABILITY_AUDIO_MISSING", file+"#requested_capabilities", "the plugin has sounds but does not request \"audio.output\"", `add "audio.output" to requested_capabilities`)
 	}
 	if m.UI != nil && len(m.UI.Screens) > 0 && !hasUI {
 		r.add(Error, "CAPABILITY_UI_MISSING", file+"#requested_capabilities", "the plugin has screens but does not request \"ui\"", `add "ui" to requested_capabilities`)
