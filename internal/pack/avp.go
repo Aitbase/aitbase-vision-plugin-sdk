@@ -2,6 +2,7 @@ package pack
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,8 +10,11 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"hash/crc32"
+	"sort"
 	"strings"
 
+	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/check"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/signing"
 )
 
@@ -19,18 +23,13 @@ const SignaturePrefix = "AVP-SIG-1 "
 
 // BuildAVP writes a signed package (format 1): a deterministic zip of files, its comment
 // "AVP-SIG-1 <base64 public key> <base64 signature>". The ECDSA-SHA256 signature covers every byte
-// before the comment length field. The module and sounds are stored, not deflated, so the device
-// can use them in place without a second copy in memory.
+// before the comment length field. Every entry is stored, with no extra fields or data
+// descriptors, so the device reads each file in place on the SD card and never unpacks anything.
 //
 // It returns the package and the digest of the signed bytes, which depends only on the contents
 // (the signature itself differs each time).
 func BuildAVP(files []File, key *ecdsa.PrivateKey) ([]byte, string, error) {
-	unsigned, _, err := build(files, func(name string) uint16 {
-		if strings.HasSuffix(name, ".wasm") || strings.HasSuffix(name, ".wav") {
-			return zip.Store
-		}
-		return zip.Deflate
-	})
+	unsigned, err := buildStored(files)
 	if err != nil {
 		return nil, "", err
 	}
@@ -56,4 +55,47 @@ func BuildAVP(files []File, key *ecdsa.PrivateKey) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("PACKAGE_TOO_LARGE: %d bytes, the limit is %d", len(out), MaxPackageBytes)
 	}
 	return out, hex.EncodeToString(sum[:]), nil
+}
+
+// buildStored writes the deterministic zip of files with every entry stored: sizes and CRC in
+// each local header, no extra fields, no data descriptors, a zero timestamp.
+func buildStored(files []File) ([]byte, error) {
+	sorted := append([]File(nil), files...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+	seen := map[string]string{}
+	for _, f := range sorted {
+		if code, msg := check.CheckPackagePath(f.Name); code != "" {
+			return nil, fmt.Errorf("%s: %s: %s", code, f.Name, msg)
+		}
+		key := strings.ToLower(f.Name)
+		if other, ok := seen[key]; ok {
+			return nil, fmt.Errorf("PATH_CASE_COLLISION: %s and %s differ only by letter case", other, f.Name)
+		}
+		seen[key] = f.Name
+	}
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, f := range sorted {
+		h := &zip.FileHeader{
+			Name:               f.Name,
+			Method:             zip.Store,
+			CRC32:              crc32.ChecksumIEEE(f.Data),
+			CompressedSize64:   uint64(len(f.Data)),
+			UncompressedSize64: uint64(len(f.Data)),
+		}
+		w, err := zw.CreateRaw(h)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := w.Write(f.Data); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	if buf.Len() > MaxPackageBytes {
+		return nil, fmt.Errorf("PACKAGE_TOO_LARGE: %d bytes, the limit is %d", buf.Len(), MaxPackageBytes)
+	}
+	return buf.Bytes(), nil
 }

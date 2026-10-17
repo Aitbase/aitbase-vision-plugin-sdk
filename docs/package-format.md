@@ -6,14 +6,16 @@ A package is one file named `<id>-<version>.avp`, for example `alice.weather-1.2
 
 An `.avp` is a zip archive holding exactly these files, at its top level:
 
-| Entry | Contents | Compression |
-|---|---|---|
-| `plugin.json` | The manifest ([schema](../schema/plugin.schema.json)). | Deflate |
-| `<entry>.wasm` | The WebAssembly module, at most 4 MiB. | Stored |
-| `<screen>.ui.json` | One compiled screen per entry in `ui.screens`, at most 16 KiB each. | Deflate |
-| `sounds/<name>.wav` | One sound per entry in `sounds`: 16 kHz, mono, 16-bit PCM, at most 10 s. | Stored |
+| Entry | Contents |
+|---|---|
+| `plugin.json` | The manifest ([schema](../schema/plugin.schema.json)). |
+| `<entry>.wasm` | The WebAssembly module, at most 4 MiB. |
+| `<screen>.ui.json` | One compiled screen per entry in `ui.screens`, at most 16 KiB each. |
+| `sounds/<name>.wav` | One sound per entry in `sounds`: 16 kHz, mono, 16-bit PCM, at most 10 s. |
 
-The device refuses a package with any other file, a listed file missing, or the same name twice. The module and sounds are stored uncompressed, so the device uses them in place without a second copy in memory.
+Every entry is **stored** (not compressed), with its sizes in its local header, no extra field and no data descriptor. The device refuses a package with compressed entries, any other file, a listed file missing, or the same name twice.
+
+The device never unpacks a package: it reads each file in place from the SD card, so a large package uses no more of the device's memory than a small one.
 
 ## Signature
 
@@ -27,7 +29,7 @@ AVP-SIG-1 <base64 public key> <base64 signature>
 - **Signature:** ECDSA with SHA-256 (DER), over every byte of the file before the end-of-central-directory record's comment length field.
 - **Author:** the SHA-256 of the public key. The Device Console shows its first 16 hex digits.
 
-The device reads the whole file into memory, checks the signature, then checks and extracts every entry from those bytes. It runs only those verified bytes; it never reads the card again for that run.
+The device checks the signature by reading the file in small pieces and records each file's SHA-256. Whenever it reads a file later (the module to start the plugin, a sound to play it), it checks that hash, so a file changed after the check is refused.
 
 A signature identifies who packed a plugin and shows it hasn't changed since. It doesn't make a plugin safe: every plugin runs in the same sandbox, with only the capabilities it requests.
 
