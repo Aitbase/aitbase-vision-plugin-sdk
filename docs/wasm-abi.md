@@ -21,7 +21,7 @@ cmake -S . -B build-wasm \
 cmake --build build-wasm
 ```
 
-The module is written as `build-wasm/<entry>`. A device package names it `<entry>.wasm`. `.avp` packages with a module are not supported yet.
+The module is written as `build-wasm/<entry>`. A device package names it `<entry>.wasm` ([package format](package-format.md)).
 
 ## Exports (plugin → device)
 

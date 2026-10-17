@@ -2,7 +2,7 @@
 
 `aitbase-plugin` creates, checks, builds and packages plugins. It is one program with no runtime dependencies, built for Windows, macOS and Linux.
 
-> **Preview.** `init`, `check`, `build`, `pack`, `toolchain` and `version` work today. `build` needs CMake. A native build also needs a C compiler; `build --wasm` downloads its own. `check` uses Python 3.8+ to compile screens. The device commands (`devices`, `pair`, `dev`, `logs`, `screenshot`, `press`, `pack-sd`) are reserved names that return `NOT_AVAILABLE` until device firmware supports them.
+> **Preview.** `init`, `check`, `build`, `pack`, `key`, `toolchain` and `version` work today. `build` needs CMake. A native build also needs a C compiler; `build --wasm` downloads its own. `check` uses Python 3.8+ to compile screens. The device commands (`devices`, `pair`, `dev`, `logs`, `screenshot`, `press`, `pack-sd`) are reserved names that return `NOT_AVAILABLE` until device firmware supports them.
 
 ## Install
 
@@ -71,7 +71,8 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 | `init <dir> --id <id> [--name <name>]` | Creates a plugin project: code, a screen, `AGENTS.md`, agent skills and a copy of the SDK in `sdk/`. |
 | `check [dir]` | Validates `plugin.json`, ids, file names and screens. |
 | `build [dir] [--wasm] [--build-dir <path>]` | Configures and builds with CMake. Build output goes to stderr. Without `--wasm`: a native build for the development bridge, in `<dir>/build`. With `--wasm`: WebAssembly for the device, in `<dir>/build-wasm`; see [WebAssembly](#webassembly). |
-| `pack [dir] [--wasm] [--build-dir <path>] [--out <path>]` | Without `--wasm`: reads the program and compiled screens from `<dir>/build` and writes `<id>-<version>.avp`. With `--wasm`: reads `<dir>/build-wasm` and writes `<id>-<version>-wasm.zip` for the device's SD card. Both go to the output directory (default `<dir>/dist`) and print their SHA-256. |
+| `pack [dir] [--wasm] [--build-dir <path>] [--out <path>]` | With `--wasm`: reads `<dir>/build-wasm` and writes the signed `<id>-<version>.avp` for the device's SD card. Without it: reads a native build from `<dir>/build` and writes `<id>-<version>-native.zip`, which devices don't run. Both go to the output directory (default `<dir>/dist`) and print their SHA-256. |
+| `key` | Shows your signing key's path and author fingerprint, creating the key if it doesn't exist yet. |
 | `toolchain` | Downloads wasi-sdk if needed and prints its path, for running CMake yourself or setting up an editor. |
 | `version` | Prints the SDK version. |
 
@@ -90,15 +91,16 @@ Devices run community plugins as WebAssembly. Two commands build one and package
 
 ```sh
 aitbase-plugin build --wasm
-aitbase-plugin pack --wasm     # dist/<id>-<version>-wasm.zip
+aitbase-plugin pack --wasm     # dist/<id>-<version>.avp, signed
 ```
 
 - **Toolchain:** `build --wasm` uses [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) 34.0. The first time, it downloads it, about 200 MB, into your user cache folder (`aitbase-plugin/` there). It checks the download against the SHA-256 pinned in the SDK before using it; a mismatch stops the build. Every later build reuses it. To use a wasi-sdk you already have, set `AITBASE_WASI_SDK` to its directory.
 - **Systems:** wasi-sdk is published for Linux, macOS and Windows on x86-64 and ARM64. On Windows, `build --wasm` also needs [Ninja](https://ninja-build.org/).
 - **What `pack --wasm` checks:** it strips debug information from the module, then refuses it if the device would: imports the device does not provide (for example files or sockets through WASI), missing exports, a start section, more than 2 MiB of initial memory, or more than 4 MiB.
-- **On the device:** unzip the package at the root of the SD card. This needs **Developer mode**, which is on by default; an owner who turned it off turns it back on in the Device Console under **Advanced → Plugins**. It creates `aitbase/plugins/<id>/` with `<entry>.wasm`, the compiled screens and `plugin.json`, and the device runs the newest plugin there by itself. The log is in `aitbase/logs/<id>.log` on the card and on the Plugins page.
+- **On the device:** copy the `.avp` into `aitbase/plugins/` on the SD card (create the folders if needed). This needs **Developer mode**, which is on by default; an owner who turned it off turns it back on in the Device Console under **Advanced → Plugins**. The device checks the signature and runs the newest package by itself. The log is in `aitbase/logs/<id>.log` on the card and on the Plugins page.
+- **Signing:** the first `pack --wasm` creates your signing key (see `key`) in your user configuration folder, or at `$AITBASE_SIGNING_KEY`. A device remembers the first key it sees for a plugin id and refuses packages of that id signed with another key, so **back the key up** and use it on every computer you build on. If you lose it, the device owner has to forget the plugin in the Device Console, which deletes its saved data.
 
-The zip is an interim format: the planned community package is a signed `.avp` that the device verifies before running it ([package format](package-format.md)).
+The `.avp` format is described in [package format](package-format.md). Devices no longer run unzipped plugin folders.
 
 ## JSON output
 
@@ -108,7 +110,7 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 {
   "ok": false,
   "command": "check",
-  "sdk_version": "0.5.0",
+  "sdk_version": "0.6.0",
   "diagnostics": [
     {
       "severity": "error",
@@ -121,7 +123,8 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 }
 ```
 
-- `pack` adds `package`, `sha256` and `bytes`; with `--wasm` also `module_bytes` and `sd_dir`.
+- `pack` adds `package`, `sha256` and `bytes`; with `--wasm` also `module_bytes`, `sd_dir`, `author` (the key's fingerprint), `signing_key` and `key_created`.
+- `key` adds `path`, `fingerprint` and `created`.
 - `toolchain` adds `wasi_sdk`, `wasi_sdk_version` and `toolchain_file`.
 - `init` adds `dir`, `id` and `files`.
 - `build` adds `build_dir` and `wasm`, and with `--wasm` also `wasi_sdk`.
@@ -185,4 +188,5 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `WASM_START_SECTION` | The module has a start section, which the device refuses; build it with the SDK's CMake. |
 | `PACKAGE_TOO_LARGE` | The package is over the 4 MB limit. |
 | `WRITE_FAILED` | The package could not be written. |
+| `SIGNING_KEY` | The signing key could not be read or created. Restore your backup, or point `AITBASE_SIGNING_KEY` at it. |
 | `NOT_AVAILABLE` | The command needs device support that does not exist yet. |

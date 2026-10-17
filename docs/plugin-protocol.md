@@ -11,7 +11,7 @@ Two runtimes speak this protocol:
 | Development socket | A native plugin process connects to `/tmp/aitbase_plugin_dev.sock`. Set `AITBASE_PLUGIN_ENDPOINT` to override the path. | Removed from device firmware; the SDK's native runtime still supports it for older developer firmware. |
 | Supervised (native) | The device's plugin supervisor starts the plugin in a sandbox and hands it a connected socket as an inherited descriptor, named by `AITBASE_PLUGIN_FD`. The SDK runtime uses it instead of the path and makes the process non-dumpable. The device binds the connection to the plugin identity it assigned. | Official native plugins, shipped in firmware. |
 | Supervised (WASM) | The same supervisor starts a sandboxed WASM runner, which hosts the plugin module and passes the same messages through the [WASM host ABI](wasm-abi.md). | Preview, in current firmware. Community plugins on the SD card run while Developer mode is on, which it is by default, and hold every capability they request. |
-| Production (WASM) | As supervised WASM, plus owner approval of sensitive capabilities, package verification and installation from SD. | Planned. |
+| Production (WASM) | As supervised WASM, from signed `.avp` packages the device verifies ([package format](package-format.md)), plus owner approval of sensitive capabilities. | Signed packages: current firmware. Approval: planned. |
 
 The device serves one plugin connection at a time. When a plugin disconnects, the device closes that plugin's screen.
 

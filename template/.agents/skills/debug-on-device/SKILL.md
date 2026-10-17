@@ -29,7 +29,11 @@ The device reports problems as events. Make sure `aitbase_on_event` logs these, 
 
 Ask the user to open the Device Console's **Advanced → Plugins** page:
 - **Developer mode off:** it is on by default, so the user turned it off; they turn it back on there. Nothing on the SD card runs while it is off.
-- **The package is listed as skipped:** the reason says why, for example no `<entry>.wasm` because the build was native. Run `aitbase-plugin build --wasm` and `pack --wasm` again.
+- **The package is listed as skipped:** the reason says why:
+  - "unzipped plugin folders don't run": the user unzipped it. Copy the `.avp` file itself into `aitbase/plugins/`.
+  - "signature does not match": the file was damaged or only partly copied. Copy it again.
+  - "signed by another author": the plugin was packed with a different signing key than before, for example on another computer. Use the original key (`aitbase-plugin key` shows where it is). If it is lost, the owner can forget the plugin on that page, which deletes its saved data.
+  - Anything else: run `aitbase-plugin build --wasm` and `pack --wasm` again.
 - **"Last run ... ended":** the reason is also at the end of the log, for example `exit 121` (the device refused the module) or `exit 122` (a trap, or a callback ran too long).
 
 ## 4. Asking the user
