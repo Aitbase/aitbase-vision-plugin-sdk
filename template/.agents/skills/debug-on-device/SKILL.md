@@ -18,7 +18,8 @@ The device reports problems as events. Make sure `aitbase_on_event` logs these, 
 | Event | Meaning | What to do |
 |---|---|---|
 | `AITBASE_EVENT_REJECTED` | The screen could not open: busy, cancelled or timed out. `detail` says why. | Open with `AITBASE_UI_MAX_WAIT_MS`; stop if it still fails. |
-| `AITBASE_EVENT_ERROR` | A request failed. `op` names it; `status` and `detail` say why. | `not_open`: you updated before `OPENED` or after the screen closed. UI codes: the screen or update is invalid. |
+| `AITBASE_EVENT_ERROR` | A request failed. `op` names it; `status` and `detail` say why; `request` is the id the call returned. | `not_open`: you updated before `OPENED` or after the screen closed. `no_grant`: add the capability to `requested_capabilities`. `destination_blocked`: the URL is not a public http(s) host. `not_foreground`: play sounds only after `OPENED`. `rate_limited`: slow down. `no_storage`: no SD card. Every code: `sdk/docs/capabilities.md`. UI codes: the screen or update is invalid. |
+| `AITBASE_EVENT_SOUND_DONE` with `detail` `failed` | The speaker was busy or unavailable. | Normal now and then; don't retry in a loop. |
 | `AITBASE_EVENT_UPDATE_REJECTED` | An update to `node` was refused. | Check the node name (`<instance>.<label>`), the subject (`title`) and the text length (80 bytes or less). |
 | `AITBASE_EVENT_PREEMPTED` | The user left with a LEFT long press, or the device needed the screen. | Stop. This is normal. |
 

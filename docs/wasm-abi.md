@@ -31,9 +31,10 @@ The module must export its linear memory as `memory`, and these functions. All i
 |---|---|---|
 | `_initialize` | `() -> ()` | Optional; first, once. wasi-sdk reactors run C constructors here. |
 | `aitbase_abi_version` | `() -> i32` | Once; must return `1`. |
-| `aitbase_rx_buffer` | `() -> i32` | Once; the address of a 4096-byte buffer in linear memory. |
+| `aitbase_rx_buffer` | `() -> i32` | Once; the address of the receive buffer in linear memory. |
+| `aitbase_rx_capacity` | `() -> i32` | Optional; once. The receive buffer's size, 4096 to 16384 bytes. Without it the device assumes 4096. The SDK exports 16384 and says so in `hello` (`rx_max`). |
 | `aitbase_start` | `() -> i32` | Once. The SDK sends `system.hello` here. |
-| `aitbase_message` | `(len) -> i32` | For each message from the device. The runner has copied it, without its newline, to the receive buffer; `len` is at most 4096. |
+| `aitbase_message` | `(len) -> i32` | For each message from the device. The runner has copied it, without its newline, to the receive buffer; `len` is at most the buffer's size. |
 | `aitbase_timer` | `() -> i32` | When the interval set with `timer_set` elapses. |
 | `aitbase_stop` | `() -> ()` | When the device ends the plugin (shutdown, disconnect). The SDK calls `aitbase_on_stop` here. |
 
@@ -73,6 +74,6 @@ Module `wasi_snapshot_preview1`: wasi-libc links these into any program that use
 | Instructions per call | Provisional: 50 million counted WebAssembly instructions, to be calibrated per device |
 | Threads | None |
 | Message to the device | 20480 bytes |
-| Message from the device | 4096 bytes |
+| Message from the device | The receive buffer: 4096 bytes, or up to 16384 with `aitbase_rx_capacity` |
 
 WebAssembly features: WebAssembly 2.0 features that current clang uses by default, including bulk memory, reference types, multi-value, sign extension and non-trapping float-to-int. No SIMD, threads, exceptions, GC or memory64.

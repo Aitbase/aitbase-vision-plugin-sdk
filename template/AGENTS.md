@@ -8,7 +8,7 @@ You do not have, and do not need, the device firmware source. Everything you nee
 
 - A plugin is C code that implements callbacks, plus screens written in a restricted XML.
 - The device draws the screens itself. The plugin only opens a screen, sets bound values and reacts to events.
-- A plugin **cannot** use files, sockets, threads, `sleep`, `system()`, `/dev`, LVGL or any OS API. There is no workaround. If the user asks for something that needs one of these, say it is not possible with this SDK version.
+- A plugin **cannot** use files, sockets, threads, `sleep`, `system()`, `/dev`, LVGL or any OS API. There is no workaround. The device does a few things for the plugin instead: keep small values (storage), make HTTP requests, play sounds. If the user asks for something else that needs the OS, say it is not possible with this SDK version.
 - Callbacks must return quickly. Never block or loop waiting. For periodic work, use `aitbase_timer_set()` and handle `AITBASE_EVENT_TIMER`.
 - Do not write `main()`. The SDK provides it.
 
@@ -16,8 +16,15 @@ You do not have, and do not need, the device firmware source. Everything you nee
 
 Only what is listed here exists. Do not invent functions, widgets, colors, actions or capabilities.
 
-- **Capability:** only `"ui"`. Camera, microphone, audio, HTTP, storage and MCP tools are planned but not available. `aitbase-plugin check` rejects them.
-- **API:** `sdk/include/aitbase_plugin.h`. Read it before writing code. Functions: `aitbase_ui_open`, `aitbase_ui_update`, `aitbase_ui_set_text`, `aitbase_ui_close`, `aitbase_timer_set`, `aitbase_plugin_stop`, `aitbase_log`, `aitbase_event_kind_name`.
+- **Capabilities:** list what the plugin uses in `requested_capabilities` in `plugin.json`:
+  - `"ui"`: its screens;
+  - `"storage"`: small text values kept across runs (needs an SD card in the device);
+  - `"http"`: HTTP(S) requests to public internet hosts, never local network addresses;
+  - `"audio.output"`: tones and the package's own sounds (`sounds/<name>.wav`, listed under `"sounds"`), only while its screen is visible.
+
+  Camera, microphone and MCP tools are planned but not available; `aitbase-plugin check` rejects them. Limits and every error code are in `sdk/docs/capabilities.md`.
+- **API:** `sdk/include/aitbase_plugin.h`. Read it before writing code. Functions: `aitbase_ui_open`, `aitbase_ui_update`, `aitbase_ui_set_text`, `aitbase_ui_close`, `aitbase_storage_get`, `aitbase_storage_set`, `aitbase_storage_delete`, `aitbase_storage_keys`, `aitbase_http_get`, `aitbase_http_request`, `aitbase_audio_tone`, `aitbase_audio_play`, `aitbase_audio_stop`, `aitbase_timer_set`, `aitbase_plugin_stop`, `aitbase_log`, `aitbase_event_kind_name`.
+- **Asynchronous results:** storage, HTTP and sound calls return a request id at once. The answer arrives later as `AITBASE_EVENT_RESULT` (or `AITBASE_EVENT_SOUND_DONE`, or `AITBASE_EVENT_ERROR`) with that id in `event->request`. Keep the id, and copy `event->text` if you need it after the callback. Never wait for a result in a loop.
 - **UI:** widgets `lv_obj`, `lv_label`, `lv_button`, `lv_image`. Four colors: `#surface`, `#on_surface`, `#accent`, `#control`. One bindable subject: `title`. One action: `plugin.increment`. Full rules: the `plugin-ui-xml` skill and `sdk/schema/plugin_ui_registry.json`.
 - **Screen:** 240×320 pixels.
 

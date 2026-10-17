@@ -54,7 +54,10 @@ func TestManifestErrors(t *testing.T) {
 		{"reserved id", `{"id":"aitbase.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"]}`, `AITBASE_PLUGIN_ID("aitbase.counter");`, "ID_RESERVED"},
 		{"version", `{"id":"alice.counter","name":"C","version":"1.0","api_version":1,"entry":"c","requested_capabilities":["ui"]}`, goodSource, "VERSION_FORMAT"},
 		{"api", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":2,"entry":"c","requested_capabilities":["ui"]}`, goodSource, "API_VERSION_UNSUPPORTED"},
-		{"planned capability", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","http"]}`, goodSource, "CAPABILITY_UNAVAILABLE"},
+		{"planned capability", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","camera.capture"]}`, goodSource, "CAPABILITY_UNAVAILABLE"},
+		{"sounds without audio", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","sounds":["beep"],"requested_capabilities":["ui"]}`, goodSource, "CAPABILITY_AUDIO_MISSING"},
+		{"missing sound", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","sounds":["beep"],"requested_capabilities":["ui","audio.output"]}`, goodSource, "SOUND_MISSING"},
+		{"bad sound name", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","sounds":["../x"],"requested_capabilities":["ui","audio.output"]}`, goodSource, "SOUND_NAME"},
 		{"unknown capability", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","shell"]}`, goodSource, "CAPABILITY_UNKNOWN"},
 		{"no ui capability", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","ui":{"screens":["main"]},"requested_capabilities":[]}`, goodSource, "CAPABILITY_UI_MISSING"},
 		{"missing screen", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","ui":{"screens":["other"]},"requested_capabilities":["ui"]}`, goodSource, "SCREEN_MISSING"},
@@ -113,5 +116,48 @@ func TestCaseCollision(t *testing.T) {
 	}
 	if r := Project(dir, "", Options{SkipUI: true}); !codes(r)["PATH_CASE_COLLISION"] {
 		t.Fatalf("want PATH_CASE_COLLISION, got %+v", r.Diagnostics)
+	}
+}
+
+func TestBrokerCapabilitiesAreAvailable(t *testing.T) {
+	dir := writeProject(t, `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","storage","http","audio.output"]}`, goodSource)
+	r := Project(dir, "", Options{SkipUI: true})
+	for _, d := range r.Diagnostics {
+		t.Errorf("unexpected %s: %s", d.Code, d.Message)
+	}
+}
+
+func wav(rate uint32, channels, bits uint16, samples int) []byte {
+	data := uint32(samples * int(bits) / 8 * int(channels))
+	b := []byte("RIFF\x00\x00\x00\x00WAVEfmt ")
+	le32 := func(v uint32) { b = append(b, byte(v), byte(v>>8), byte(v>>16), byte(v>>24)) }
+	le16 := func(v uint16) { b = append(b, byte(v), byte(v>>8)) }
+	le32(16)
+	le16(1)
+	le16(channels)
+	le32(rate)
+	le32(rate * uint32(channels) * uint32(bits) / 8)
+	le16(channels * bits / 8)
+	le16(bits)
+	b = append(b, "data"...)
+	le32(data)
+	return append(b, make([]byte, data)...)
+}
+
+func TestWavProblem(t *testing.T) {
+	if p := WavProblem(wav(16000, 1, 16, 1600)); p != "" {
+		t.Errorf("a valid sound was refused: %s", p)
+	}
+	for name, data := range map[string][]byte{
+		"8 kHz":    wav(8000, 1, 16, 1600),
+		"stereo":   wav(16000, 2, 16, 1600),
+		"8-bit":    wav(16000, 1, 8, 1600),
+		"too long": wav(16000, 1, 16, 16000*11),
+		"not wav":  []byte("ID3\x04 an mp3"),
+		"cut":      wav(16000, 1, 16, 1600)[:60],
+	} {
+		if WavProblem(data) == "" {
+			t.Errorf("%s was accepted", name)
+		}
 	}
 }

@@ -12,6 +12,7 @@ A `.avp` is a zip archive:
 |---|---|
 | `plugin.json` | The manifest, as in the project ([schema](../schema/plugin.schema.json)). |
 | `ui/<screen>.ui.json` | One compiled screen per entry in `ui.screens`. |
+| `sounds/<name>.wav` | One sound per entry in `sounds`: 16 kHz, mono, 16-bit PCM, at most 10 s. |
 | `bin/<entry>` | The program. Format 0 only: a native development build. WASM packages will carry `plugin.wasm` instead. |
 
 ## Rules
