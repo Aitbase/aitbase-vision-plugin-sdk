@@ -15,7 +15,7 @@ description: Turn a user's idea into a working AITBASE VISION plugin in this pro
    - For storage, HTTP or sound: add the capability to `requested_capabilities` in `plugin.json`. The call returns a request id at once; handle the answer in `aitbase_on_event` as `AITBASE_EVENT_RESULT`, `AITBASE_EVENT_SOUND_DONE` or `AITBASE_EVENT_ERROR`, matching `event->request`. Show a "Loading…" text meanwhile. Sounds go in `sounds/<name>.wav`, listed under `"sounds"` in `plugin.json`, and play only while the screen is visible.
    - Update a label with `aitbase_ui_set_text(p, "<instance>.<label>", "title", text)`. The node name is the component instance name, a dot, then the label name.
 5. **Check and build** with `aitbase-plugin check --json` and `aitbase-plugin build --wasm --json`. Fix each diagnostic using its `fix` field, and repeat until both pass.
-6. **Package** with `aitbase-plugin pack --wasm --json`. The user unzips `dist/<id>-<version>-wasm.zip` at the root of the device's SD card to try it.
+6. **Package** with `aitbase-plugin pack --wasm --json`. The user copies `dist/<id>-<version>.avp` into `aitbase/plugins/` on the device's SD card to try it. If `key_created` is true, tell the user where their signing key is and to back it up.
 7. **Tell the user** what you changed, what the screen should look like, which buttons do what, and what they need to check on the device. Be clear that a build passing is not the same as working on the device.
 
 ## Common mistakes

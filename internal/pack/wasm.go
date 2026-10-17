@@ -193,12 +193,5 @@ func StripCustomSections(data []byte) ([]byte, error) {
 	return out, nil
 }
 
-// SDFileName is the WASM package name: <id>-<version>-wasm.zip.
-func SDFileName(id, version string) string {
-	return id + "-" + version + "-wasm.zip"
-}
-
-// SDDir is where a WASM package lives on the device's SD card, and inside its zip.
-func SDDir(id string) string {
-	return "aitbase/plugins/" + id
-}
+// SDPluginsDir is where packages go on the device's SD card.
+const SDPluginsDir = "aitbase/plugins"

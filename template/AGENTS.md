@@ -27,6 +27,7 @@ Only what is listed here exists. Do not invent functions, widgets, colors, actio
 - **Asynchronous results:** storage, HTTP and sound calls return a request id at once. The answer arrives later as `AITBASE_EVENT_RESULT` (or `AITBASE_EVENT_SOUND_DONE`, or `AITBASE_EVENT_ERROR`) with that id in `event->request`. Keep the id, and copy `event->text` if you need it after the callback. Never wait for a result in a loop.
 - **UI:** widgets `lv_obj`, `lv_label`, `lv_button`, `lv_image`. Four colors: `#surface`, `#on_surface`, `#accent`, `#control`. One bindable subject: `title`. One action: `plugin.increment`. Full rules: the `plugin-ui-xml` skill and `sdk/schema/plugin_ui_registry.json`.
 - **Screen:** 240×320 pixels.
+- **Signing:** `pack --wasm` signs the package with the user's key, created on the first pack (`aitbase-plugin key` shows it). The device remembers the first key per plugin id and refuses updates signed with another, so tell the user to back the key file up. Never print, copy or commit the key file.
 - **Voice start:** the user can open the plugin by asking the device's assistant ("open <name>"). The assistant matches the manifest's `name`, so keep it short and easy to say, and unlike other plugins' names. The screen appears when the assistant finishes speaking, which is why `aitbase_ui_open` should wait (`AITBASE_UI_MAX_WAIT_MS`).
 
 ## Input: two buttons, no touch
@@ -56,7 +57,7 @@ Run these after every change, from the project directory. Use `--json` and read 
 ```sh
 aitbase-plugin check --json          # manifest, ids, file names, screens
 aitbase-plugin build --wasm --json   # compiles C to WebAssembly, and the screens
-aitbase-plugin pack --wasm --json    # writes dist/<id>-<version>-wasm.zip for the device
+aitbase-plugin pack --wasm --json    # writes the signed dist/<id>-<version>.avp for the device
 ```
 
 The first `build --wasm` downloads the WebAssembly toolchain (about 200 MB) and can take a few minutes; later builds reuse it. If the download fails, tell the user, and don't install another compiler instead. `pack --wasm` also refuses code the device can't run, for example files or sockets: use only the calls in `sdk/include/aitbase_plugin.h`.
@@ -68,7 +69,7 @@ Fix every `error` before continuing. Do not silence a check by removing the feat
 There is no simulator, so a successful build does not prove the plugin works. Only the device shows that.
 
 To try it on the user's device:
-1. The user unzips `dist/<id>-<version>-wasm.zip` at the root of the device's SD card.
+1. The user copies `dist/<id>-<version>.avp` into `aitbase/plugins/` on the device's SD card (creating the folders if needed). Don't unzip it.
 2. Within a few seconds the device runs the newest plugin on the card, with a **DEV** badge on its screen. A newer copy replaces the running one. This works because **Developer mode** is on by default; if the user turned it off, they turn it back on in the Device Console (**Advanced → Plugins**). Only the user can do this: never ask for the password.
 3. The plugin's log is on the card, in `aitbase/logs/<id>.log`, and on the Device Console's Plugins page.
 

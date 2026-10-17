@@ -1,40 +1,58 @@
-# Plugin package (`.avp`), draft format 0
+# Plugin package (`.avp`), format 1
 
-> **Draft.** No device installs packages yet. This format records the rules every package must follow so that tools and devices can be built against them. It will change before 1.0, at least to add signatures and to replace the native program with `plugin.wasm`.
-
-A package is one file named `<id>-<version>.avp`, for example `alice.weather-1.2.0.avp`. It is the unit people share and copy to a device's SD card at `<SD root>/aitbase/plugins/`.
+A package is one file named `<id>-<version>.avp`, for example `alice.weather-1.2.0.avp`. It is what people share and copy into `aitbase/plugins/` on a device's SD card. `aitbase-plugin pack --wasm` writes it.
 
 ## Contents
 
-A `.avp` is a zip archive:
+An `.avp` is a zip archive holding exactly these files, at its top level:
 
-| Entry | Contents |
-|---|---|
-| `plugin.json` | The manifest, as in the project ([schema](../schema/plugin.schema.json)). |
-| `ui/<screen>.ui.json` | One compiled screen per entry in `ui.screens`. |
-| `sounds/<name>.wav` | One sound per entry in `sounds`: 16 kHz, mono, 16-bit PCM, at most 10 s. |
-| `bin/<entry>` | The program. Format 0 only: a native development build. WASM packages will carry `plugin.wasm` instead. |
+| Entry | Contents | Compression |
+|---|---|---|
+| `plugin.json` | The manifest ([schema](../schema/plugin.schema.json)). | Deflate |
+| `<entry>.wasm` | The WebAssembly module, at most 4 MiB. | Stored |
+| `<screen>.ui.json` | One compiled screen per entry in `ui.screens`, at most 16 KiB each. | Deflate |
+| `sounds/<name>.wav` | One sound per entry in `sounds`: 16 kHz, mono, 16-bit PCM, at most 10 s. | Stored |
+
+The device refuses a package with any other file, a listed file missing, or the same name twice. The module and sounds are stored uncompressed, so the device uses them in place without a second copy in memory.
+
+## Signature
+
+The zip comment holds the signature and must end the file:
+
+```text
+AVP-SIG-1 <base64 public key> <base64 signature>
+```
+
+- **Key:** an ECDSA P-256 public key, DER SubjectPublicKeyInfo.
+- **Signature:** ECDSA with SHA-256 (DER), over every byte of the file before the end-of-central-directory record's comment length field.
+- **Author:** the SHA-256 of the public key. The Device Console shows its first 16 hex digits.
+
+The device reads the whole file into memory, checks the signature, then checks and extracts every entry from those bytes. It runs only those verified bytes; it never reads the card again for that run.
+
+A signature identifies who packed a plugin and shows it hasn't changed since. It doesn't make a plugin safe: every plugin runs in the same sandbox, with only the capabilities it requests.
+
+## Authors
+
+- **First key wins.** A device remembers the first author key it sees for a plugin id. A package with the same id signed by another key doesn't run: it would otherwise get the plugin's saved data. The owner can **forget** the plugin in the Device Console to allow a new author; that deletes the plugin's saved data.
+- **Keep your key.** `pack --wasm` creates it on first use; `aitbase-plugin key` shows where. Back it up, and use the same key on every computer you build on.
+- `aitbase.*` ids are reserved for official plugins, which ship in the device firmware; packages that use them are refused.
 
 ## Rules
 
-The same plugin must produce the same bytes on every OS, so its SHA-256 can identify it:
+The same plugin must produce the same contents on every OS:
 - **Ordering:** entries are sorted by name.
-- **Paths:** forward-slash and relative.
+- **Paths:** forward-slash and relative; only `sounds/` as a folder.
 - **Timestamps:** fixed to 1980-01-01 00:00:00.
 - **Mode:** `0644`.
-- **Compression:** Deflate at best compression.
 
-File names must survive Windows, macOS, Linux and FAT/exFAT SD cards:
-- only ASCII letters, digits, `.`, `-` and `_`;
-- no names that differ only by letter case;
-- no Windows reserved names (`con`, `aux`, `nul`, `com1`…);
-- no trailing `.` or space;
-- no symbolic links.
+The signed bytes' SHA-256, which `pack` prints, depends only on the contents. The signature itself differs on each pack.
 
-A package is at most **4 MB**, because the device loads a whole package into memory and checks its digest before running it.
+File names must survive Windows, macOS, Linux and FAT/exFAT SD cards: lowercase ASCII letters, digits, `_`, and `.` in extensions; no names that differ only by letter case.
 
-## How a device treats packages (planned)
+A package is at most **4 MB**.
 
-- Finding a package on the SD card never runs it. The owner enables it in the Device Console.
-- The approval is tied to the package's id, digest, author key and requested capabilities. A changed file needs approval again.
-- The device reads the package into memory, verifies its digest, and runs only those verified bytes.
+## On the device
+
+- **Developer mode** (on by default during the preview) runs the newest package in `aitbase/plugins/` with the capabilities it requests. Turning it off stops community plugins.
+- Packages that can't run are listed on the Device Console's Plugins page with the reason: not signed, damaged, another author, a missing file.
+- Unzipped plugin folders, from SDK 0.5 and earlier, no longer run. Pack again with `pack --wasm`.
