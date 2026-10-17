@@ -27,6 +27,7 @@ Only what is listed here exists. Do not invent functions, widgets, colors, actio
 - **Asynchronous results:** storage, HTTP and sound calls return a request id at once. The answer arrives later as `AITBASE_EVENT_RESULT` (or `AITBASE_EVENT_SOUND_DONE`, or `AITBASE_EVENT_ERROR`) with that id in `event->request`. Keep the id, and copy `event->text` if you need it after the callback. Never wait for a result in a loop.
 - **UI:** widgets `lv_obj`, `lv_label`, `lv_button`, `lv_image`. Four colors: `#surface`, `#on_surface`, `#accent`, `#control`. One bindable subject: `title`. One action: `plugin.increment`. Full rules: the `plugin-ui-xml` skill and `sdk/schema/plugin_ui_registry.json`.
 - **Screen:** 240×320 pixels.
+- **Voice start:** the user can open the plugin by asking the device's assistant ("open <name>"). The assistant matches the manifest's `name`, so keep it short and easy to say, and unlike other plugins' names. The screen appears when the assistant finishes speaking, which is why `aitbase_ui_open` should wait (`AITBASE_UI_MAX_WAIT_MS`).
 
 ## Input: two buttons, no touch
 
