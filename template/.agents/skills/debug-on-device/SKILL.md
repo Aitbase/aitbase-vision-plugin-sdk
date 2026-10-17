@@ -28,7 +28,6 @@ The device reports problems as events. Make sure `aitbase_on_event` logs these, 
 ## 3. Nothing runs on the device
 
 Ask the user to open the Device Console's **Advanced → Plugins** page:
-- **Developer mode off:** it is on by default, so the user turned it off; they turn it back on there. Nothing on the SD card runs while it is off.
 - **The package is listed as skipped:** the reason says why:
   - "unzipped plugin folders don't run": the user unzipped it. Copy the `.avp` file itself into `aitbase/plugins/`.
   - "signature does not match": the file was damaged or only partly copied. Copy it again.

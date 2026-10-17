@@ -70,10 +70,10 @@ There is no simulator, so a successful build does not prove the plugin works. On
 
 To try it on the user's device:
 1. The user copies `dist/<id>-<version>.avp` into `aitbase/plugins/` on the device's SD card (creating the folders if needed). Don't unzip it.
-2. Within a few seconds the device runs the newest plugin on the card, with a **DEV** badge on its screen. A newer copy replaces the running one. This works because **Developer mode** is on by default; if the user turned it off, they turn it back on in the Device Console (**Advanced → Plugins**). Only the user can do this: never ask for the password.
+2. Within a few seconds the device runs the newest plugin on the card. A newer copy replaces the running one. Never ask for the Device Console password.
 3. The plugin's log is on the card, in `aitbase/logs/<id>.log`, and on the Device Console's Plugins page.
 
-If nothing runs, ask the user whether Developer mode is on and what the Plugins page shows: it lists packages it skipped, with the reason.
+If nothing runs, ask the user what the Device Console's Plugins page shows: it lists packages it skipped, with the reason.
 
 The commands `dev`, `logs`, `screenshot` and `press` are planned and currently return `NOT_AVAILABLE`. Do not try to work around this. Tell the user what to check on the device, and ask them what they see and what the log says.
 

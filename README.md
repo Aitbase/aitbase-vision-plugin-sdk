@@ -2,7 +2,7 @@
 
 Build plugins that put their own screen on an AITBASE VISION device.
 
-> **Status: 0.6.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs WebAssembly plugins from the SD card while Developer mode is on, which it is by default. Plugins can show screens, keep small values, make HTTP requests and play sounds ([capabilities](docs/capabilities.md)). Packages are signed `.avp` files; store distribution is not available yet.
+> **Status: 0.6.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs signed WebAssembly plugins from the SD card. Plugins can show screens, keep small values, make HTTP requests and play sounds ([capabilities](docs/capabilities.md)). Packages are signed `.avp` files; store distribution is not available yet.
 
 ## Quick start
 
@@ -17,7 +17,7 @@ aitbase-plugin build --wasm   # downloads the WebAssembly toolchain the first ti
 aitbase-plugin pack --wasm    # dist/yourname.my-plugin-0.1.0.avp, signed
 ```
 
-Copy the `.avp` into `aitbase/plugins/` on the device's SD card, and the device runs it (Developer mode is on by default). The first `pack --wasm` creates your signing key: back it up. See [WebAssembly](docs/cli.md#webassembly).
+Copy the `.avp` into `aitbase/plugins/` on the device's SD card, and the device runs it. The first `pack --wasm` creates your signing key: back it up. See [WebAssembly](docs/cli.md#webassembly).
 
 The new project is ready for AI coding agents:
 - **`AGENTS.md` and `CLAUDE.md`:** what plugins can and cannot do, and the check/build loop.
@@ -123,7 +123,7 @@ Contributors: see [AGENTS.md](AGENTS.md).
 ## Roadmap
 
 These items are planned, not implemented:
-- **More capabilities:** camera, microphone and MCP tools, each behind explicit user permission. Storage, HTTP and sound are available ([docs/capabilities.md](docs/capabilities.md)); outside Developer mode they will also need the owner's approval.
+- **More capabilities:** camera, microphone and MCP tools, each behind explicit user permission. Storage, HTTP and sound are available ([docs/capabilities.md](docs/capabilities.md)); later they will also need the owner's approval.
 - **Installation and device tools:** signed packages, installation from the SD card (`aitbase/plugins/`) and the device's web console, and the CLI device commands (`pair`, `dev`, `logs`, `screenshot`, `press`).
 - **No Python or C toolchain to install:** the UI compiler built into the CLI, and the WASM toolchain downloaded automatically.
 - **Richer UI:** a larger UI schema (more widgets, styles and bindings).
