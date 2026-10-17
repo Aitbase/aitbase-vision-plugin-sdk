@@ -108,7 +108,7 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 {
   "ok": false,
   "command": "check",
-  "sdk_version": "0.4.0",
+  "sdk_version": "0.5.0",
   "diagnostics": [
     {
       "severity": "error",
@@ -155,6 +155,10 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `CAPABILITY_UNAVAILABLE` | The capability is planned but no device supports it yet. |
 | `CAPABILITY_UNKNOWN` | The capability does not exist. |
 | `CAPABILITY_UI_MISSING` | The plugin has screens but does not request `ui`. |
+| `CAPABILITY_AUDIO_MISSING` | The plugin lists sounds but does not request `audio.output`. |
+| `SOUND_NAME` | A sound name is not lowercase letters, digits and `_` (at most 32), or is listed twice. |
+| `SOUND_MISSING` | A listed sound has no `sounds/<name>.wav`. |
+| `SOUND_FORMAT` | The sound is not a 16 kHz, mono, 16-bit PCM WAV of at most 10 seconds. |
 | `PATH_CHARS` | A file name uses characters other than ASCII letters, digits, `.`, `-` and `_`, or has an empty, `.` or `..` part. |
 | `PATH_TRAILING` | A file name ends with `.` or a space. |
 | `PATH_RESERVED_NAME` | A file name is reserved on Windows (`con`, `aux`, `nul`, `com1`…). |

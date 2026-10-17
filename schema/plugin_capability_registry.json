@@ -1,0 +1,178 @@
+{
+  "format": "aitbase.plugin.capabilities",
+  "version": 1,
+  "statuses": [
+    {"name": "invalid", "status": -1, "summary": "The request or its arguments are invalid."},
+    {"name": "stale", "status": -2, "summary": "No screen is open, or the screen is no longer current."},
+    {"name": "busy", "status": -3, "summary": "The device can't take this request now; try again later."},
+    {"name": "no_memory", "status": -4, "summary": "The device ran out of memory for this request."},
+    {"name": "denied", "status": -5, "summary": "The plugin may not do this: a missing grant, or a destination the device refuses."},
+    {"name": "unavailable", "status": -6, "summary": "Not available now or on this device: no SD card, or the screen isn't visible."},
+    {"name": "limit", "status": -7, "summary": "A rate, size or storage limit was reached."},
+    {"name": "failed", "status": -8, "summary": "The device tried and failed: network error, timeout, TLS error."}
+  ],
+  "errors": [
+    {"code": "bad_request", "status": "invalid", "summary": "Malformed request, or an argument is missing, of the wrong type, out of range or too long."},
+    {"code": "unknown_op", "status": "invalid", "summary": "The device doesn't know this capability or operation."},
+    {"code": "hello_required", "status": "invalid", "summary": "system.hello must be the first request."},
+    {"code": "protocol_unsupported", "status": "invalid", "summary": "The device doesn't support this protocol or API version."},
+    {"code": "identity_mismatch", "status": "invalid", "summary": "hello claimed an id other than the one the device started; the plugin is stopped."},
+    {"code": "bad_header", "status": "invalid", "summary": "An HTTP header is malformed, or one the device sets itself (Host, Content-Length, Connection, Transfer-Encoding, Proxy-*)."},
+    {"code": "sound_not_found", "status": "invalid", "summary": "The package has no sounds/<name>.wav."},
+    {"code": "bad_sound", "status": "invalid", "summary": "The sound isn't a 16 kHz, mono, 16-bit PCM WAV file within the size limit."},
+    {"code": "not_open", "status": "stale", "summary": "No screen is open."},
+    {"code": "in_flight", "status": "busy", "summary": "An HTTP request is already running; wait for its result."},
+    {"code": "no_memory", "status": "no_memory", "summary": "The device ran out of memory."},
+    {"code": "no_grant", "status": "denied", "summary": "plugin.json doesn't list the capability this operation needs in requested_capabilities."},
+    {"code": "destination_blocked", "status": "denied", "summary": "The URL isn't http or https, or its host resolves to a loopback, private, link-local or other non-public address."},
+    {"code": "not_foreground", "status": "unavailable", "summary": "Sound plays only while the plugin's screen is visible."},
+    {"code": "no_storage", "status": "unavailable", "summary": "Plugin storage isn't available: no SD card, or it can't be written."},
+    {"code": "rate_limited", "status": "limit", "summary": "Too many requests of this kind; slow down."},
+    {"code": "quota_exceeded", "status": "limit", "summary": "Plugin storage is full."},
+    {"code": "too_large", "status": "limit", "summary": "The result is larger than the plugin can receive."},
+    {"code": "timeout", "status": "failed", "summary": "The HTTP request didn't finish in time."},
+    {"code": "network_error", "status": "failed", "summary": "DNS, connection or transfer failure."},
+    {"code": "tls_error", "status": "failed", "summary": "The server's TLS certificate couldn't be verified."}
+  ],
+  "grants": [
+    {
+      "name": "ui",
+      "class": "standard",
+      "implicit": true,
+      "summary": "Show the plugin's own screens and update them."
+    },
+    {
+      "name": "storage",
+      "class": "standard",
+      "rate_per_s": 20,
+      "burst": 40,
+      "summary": "Keep small text values across runs, in a store only this plugin can reach. Needs an SD card."
+    },
+    {
+      "name": "http",
+      "class": "sensitive",
+      "rate_per_s": 1,
+      "burst": 5,
+      "summary": "Make HTTP and HTTPS requests to public internet hosts. Local network, loopback and reserved addresses are refused."
+    },
+    {
+      "name": "audio.output",
+      "class": "sensitive",
+      "rate_per_s": 5,
+      "burst": 10,
+      "summary": "Play tones and the package's own sounds on the speaker, only while the plugin's screen is visible."
+    }
+  ],
+  "limits": {
+    "rx_default": 4096,
+    "rx_max": 16384,
+    "storage_key_max": 64,
+    "storage_value_max": 4096,
+    "storage_keys_max": 128,
+    "storage_total_max": 65536,
+    "http_url_max": 1024,
+    "http_headers_max": 16,
+    "http_header_max": 512,
+    "http_body_max": 8192,
+    "http_response_max": 65536,
+    "http_timeout_ms_default": 10000,
+    "http_timeout_ms_max": 15000,
+    "audio_sound_bytes_max": 327680,
+    "audio_sample_rate": 16000
+  },
+  "ops": [
+    {
+      "cap": "ui", "op": "open", "grant": "ui", "adapter": "ui",
+      "summary": "Opens a compiled screen. With wait_ms, waits up to that long for the device to become idle (voice start, D11).",
+      "args": {
+        "screen": {"type": "string", "max": 32, "charset": "name", "optional": true},
+        "wait_ms": {"type": "int", "min": 0, "max": 30000, "optional": true},
+        "document": {"type": "object"}
+      }
+    },
+    {
+      "cap": "ui", "op": "update", "grant": "ui", "adapter": "ui",
+      "summary": "Sets a bound value on the open screen.",
+      "args": {
+        "node": {"type": "string", "max": 72},
+        "key": {"type": "string", "max": 32},
+        "type": {"type": "string", "max": 16},
+        "value": {"type": "string", "max": 1024}
+      }
+    },
+    {
+      "cap": "ui", "op": "close", "grant": "ui", "adapter": "ui",
+      "summary": "Closes the open screen.",
+      "args": {}
+    },
+    {
+      "cap": "storage", "op": "get", "grant": "storage", "adapter": "storage", "result": true,
+      "summary": "Reads a value. The result has found (true or false) and value.",
+      "args": {
+        "key": {"type": "string", "max": 64, "charset": "key"}
+      }
+    },
+    {
+      "cap": "storage", "op": "set", "grant": "storage", "adapter": "storage",
+      "summary": "Stores a text value under a key, replacing any earlier value. Values may contain tabs and newlines, but no other control characters.",
+      "args": {
+        "key": {"type": "string", "max": 64, "charset": "key"},
+        "value": {"type": "string", "max": 4096, "charset": "text"}
+      }
+    },
+    {
+      "cap": "storage", "op": "delete", "grant": "storage", "adapter": "storage",
+      "summary": "Removes a key. Removing a missing key succeeds.",
+      "args": {
+        "key": {"type": "string", "max": 64, "charset": "key"}
+      }
+    },
+    {
+      "cap": "storage", "op": "keys", "grant": "storage", "adapter": "storage", "result": true,
+      "summary": "Lists the stored keys. The result has keys, an array of strings.",
+      "args": {}
+    },
+    {
+      "cap": "http", "op": "request", "grant": "http", "adapter": "http", "result": true,
+      "summary": "Makes one HTTP request and returns status, content_type, body (text, cut to fit) and truncated. Redirects are returned, not followed. One request at a time.",
+      "args": {
+        "method": {"type": "enum", "values": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]},
+        "url": {"type": "string", "max": 1024, "charset": "url"},
+        "headers": {"type": "object", "optional": true},
+        "body": {"type": "string", "max": 8192, "optional": true},
+        "timeout_ms": {"type": "int", "min": 1000, "max": 15000, "optional": true}
+      }
+    },
+    {
+      "cap": "audio", "op": "tone", "grant": "audio.output", "adapter": "audio",
+      "summary": "Plays a sine tone, replacing any sound playing. A sound_done event follows.",
+      "args": {
+        "freq_hz": {"type": "int", "min": 100, "max": 4000},
+        "duration_ms": {"type": "int", "min": 10, "max": 2000},
+        "volume": {"type": "int", "min": 0, "max": 100, "optional": true}
+      }
+    },
+    {
+      "cap": "audio", "op": "play", "grant": "audio.output", "adapter": "audio",
+      "summary": "Plays sounds/<sound>.wav from the package (16 kHz, mono, 16-bit PCM, at most 10 s), replacing any sound playing. A sound_done event follows.",
+      "args": {
+        "sound": {"type": "string", "max": 32, "charset": "name"},
+        "volume": {"type": "int", "min": 0, "max": 100, "optional": true}
+      }
+    },
+    {
+      "cap": "audio", "op": "stop", "grant": "audio.output", "adapter": "audio",
+      "summary": "Stops the sound playing, if any.",
+      "args": {}
+    }
+  ],
+  "events": [
+    {"cap": "ui", "event": "opened", "summary": "The screen is visible."},
+    {"cap": "ui", "event": "rejected", "summary": "The open was refused, cancelled by another device state, or timed out. data.detail says why."},
+    {"cap": "ui", "event": "closed", "summary": "The screen was closed after a close request."},
+    {"cap": "ui", "event": "preempted", "summary": "The device took the screen back: LEFT long press, voice assistant, settings. Any sound stops."},
+    {"cap": "ui", "event": "action", "summary": "The user activated a focusable widget with RIGHT. data.node and data.action."},
+    {"cap": "ui", "event": "update_rejected", "summary": "An update was refused when the device applied it. data.node and data.detail."},
+    {"cap": "audio", "event": "sound_done", "summary": "The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed."}
+  ]
+}

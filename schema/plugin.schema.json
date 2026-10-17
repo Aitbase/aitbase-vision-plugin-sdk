@@ -49,11 +49,17 @@
         }
       }
     },
-    "requested_capabilities": {
-      "description": "Capabilities the plugin asks the device owner to approve. Only \"ui\" is available in this SDK version.",
+    "sounds": {
+      "description": "Sounds in sounds/<name>.wav (16 kHz, mono, 16-bit PCM, at most 10 s), played with aitbase_audio_play(p, \"<name>\", ...). Needs audio.output.",
       "type": "array",
       "uniqueItems": true,
-      "items": {"enum": ["ui"]}
+      "items": {"type": "string", "maxLength": 32, "pattern": "^[a-z][a-z0-9_]*$"}
+    },
+    "requested_capabilities": {
+      "description": "Capabilities the plugin uses. See docs/capabilities.md. While Developer mode is on, the device grants every capability a plugin requests.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["ui", "storage", "http", "audio.output"]}
     }
   }
 }

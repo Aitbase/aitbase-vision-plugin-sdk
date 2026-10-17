@@ -15,7 +15,14 @@
  * AITBASE_EVENT_PREEMPTED.
  *
  * Requests return once they are queued; failures arrive later as AITBASE_EVENT_ERROR.
- * Functions return 0 on success or a negative aitbase_status_t.
+ * Screen functions return 0 on success or a negative aitbase_status_t. Storage, HTTP and sound
+ * functions return a request id (> 0) instead; their results arrive as AITBASE_EVENT_RESULT or
+ * AITBASE_EVENT_SOUND_DONE carrying the same id in event->request, and failures as
+ * AITBASE_EVENT_ERROR with that id too.
+ *
+ * Storage, HTTP and sound need the capability in plugin.json's requested_capabilities ("storage",
+ * "http", "audio.output"); without it the request fails with detail "no_grant". The device's
+ * limits and every error code are in docs/capabilities.md and aitbase_capabilities.h.
  *
  * Minimal plugin:
  *
@@ -29,6 +36,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
+#include "aitbase_capabilities.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,15 +68,29 @@ typedef enum aitbase_event_kind {
     AITBASE_EVENT_UPDATE_REJECTED = 6, /* an update to node was refused; see detail */
     AITBASE_EVENT_ERROR = 7,           /* a request failed; op names it, status/detail say why */
     AITBASE_EVENT_TIMER = 8,           /* the interval set with aitbase_timer_set() elapsed */
+    AITBASE_EVENT_RESULT = 9,          /* a storage or HTTP request succeeded; see request, op, text, code */
+    AITBASE_EVENT_SOUND_DONE = 10,     /* the sound started by request ended; detail is "finished",
+                                          "stopped" or "failed" */
 } aitbase_event_kind_t;
 
 typedef struct aitbase_event {
     aitbase_event_kind_t kind;
     char node[33];
     char action[33];
-    char op[16];
-    int status;
-    char detail[65];
+    char op[16];       /* ERROR, RESULT: the request's operation: "open", "update", "close",
+                          "storage.get", "http.request", "audio.play"... */
+    int status;        /* ERROR: a device status, AITBASE_DEVICE_* */
+    char detail[65];   /* ERROR: a stable error code; SOUND_DONE: how the sound ended */
+    /* Since SDK 0.5. */
+    uint32_t request;  /* ERROR, RESULT, SOUND_DONE: the id the request function returned; 0 for
+                          screen requests */
+    const char *text;  /* RESULT: storage.get: the value; storage.keys: the keys, one per line;
+                          http.request: the response body, text only. "" otherwise. Valid until
+                          aitbase_on_event returns; copy what you keep. */
+    size_t text_len;
+    int code;          /* RESULT: storage.get: 1 found, 0 missing; http.request: the HTTP status */
+    int truncated;     /* RESULT of http.request: 1 when the body was cut to fit */
+    const char *location; /* RESULT of http.request: the redirect target of a 3xx, else "" */
 } aitbase_event_t;
 
 typedef enum aitbase_log_level {
@@ -107,6 +130,52 @@ int aitbase_ui_update(aitbase_plugin_t *plugin, const char *node, const char *ke
 int aitbase_ui_set_text(aitbase_plugin_t *plugin, const char *node, const char *key,
                         const char *text);
 int aitbase_ui_close(aitbase_plugin_t *plugin);
+
+/* --- Storage ("storage"): small text values kept across runs, private to this plugin ----------- */
+
+/* Keys: 1 to 64 letters, digits, '.', '_' or '-'. Values: up to 4096 bytes of UTF-8 text; tabs and
+ * newlines are fine, other control characters are not. At most 128 keys and 64 KiB per plugin.
+ * Needs an SD card in the device; without one requests fail with "no_storage". */
+
+/* RESULT: code 1 and text = the value, or code 0 when the key is missing. */
+int aitbase_storage_get(aitbase_plugin_t *plugin, const char *key);
+/* Silent on success. */
+int aitbase_storage_set(aitbase_plugin_t *plugin, const char *key, const char *value);
+/* Silent on success, also when the key is missing. */
+int aitbase_storage_delete(aitbase_plugin_t *plugin, const char *key);
+/* RESULT: text = the keys, separated by newlines. */
+int aitbase_storage_keys(aitbase_plugin_t *plugin);
+
+/* --- HTTP ("http"): requests to public internet hosts ------------------------------------------- */
+
+/* The device makes the request. http:// and https:// only; hosts that resolve to local,
+ * private or reserved addresses are refused ("destination_blocked"). Redirects are not followed:
+ * a 3xx RESULT has the target in event->location, and the plugin decides whether to request it.
+ * One request at a time ("in_flight"); at most 1 a second with bursts of 5. The response body is
+ * text, cut to fit the plugin's receive buffer (event->truncated). */
+typedef struct aitbase_http_request {
+    const char *method;          /* "GET", "POST", "PUT", "PATCH", "DELETE" or "HEAD"; NULL means GET */
+    const char *url;             /* up to 1024 printable ASCII characters, no spaces */
+    const char *const *headers;  /* "Name: value" strings, up to 16; NULL for none */
+    size_t header_count;
+    const char *body;            /* text, up to 8192 bytes; NULL for none */
+    uint32_t timeout_ms;         /* 1000 to 15000; 0 means 10000 */
+} aitbase_http_request_t;
+
+/* RESULT: code = the HTTP status, text = the body. */
+int aitbase_http_request(aitbase_plugin_t *plugin, const aitbase_http_request_t *request);
+/* aitbase_http_request() with GET and no headers. */
+int aitbase_http_get(aitbase_plugin_t *plugin, const char *url);
+
+/* --- Sound ("audio.output"): only while the plugin's screen is visible --------------------------- */
+
+/* A new sound replaces the one playing. Each ends with AITBASE_EVENT_SOUND_DONE. Sounds stop when
+ * the device takes the screen back. volume is 0 to 100. */
+int aitbase_audio_tone(aitbase_plugin_t *plugin, uint32_t freq_hz, uint32_t duration_ms, uint32_t volume);
+/* Plays sounds/<sound>.wav from the package: 16 kHz, mono, 16-bit PCM, at most 10 s. List it in
+ * plugin.json under "sounds". */
+int aitbase_audio_play(aitbase_plugin_t *plugin, const char *sound, uint32_t volume);
+int aitbase_audio_stop(aitbase_plugin_t *plugin);
 
 /* --- Plugin ------------------------------------------------------------------------------------ */
 

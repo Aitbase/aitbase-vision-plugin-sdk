@@ -409,6 +409,9 @@ func runPack(e env, args []string) int {
 			need = append(need, struct{ src, name, fix string }{filepath.Join(build, s+".ui.json"), "ui/" + s + ".ui.json", "run `aitbase-plugin build` first"})
 		}
 	}
+	for _, snd := range m.Sounds {
+		need = append(need, struct{ src, name, fix string }{filepath.Join(dir, "sounds", snd+".wav"), "sounds/" + snd + ".wav", "add the sound, or remove it from sounds"})
+	}
 	diags := r.Diagnostics
 	for _, n := range need {
 		data, err := os.ReadFile(n.src)
@@ -476,6 +479,15 @@ func packWasm(e env, asJSON bool, dir, build, outDir string, r *check.Result) in
 			}
 			files = append(files, pack.File{Name: prefix + s + ".ui.json", Data: data})
 		}
+	}
+	for _, snd := range m.Sounds {
+		p := filepath.Join(dir, "sounds", snd+".wav")
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return fail(check.Diagnostic{Severity: check.Error, Code: "SOUND_MISSING", Path: filepath.ToSlash(p),
+				Message: "not found", Fix: "add the sound, or remove it from sounds"})
+		}
+		files = append(files, pack.File{Name: prefix + "sounds/" + snd + ".wav", Data: data})
 	}
 	data, digest, err := pack.Build(files)
 	if err != nil {

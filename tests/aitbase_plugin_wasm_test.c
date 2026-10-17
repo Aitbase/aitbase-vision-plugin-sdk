@@ -17,6 +17,8 @@ AITBASE_PLUGIN_ID("test.plugin");
 
 static int g_ticks = 0;
 static int g_stops = 0;
+static int g_ids[4];
+static uint32_t g_error_request = 99;
 
 static void say(aitbase_plugin_t *p, const char *text) {
     aitbase_ui_set_text(p, "status.title", "title", text);
@@ -39,11 +41,28 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             if (g_ticks == 2) aitbase_timer_set(p, 0);
             break;
         case AITBASE_EVENT_ACTION:
+            if (strcmp(ev->node, "fetch") == 0) {
+                g_ids[0] = aitbase_storage_get(p, "k");
+                g_ids[1] = aitbase_http_get(p, "https://example.com/");
+                g_ids[2] = aitbase_audio_tone(p, 440, 100, 150);
+                g_ids[3] = aitbase_storage_keys(p);
+                break;
+            }
             snprintf(text, sizeof(text), "action %s %s", ev->node, ev->action);
             say(p, text);
             break;
         case AITBASE_EVENT_ERROR:
+            g_error_request = ev->request;
             snprintf(text, sizeof(text), "error %s %d %s", ev->op, ev->status, ev->detail);
+            say(p, text);
+            break;
+        case AITBASE_EVENT_RESULT:
+            snprintf(text, sizeof(text), "result %s %u %d %s|%zu", ev->op, (unsigned)ev->request, ev->code, ev->text,
+                     ev->text_len);
+            say(p, text);
+            break;
+        case AITBASE_EVENT_SOUND_DONE:
+            snprintf(text, sizeof(text), "sound %u %s", (unsigned)ev->request, ev->detail);
             say(p, text);
             break;
         case AITBASE_EVENT_PREEMPTED:
@@ -63,6 +82,7 @@ void aitbase_on_stop(aitbase_plugin_t *p) {
 
 int32_t aitbase_wasm_abi_version(void);
 char *aitbase_wasm_rx_buffer(void);
+int32_t aitbase_wasm_rx_capacity(void);
 int32_t aitbase_wasm_start(void);
 int32_t aitbase_wasm_message(uint32_t len);
 int32_t aitbase_wasm_timer(void);
@@ -79,7 +99,7 @@ static int g_failed = 0;
         }                                                                    \
     } while (0)
 
-static char g_sent[16][20480];
+static char g_sent[32][20480];
 static int g_sent_count = 0;
 static int g_read_count = 0;
 static uint32_t g_timer_ms = 0;
@@ -89,7 +109,7 @@ static const char kScreen[] = "{\"format\":\"aitbase.plugin-ui\",\"version\":1,\
 
 int32_t aitbase_host_send(const char *message, uint32_t len) {
     if (len == 0 || len >= sizeof(g_sent[0]) || memchr(message, '\n', len)) return -1;
-    if (g_sent_count < 16) {
+    if (g_sent_count < 32) {
         memcpy(g_sent[g_sent_count], message, len);
         g_sent[g_sent_count][len] = '\0';
     }
@@ -150,16 +170,19 @@ static void expect_update(int *next, const char *value) {
 int main(void) {
     int next = 0;
     char line[256];
+    char text_expected[96];
     cJSON *req;
 
     EXPECT(aitbase_wasm_abi_version() == 1, "ABI version 1");
     EXPECT(aitbase_wasm_rx_buffer() != NULL, "receive buffer");
+    EXPECT(aitbase_wasm_rx_capacity() == AITBASE_LIMIT_RX_MAX, "the receive buffer is the device's largest");
 
     /* start sends the handshake, and nothing else until the device accepts it. */
     EXPECT(aitbase_wasm_start() == 0, "start continues");
     req = take(&next);
     EXPECT(req && strcmp(str(req, "op"), "hello") == 0, "hello first");
     EXPECT(strcmp(str(cJSON_GetObjectItem(req, "args"), "plugin"), "test.plugin") == 0, "hello carries the plugin id");
+    EXPECT(num(cJSON_GetObjectItem(req, "args"), "rx_max") == (int)AITBASE_LIMIT_RX_MAX, "hello declares the receive buffer");
     EXPECT(g_sent_count == 1, "nothing before the handshake reply");
     snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"protocol\":1}}", num(req, "id"));
     cJSON_Delete(req);
@@ -191,8 +214,53 @@ int main(void) {
     EXPECT(deliver("{\"id\":4,\"status\":-1,\"error\":\"bad_request\",\"result\":{}}") == 0, "error reply");
     expect_update(&next, "error update -1 bad_request");
 
+    EXPECT(g_error_request == 0, "screen requests carry no request id");
+
+    /* Broker requests return ids; their results and sound events carry them back. */
+    EXPECT(deliver("{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"fetch\",\"action\":\"plugin.fetch\"}}") == 0, "fetch");
+    EXPECT(g_ids[0] > 0 && g_ids[1] > g_ids[0] && g_ids[2] > g_ids[1] && g_ids[3] > g_ids[2], "request ids");
+    req = take(&next);
+    EXPECT(req && strcmp(str(req, "cap"), "storage") == 0 && strcmp(str(req, "op"), "get") == 0 &&
+           strcmp(str(cJSON_GetObjectItem(req, "args"), "key"), "k") == 0, "storage.get request");
+    cJSON_Delete(req);
+    req = take(&next);
+    EXPECT(req && strcmp(str(req, "cap"), "http") == 0 && strcmp(str(cJSON_GetObjectItem(req, "args"), "method"), "GET") == 0 &&
+           strcmp(str(cJSON_GetObjectItem(req, "args"), "url"), "https://example.com/") == 0, "http.request");
+    cJSON_Delete(req);
+    req = take(&next);
+    EXPECT(req && strcmp(str(req, "op"), "tone") == 0 && num(cJSON_GetObjectItem(req, "args"), "volume") == 100,
+           "audio.tone with the volume clamped");
+    cJSON_Delete(req);
+    req = take(&next);
+    EXPECT(req && strcmp(str(req, "op"), "keys") == 0, "storage.keys");
+    cJSON_Delete(req);
+
+    snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"found\":true,\"value\":\"v1\"}}", g_ids[0]);
+    EXPECT(deliver(line) == 0, "storage.get result");
+    snprintf(text_expected, sizeof(text_expected), "result storage.get %d 1 v1|2", g_ids[0]);
+    expect_update(&next, text_expected);
+    snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"status\":302,\"body\":\"hi\",\"location\":\"https://b/\",\"truncated\":false}}", g_ids[1]);
+    EXPECT(deliver(line) == 0, "http result");
+    snprintf(text_expected, sizeof(text_expected), "result http.request %d 302 hi|2", g_ids[1]);
+    expect_update(&next, text_expected);
+    snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{}}", g_ids[2]);
+    const int before = g_sent_count;
+    EXPECT(deliver(line) == 0 && g_sent_count == before, "a silent request's success is not an event");
+    snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"keys\":[\"a\",\"b\"]}}", g_ids[3]);
+    EXPECT(deliver(line) == 0, "keys result");
+    snprintf(text_expected, sizeof(text_expected), "result storage.keys %d 0 a\nb|3", g_ids[3]);
+    expect_update(&next, text_expected);
+    snprintf(line, sizeof(line), "{\"cap\":\"audio\",\"event\":\"sound_done\",\"data\":{\"request\":%d,\"detail\":\"finished\"}}", g_ids[2]);
+    EXPECT(deliver(line) == 0, "sound_done");
+    snprintf(text_expected, sizeof(text_expected), "sound %d finished", g_ids[2]);
+    expect_update(&next, text_expected);
+    snprintf(line, sizeof(line), "{\"id\":%d,\"status\":-5,\"error\":\"no_grant\",\"result\":{}}", g_ids[1]);
+    EXPECT(deliver(line) == 0, "broker error");
+    expect_update(&next, "error http.request -5 no_grant");
+    EXPECT(g_error_request == (uint32_t)g_ids[1], "errors carry the request id");
+
     EXPECT(deliver("not json") == -1, "a malformed device message is a failure");
-    EXPECT(aitbase_wasm_message(5000) == -1, "a length past the receive buffer is a failure");
+    EXPECT(aitbase_wasm_message(AITBASE_LIMIT_RX_MAX + 1) == -1, "a length past the receive buffer is a failure");
 
     /* Preemption: the plugin stops; the runtime closes the screen and runs aitbase_on_stop once. */
     EXPECT(deliver("{\"cap\":\"ui\",\"event\":\"preempted\",\"data\":{\"node\":\"\",\"action\":\"\",\"detail\":\"\"}}") == 1, "stopped");

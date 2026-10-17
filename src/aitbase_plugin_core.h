@@ -15,7 +15,9 @@
 
 #define AITBASE_PROTOCOL_VERSION 1
 #define AITBASE_MAX_UI_BYTES 16384u
-#define AITBASE_RX_BUFFER 4096u
+/* Receive buffer: the longest device message the plugin accepts. Sent as rx_max in hello; the
+ * device keeps replies within it (AITBASE_LIMIT_RX_MAX at most). */
+#define AITBASE_RX_BUFFER 16384u
 #define AITBASE_PENDING 32u
 #define AITBASE_MIN_TIMER_MS 10u
 
@@ -27,6 +29,7 @@ struct aitbase_plugin {
     struct {
         uint32_t id;
         char op[16];
+        int tracked; /* the plugin holds the id: RESULT, SOUND_DONE and ERROR carry it */
     } pending[AITBASE_PENDING];
     /* Native transport only. */
     int fd;
