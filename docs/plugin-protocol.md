@@ -10,8 +10,8 @@ Two runtimes speak this protocol:
 |---|---|---|
 | Development socket | A native plugin process connects to `/tmp/aitbase_plugin_dev.sock`. Set `AITBASE_PLUGIN_ENDPOINT` to override the path. | Removed from device firmware; the SDK's native runtime still supports it for older developer firmware. |
 | Supervised (native) | The device's plugin supervisor starts the plugin in a sandbox and hands it a connected socket as an inherited descriptor, named by `AITBASE_PLUGIN_FD`. The SDK runtime uses it instead of the path and makes the process non-dumpable. The device binds the connection to the plugin identity it assigned. | Official native plugins, shipped in firmware. |
-| Supervised (WASM) | The same supervisor starts a sandboxed WASM runner, which hosts the plugin module and passes the same messages through the [WASM host ABI](wasm-abi.md). | Preview, in current firmware. Community plugins on the SD card run while Developer mode is on, which it is by default. |
-| Production (WASM) | As supervised WASM, plus permission checks, package verification and installation from SD. | Planned. |
+| Supervised (WASM) | The same supervisor starts a sandboxed WASM runner, which hosts the plugin module and passes the same messages through the [WASM host ABI](wasm-abi.md). | Preview, in current firmware. Community plugins on the SD card run while Developer mode is on, which it is by default, and hold every capability they request. |
+| Production (WASM) | As supervised WASM, plus owner approval of sensitive capabilities, package verification and installation from SD. | Planned. |
 
 The device serves one plugin connection at a time. When a plugin disconnects, the device closes that plugin's screen.
 
@@ -30,14 +30,21 @@ Each message is one UTF-8 JSON object per line (`\n`). A message from the plugin
 
 | `cap` | `op` | `args` |
 |---|---|---|
-| `system` | `hello` | `protocol` (1), `api_version`, `plugin` (id from `plugin.json`) |
+| `system` | `hello` | `protocol` (1), `api_version`, `plugin` (id from `plugin.json`), `rx_max` (optional: the longest message the plugin can receive, 4096 to 16384; default 4096) |
 | `ui` | `open` | `screen`, `wait_ms` (0 to 30000), `document` (compiled screen) |
 | `ui` | `update` | `node`, `key`, `type`, `value` |
 | `ui` | `close` | none |
+| `storage` | `get`, `set`, `delete`, `keys` | `key`, and `value` for `set` |
+| `http` | `request` | `method`, `url`, `headers`, `body`, `timeout_ms` |
+| `audio` | `tone`, `play`, `stop` | `freq_hz`, `duration_ms`, `volume`; `sound`, `volume` |
+
+Every operation, its arguments and limits, and the capability it needs are in [capabilities](capabilities.md), generated from the device's capability registry. The device checks each request there before doing anything: unknown arguments, wrong types and values out of range are `bad_request`, and an operation whose capability the plugin didn't request is `no_grant`.
 
 **`hello` must be the first request.** The device answers any other request sent before `hello` with `hello_required`. If the device doesn't support the protocol version, it answers `protocol_unsupported`.
 
 Under the supervisor, the `plugin` field in `hello` must be the identity the supervisor assigned; otherwise the device answers `identity_mismatch` and stops the plugin. On the development socket it is taken as given.
+
+The `hello` reply's result has `protocol`, `api_version`, the `rx_max` the device will respect, and `grants`, the capabilities the plugin holds (for example `"ui, storage, http"`).
 
 ## Replies (device → plugin)
 
@@ -45,14 +52,20 @@ Under the supervisor, the `plugin` field in `hello` must be the identity the sup
 {"id": 7, "status": 0, "error": "", "result": {}}
 ```
 
-Every request gets exactly one reply with the same `id`. `status` is `0` on success. Otherwise it is negative, and `error` holds a stable code:
+Every request gets exactly one reply with the same `id`. Most replies come at once; an `http.request` reply comes when the request finishes, and other replies may arrive in between. `status` is `0` on success, and `result` holds what the operation returns. Otherwise `status` is negative, and `error` holds a stable code:
 
 | `status` | Meaning | Example codes |
 |---|---|---|
-| -1 | The request or its arguments are invalid. | `bad_request`, `unknown_op`, `hello_required`, `protocol_unsupported`, `identity_mismatch`, UI validation codes |
+| -1 | The request or its arguments are invalid. | `bad_request`, `unknown_op`, `hello_required`, `protocol_unsupported`, `identity_mismatch`, `bad_header`, UI validation codes |
 | -2 | Stale: no screen is open, or the screen is no longer current. | `not_open` |
-| -3 | Busy: the update mailbox is full. | |
+| -3 | Busy: the update mailbox is full, or a request of the same kind is running. | `in_flight` |
 | -4 | Out of memory. | |
+| -5 | Denied. | `no_grant`, `destination_blocked` |
+| -6 | Unavailable now or on this device. | `not_foreground`, `no_storage` |
+| -7 | A rate, size or storage limit. | `rate_limited`, `quota_exceeded`, `too_large` |
+| -8 | The device tried and failed. | `timeout`, `network_error`, `tls_error` |
+
+The device never sends a message longer than the plugin's `rx_max`. A result that wouldn't fit is cut where the operation allows it (an HTTP body, with `truncated`), or replaced by `too_large`.
 
 ## Events (device → plugin)
 
@@ -68,5 +81,11 @@ Every request gets exactly one reply with the same `id`. `status` is `0` on succ
 | `preempted` | The device took the screen back: LEFT long press, voice assistant, settings… | |
 | `action` | The user activated a focusable widget with RIGHT. | `node`, `action` |
 | `update_rejected` | An update was refused when the device applied it. | `node`, `detail` |
+
+`cap` `audio`:
+
+| `event` | Meaning | `data` |
+|---|---|---|
+| `sound_done` | The sound started by request `request` ended. | `request`, `detail`: `finished`, `stopped` or `failed` |
 
 A message is a reply if it has an `id`, and an event if it has an `event`. Clients must ignore events and fields they don't know, so newer devices can add them.

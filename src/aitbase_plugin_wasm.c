@@ -85,6 +85,11 @@ AITBASE_EXPORT("aitbase_rx_buffer") char *aitbase_wasm_rx_buffer(void) {
     return g_plugin.rx;
 }
 
+/* The receive buffer's size. Optional for the runner: without it, it assumes 4096 bytes. */
+AITBASE_EXPORT("aitbase_rx_capacity") int32_t aitbase_wasm_rx_capacity(void) {
+    return (int32_t)sizeof(g_plugin.rx);
+}
+
 AITBASE_EXPORT("aitbase_start") int32_t aitbase_wasm_start(void) {
     return aitbase_core_send_hello(&g_plugin) == AITBASE_OK ? AITBASE_WASM_CONTINUE : AITBASE_WASM_FAILED;
 }
