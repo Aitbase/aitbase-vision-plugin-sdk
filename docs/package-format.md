@@ -55,6 +55,6 @@ A package is at most **4 MB**.
 
 ## On the device
 
-- **Developer mode** (on by default during the preview) runs the newest package in `aitbase/plugins/` with the capabilities it requests. Turning it off stops community plugins.
+- The device runs the newest package in `aitbase/plugins/` by itself, with the capabilities it requests. There is no switch: to stop a plugin, remove its file.
 - Packages that can't run are listed on the Device Console's Plugins page with the reason: not signed, damaged, another author, a missing file.
 - Unzipped plugin folders, from SDK 0.5 and earlier, no longer run. Pack again with `pack --wasm`.

@@ -2,7 +2,7 @@
 
 How a plugin compiled to WebAssembly talks to the device's plugin runner. **Plugins do not use it directly.** They call `aitbase_plugin.h`, and the SDK's WASM runtime (`src/aitbase_plugin_wasm.c`) implements this ABI. It is written down for SDK maintainers and for other language SDKs.
 
-> **Preview.** Current device firmware runs WASM plugins from the SD card while Developer mode is on, which it is by default (Device Console, Advanced → Plugins). It may change before SDK 1.0.
+> **Preview.** Current device firmware runs signed WASM packages from the SD card. It may change before SDK 1.0.
 
 ## Model
 

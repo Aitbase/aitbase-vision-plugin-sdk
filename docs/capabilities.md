@@ -8,8 +8,8 @@ protocol operations behind it, the limits the device enforces, and every error c
 ## Grants
 
 List the capabilities your plugin needs in `requested_capabilities` in `plugin.json`. An
-operation whose capability isn't listed fails with `no_grant`. While Developer mode is on,
-the device grants everything a community plugin requests (preview).
+operation whose capability isn't listed fails with `no_grant`. During the preview the device
+grants a plugin everything it requests; owner approval of sensitive ones comes later.
 
 | Capability | Class | Rate limit | What it allows |
 |---|---|---|---|

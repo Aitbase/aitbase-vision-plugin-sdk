@@ -1,6 +1,6 @@
 # AITBASE VISION Plugin SDK
 
-> Build plugins with their own screens for AITBASE VISION camera robots. Plugins are C callbacks plus restricted LVGL-style XML screens; the device renders the UI and owns the two physical buttons. Preview (SDK 0.6, plugin API 1): capabilities ui, storage, http and audio.output; the device runs signed .avp packages from its SD card (Developer mode, on by default).
+> Build plugins with their own screens for AITBASE VISION camera robots. Plugins are C callbacks plus restricted LVGL-style XML screens; the device renders the UI and owns the two physical buttons. Preview (SDK 0.6, plugin API 1): capabilities ui, storage, http and audio.output; the device runs signed .avp packages from its SD card.
 
 Start a project with `aitbase-plugin init <dir> --id <yourname.plugin>` and follow its AGENTS.md. Do not use features that are not listed in these documents.
 
