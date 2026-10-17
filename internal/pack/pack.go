@@ -2,8 +2,8 @@
 //
 // A package is a zip whose bytes depend only on its contents: entries are sorted, use
 // forward-slash paths, a fixed timestamp and fixed permissions, so the same plugin produces the
-// same digest on Windows, macOS and Linux (D12). The layout is draft package format 0; see
-// docs/package-format.md.
+// same digest on Windows, macOS and Linux (D12). BuildAVP writes signed package format 1 for
+// devices; Build writes unsigned zips. See docs/package-format.md.
 package pack
 
 import (
@@ -32,8 +32,12 @@ const MaxPackageBytes = 4 << 20
 
 var epoch = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
 
-// Build returns the package bytes and their SHA-256 hex digest.
+// Build returns the package bytes and their SHA-256 hex digest. Every entry is deflated.
 func Build(files []File) ([]byte, string, error) {
+	return build(files, func(string) uint16 { return zip.Deflate })
+}
+
+func build(files []File, method func(name string) uint16) ([]byte, string, error) {
 	sorted := append([]File(nil), files...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 	seen := map[string]string{}
@@ -54,7 +58,7 @@ func Build(files []File) ([]byte, string, error) {
 		return flate.NewWriter(w, flate.BestCompression)
 	})
 	for _, f := range sorted {
-		h := &zip.FileHeader{Name: f.Name, Method: zip.Deflate, Modified: epoch}
+		h := &zip.FileHeader{Name: f.Name, Method: method(f.Name), Modified: epoch}
 		h.SetMode(0o644)
 		w, err := zw.CreateHeader(h)
 		if err != nil {
@@ -74,7 +78,13 @@ func Build(files []File) ([]byte, string, error) {
 	return buf.Bytes(), hex.EncodeToString(sum[:]), nil
 }
 
-// FileName is the package name used in dist/ and on the SD card: <id>-<version>.avp.
+// FileName is the signed package's name, in dist/ and on the SD card: <id>-<version>.avp.
 func FileName(id, version string) string {
 	return id + "-" + version + ".avp"
+}
+
+// NativeFileName is a native development build's zip: <id>-<version>-native.zip. Devices never
+// run native code from the SD card; official plugins are built into the firmware.
+func NativeFileName(id, version string) string {
+	return id + "-" + version + "-native.zip"
 }

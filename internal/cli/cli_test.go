@@ -3,19 +3,32 @@ package cli
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
 	aitbasesdk "github.com/Aitbase/aitbase-vision-plugin-sdk"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/check"
+	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/pack"
+	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/signing"
 )
 
 func run(t *testing.T, args ...string) (int, map[string]any) {
 	t.Helper()
+	// Never the user's real signing key.
+	if os.Getenv(signing.EnvKey) == "" {
+		t.Setenv(signing.EnvKey, filepath.Join(t.TempDir(), "signing-key.pem"))
+	}
 	var out, errb bytes.Buffer
 	code := Main(append(args, "--json"), &out, &errb)
 	var res map[string]any
@@ -74,7 +87,7 @@ func TestPackWithExternalBuildDir(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("pack: %v", res)
 	}
-	if res["package"] != filepath.Join(dist, "alice.p-0.1.0.avp") {
+	if res["package"] != filepath.Join(dist, "alice.p-0.1.0-native.zip") {
 		t.Fatalf("package written to %v", res["package"])
 	}
 }
@@ -192,7 +205,7 @@ func TestPackWasm(t *testing.T) {
 		t.Fatalf("pack --wasm: %v", res)
 	}
 	pkg, _ := res["package"].(string)
-	if filepath.Base(pkg) != "alice.p-0.1.0-wasm.zip" || res["sd_dir"] != "aitbase/plugins/alice.p" {
+	if filepath.Base(pkg) != "alice.p-0.1.0.avp" || res["sd_dir"] != "aitbase/plugins" {
 		t.Fatalf("unexpected result: %v", res)
 	}
 	zr, err := zip.OpenReader(pkg)
@@ -204,10 +217,16 @@ func TestPackWasm(t *testing.T) {
 	for _, f := range zr.File {
 		names = append(names, f.Name)
 	}
-	want := []string{"aitbase/plugins/alice.p/main.ui.json", "aitbase/plugins/alice.p/p.wasm", "aitbase/plugins/alice.p/plugin.json"}
+	want := []string{"main.ui.json", "p.wasm", "plugin.json"}
 	if strings.Join(names, ",") != strings.Join(want, ",") {
 		t.Fatalf("zip holds %v, want %v", names, want)
 	}
+	for _, f := range zr.File {
+		if strings.HasSuffix(f.Name, ".wasm") && f.Method != zip.Store {
+			t.Fatal("the module must be stored, so the device can use it in place")
+		}
+	}
+	verifyAVP(t, pkg, res["author"].(string))
 	if int(res["module_bytes"].(float64)) >= len(wasmModule("aitbase.send")) {
 		t.Fatal("custom sections were not stripped")
 	}
@@ -237,5 +256,62 @@ func TestSDKFoundInParent(t *testing.T) {
 	os.WriteFile(filepath.Join(plugin, "sdk", "include", "aitbase_plugin.h"), []byte("/* own */"), 0o644)
 	if got := sdkFlag(plugin, ""); got != filepath.Join(plugin, "sdk") {
 		t.Fatalf("a project's own sdk/ comes first: %q", got)
+	}
+}
+
+// verifyAVP checks a package the way the device does (control_center/src/plugin_avp.cpp): the
+// comment is the last thing in the file, and its signature covers everything before the comment
+// length field.
+func verifyAVP(t *testing.T, path, author string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	comment := ""
+	eocd := -1
+	for c := 0; c <= 512 && c+22 <= len(data); c++ {
+		at := len(data) - 22 - c
+		if binary.LittleEndian.Uint32(data[at:]) == 0x06054b50 && int(binary.LittleEndian.Uint16(data[at+20:])) == c {
+			eocd, comment = at, string(data[at+22:])
+			break
+		}
+	}
+	parts := strings.Split(strings.TrimPrefix(comment, pack.SignaturePrefix), " ")
+	if eocd < 0 || !strings.HasPrefix(comment, pack.SignaturePrefix) || len(parts) != 2 {
+		t.Fatalf("no signature comment: %q", comment)
+	}
+	der, _ := base64.StdEncoding.DecodeString(parts[0])
+	sig, _ := base64.StdEncoding.DecodeString(parts[1])
+	pub, err := x509.ParsePKIXPublicKey(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(data[:eocd+20])
+	if !ecdsa.VerifyASN1(pub.(*ecdsa.PublicKey), sum[:], sig) {
+		t.Fatal("the signature does not verify")
+	}
+	fp := sha256.Sum256(der)
+	if hex.EncodeToString(fp[:]) != author {
+		t.Fatal("the reported author is not the key's fingerprint")
+	}
+	data[0] ^= 1
+	if sum2 := sha256.Sum256(data[:eocd+20]); ecdsa.VerifyASN1(pub.(*ecdsa.PublicKey), sum2[:], sig) {
+		t.Fatal("a changed package still verifies")
+	}
+}
+
+func TestKeyIsCreatedOnceAndKept(t *testing.T) {
+	t.Setenv(signing.EnvKey, filepath.Join(t.TempDir(), "keys", "signing-key.pem"))
+	code, first := run(t, "key")
+	if code != 0 || first["created"] != true {
+		t.Fatalf("key: %v", first)
+	}
+	code, second := run(t, "key")
+	if code != 0 || second["created"] != false || second["fingerprint"] != first["fingerprint"] {
+		t.Fatalf("the key changed: %v then %v", first, second)
+	}
+	if info, err := os.Stat(first["path"].(string)); err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
+		t.Fatalf("key file: %v %v", info, err)
 	}
 }

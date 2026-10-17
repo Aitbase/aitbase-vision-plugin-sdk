@@ -9,6 +9,7 @@
 package cli
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -25,6 +26,7 @@ import (
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/check"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/pack"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/project"
+	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/signing"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/wasisdk"
 )
 
@@ -50,7 +52,8 @@ func commands() []command {
 		{"init", "create a plugin project: init <dir> --id <id>", runInit},
 		{"check", "validate the plugin project: check [dir]", runCheck},
 		{"build", "build with CMake: build [dir] [--wasm]", runBuild},
-		{"pack", "write dist/<id>-<version>.avp, or with --wasm the SD card zip: pack [dir] [--wasm]", runPack},
+		{"pack", "with --wasm, write the signed dist/<id>-<version>.avp for the SD card: pack [dir] --wasm", runPack},
+		{"key", "show your package signing key (created on first pack): key", runKey},
 		{"toolchain", "download the WebAssembly toolchain (wasi-sdk) and print its path", runToolchain},
 		{"version", "print the SDK version", runVersion},
 		{"devices", "find devices on the network (not available yet)", notAvailable("devices")},
@@ -314,6 +317,35 @@ func runToolchain(e env, args []string) int {
 		result{"wasi_sdk": root, "wasi_sdk_version": wasisdk.Version, "toolchain_file": wasisdk.ToolchainFile(root)}, root)
 }
 
+// signingKey loads or creates the author's key; a diagnostic when it can't.
+func signingKey() (*ecdsa.PrivateKey, string, bool, *check.Diagnostic) {
+	path, err := signing.DefaultPath()
+	if err == nil {
+		key, created, err := signing.LoadOrCreate(path)
+		if err == nil {
+			return key, path, created, nil
+		}
+	}
+	return nil, path, false, &check.Diagnostic{Severity: check.Error, Code: "SIGNING_KEY", Path: path,
+		Message: "cannot read or create the signing key: " + err.Error(),
+		Fix:     "restore your backup of the key file, or set " + signing.EnvKey + " to its path"}
+}
+
+func runKey(e env, args []string) int {
+	fs, asJSON := newFlags(e, "key")
+	if _, err := parse(fs, args); err != nil {
+		return exitUsage
+	}
+	key, path, created, d := signingKey()
+	if d != nil {
+		return e.finish(*asJSON, "key", false, []check.Diagnostic{*d}, nil, "")
+	}
+	fp, _ := signing.Fingerprint(key)
+	return e.finish(*asJSON, "key", true, nil, result{"path": path, "fingerprint": fp, "created": created},
+		fmt.Sprintf("signing key %s\nauthor %s (the Device Console shows %q)\nBack this file up: a device refuses updates to your plugins signed with another key.",
+			path, fp, signing.Short(fp)))
+}
+
 func runBuild(e env, args []string) int {
 	fs, asJSON := newFlags(e, "build")
 	buildDir := fs.String("build-dir", "", "CMake build directory (default: <dir>/build, or <dir>/build-wasm with --wasm)")
@@ -376,7 +408,7 @@ func runPack(e env, args []string) int {
 	fs, asJSON := newFlags(e, "pack")
 	buildDir := fs.String("build-dir", "", "build directory holding the program and <screen>.ui.json (default: <dir>/build, or <dir>/build-wasm with --wasm)")
 	outDir := fs.String("out", "", "output directory (default: <dir>/dist)")
-	wasm := fs.Bool("wasm", false, "package the WebAssembly build as <id>-<version>-wasm.zip for the device's SD card")
+	wasm := fs.Bool("wasm", false, "package the WebAssembly build as the signed <id>-<version>.avp for the device's SD card")
 	sdk, python, allowReserved, _ := checkFlags(fs)
 	pos, err := parse(fs, args)
 	if err != nil {
@@ -429,7 +461,7 @@ func runPack(e env, args []string) int {
 		code, msg, _ := strings.Cut(err.Error(), ": ")
 		return e.finish(*asJSON, "pack", false, append(diags, check.Diagnostic{Severity: check.Error, Code: code, Message: msg}), nil, "")
 	}
-	out := filepath.Join(pathFlag(dir, *outDir, "dist"), pack.FileName(m.ID, m.Version))
+	out := filepath.Join(pathFlag(dir, *outDir, "dist"), pack.NativeFileName(m.ID, m.Version))
 	if err := os.MkdirAll(filepath.Dir(out), 0o755); err == nil {
 		err = os.WriteFile(out, data, 0o644)
 	}
@@ -440,9 +472,9 @@ func runPack(e env, args []string) int {
 		fmt.Sprintf("wrote %s (%d bytes, sha256 %s)", out, len(data), digest))
 }
 
-// packWasm writes <out>/<id>-<version>-wasm.zip: aitbase/plugins/<id>/ with <entry>.wasm, the
-// compiled screens and plugin.json, which unzips at the root of the device's SD card. The module
-// is stripped of custom sections and checked against the device's host ABI first.
+// packWasm writes <out>/<id>-<version>.avp: plugin.json, <entry>.wasm, the compiled screens and the
+// sounds, signed with the author's key (package format 1, docs/package-format.md). The module is
+// stripped of custom sections and checked against the device's host ABI first.
 func packWasm(e env, asJSON bool, dir, build, outDir string, r *check.Result) int {
 	m := r.Manifest
 	diags := r.Diagnostics
@@ -467,8 +499,7 @@ func packWasm(e env, asJSON bool, dir, build, outDir string, r *check.Result) in
 	if err != nil {
 		return fail(check.Diagnostic{Severity: check.Error, Code: "MANIFEST_MISSING", Message: err.Error()})
 	}
-	prefix := pack.SDDir(m.ID) + "/"
-	files := []pack.File{{Name: prefix + m.Entry + ".wasm", Data: module}, {Name: prefix + "plugin.json", Data: manifest}}
+	files := []pack.File{{Name: m.Entry + ".wasm", Data: module}, {Name: "plugin.json", Data: manifest}}
 	if m.UI != nil {
 		for _, s := range m.UI.Screens {
 			p := filepath.Join(build, s+".ui.json")
@@ -477,7 +508,7 @@ func packWasm(e env, asJSON bool, dir, build, outDir string, r *check.Result) in
 				return fail(check.Diagnostic{Severity: check.Error, Code: "BUILD_OUTPUT_MISSING", Path: filepath.ToSlash(p),
 					Message: "not found", Fix: "run `aitbase-plugin build --wasm` first"})
 			}
-			files = append(files, pack.File{Name: prefix + s + ".ui.json", Data: data})
+			files = append(files, pack.File{Name: s + ".ui.json", Data: data})
 		}
 	}
 	for _, snd := range m.Sounds {
@@ -487,23 +518,34 @@ func packWasm(e env, asJSON bool, dir, build, outDir string, r *check.Result) in
 			return fail(check.Diagnostic{Severity: check.Error, Code: "SOUND_MISSING", Path: filepath.ToSlash(p),
 				Message: "not found", Fix: "add the sound, or remove it from sounds"})
 		}
-		files = append(files, pack.File{Name: prefix + "sounds/" + snd + ".wav", Data: data})
+		files = append(files, pack.File{Name: "sounds/" + snd + ".wav", Data: data})
 	}
-	data, digest, err := pack.Build(files)
+	key, keyPath, created, d := signingKey()
+	if d != nil {
+		return fail(*d)
+	}
+	data, digest, err := pack.BuildAVP(files, key)
 	if err != nil {
 		code, msg, _ := strings.Cut(err.Error(), ": ")
 		return fail(check.Diagnostic{Severity: check.Error, Code: code, Message: msg})
 	}
-	out := filepath.Join(outDir, pack.SDFileName(m.ID, m.Version))
+	out := filepath.Join(outDir, pack.FileName(m.ID, m.Version))
 	if err := os.MkdirAll(filepath.Dir(out), 0o755); err == nil {
 		err = os.WriteFile(out, data, 0o644)
 	}
 	if err != nil {
 		return fail(check.Diagnostic{Severity: check.Error, Code: "WRITE_FAILED", Path: out, Message: err.Error()})
 	}
+	fp, _ := signing.Fingerprint(key)
+	text := fmt.Sprintf("wrote %s (%d bytes, sha256 %s)\nsigned by %s\nCopy it into aitbase/plugins/ on the device's SD card.",
+		out, len(data), digest, signing.Short(fp))
+	if created {
+		text += fmt.Sprintf("\nCreated your signing key at %s. Back it up: devices refuse updates to your plugins signed with another key.", keyPath)
+	}
 	return e.finish(asJSON, "pack", true, diags,
-		result{"package": out, "sha256": digest, "bytes": len(data), "module_bytes": len(module), "sd_dir": pack.SDDir(m.ID)},
-		fmt.Sprintf("wrote %s (%d bytes, sha256 %s)\nUnzip it at the root of the device's SD card: it runs from %s/.", out, len(data), digest, pack.SDDir(m.ID)))
+		result{"package": out, "sha256": digest, "bytes": len(data), "module_bytes": len(module), "sd_dir": pack.SDPluginsDir,
+			"author": fp, "signing_key": keyPath, "key_created": created},
+		text)
 }
 
 func notAvailable(cmd string) func(e env, args []string) int {

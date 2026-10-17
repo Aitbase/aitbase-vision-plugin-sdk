@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — unreleased
+
+Signed packages. Needs device firmware with the package loader (D12); devices with it no longer run unzipped plugin folders.
+
+- **`pack --wasm` writes a signed `<id>-<version>.avp`**, to copy into `aitbase/plugins/` on the SD card instead of unzipping. It holds `plugin.json`, `<entry>.wasm`, the compiled screens and the sounds at its top level, all stored uncompressed so the device reads them in place, signed with ECDSA P-256 ([docs/package-format.md](docs/package-format.md)). The JSON `sd_dir` is now `aitbase/plugins`; new fields `author`, `signing_key`, `key_created`.
+- **Signing key:** created on the first `pack --wasm` in the user configuration folder (or `$AITBASE_SIGNING_KEY`), owner-only. New command `key` shows its path and fingerprint; new code `SIGNING_KEY`. Devices pin the first key per plugin id: back the key up.
+- **No Developer mode:** devices with this firmware run signed packages from the SD card without a switch, and show no DEV badge; docs and template updated.
+- **Native `pack`** (without `--wasm`) now writes `<id>-<version>-native.zip`; devices never run native code from the SD card.
+
 ## 0.5.0 — unreleased
 
 Storage, HTTP and sound through the device's capability broker. Needs device firmware with the broker (D4); older firmware answers these requests with `unknown_op`.

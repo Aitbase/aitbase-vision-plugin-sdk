@@ -56,7 +56,7 @@
       "items": {"type": "string", "maxLength": 32, "pattern": "^[a-z][a-z0-9_]*$"}
     },
     "requested_capabilities": {
-      "description": "Capabilities the plugin uses. See docs/capabilities.md. While Developer mode is on, the device grants every capability a plugin requests.",
+      "description": "Capabilities the plugin uses. See docs/capabilities.md. During the preview the device grants every capability a plugin requests.",
       "type": "array",
       "uniqueItems": true,
       "items": {"enum": ["ui", "storage", "http", "audio.output"]}
