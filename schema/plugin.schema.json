@@ -14,7 +14,7 @@
       "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$"
     },
     "name": {
-      "description": "Display name.",
+      "description": "Display name. The device's assistant opens the plugin by this name, so keep it short and easy to say.",
       "type": "string",
       "minLength": 1,
       "maxLength": 40
