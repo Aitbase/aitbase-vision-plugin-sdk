@@ -99,3 +99,5 @@ The registry will grow; each addition is a new, validated entry.
 ## Focus and buttons
 
 The device owns focus. LEFT moves focus between buttons in document order, RIGHT activates the focused button (the `clicked` trigger), and a LEFT long press always leaves the screen. Plugins can't style or hide the focus outline.
+
+The plugin also receives the buttons as `AITBASE_EVENT_KEY` while its screen shows: LEFT press, RIGHT press and RIGHT long press, each before the focus or `clicked` action of the same press. A screen without buttons is driven by these events alone. A LEFT long press is never delivered.

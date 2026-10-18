@@ -51,6 +51,11 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             snprintf(text, sizeof(text), "action %s %s", ev->node, ev->action);
             say(p, text);
             break;
+        case AITBASE_EVENT_KEY:
+            snprintf(text, sizeof(text), "key %s %s", ev->key == AITBASE_KEY_LEFT ? "left" : "right",
+                     ev->gesture == AITBASE_GESTURE_LONG_PRESS ? "long" : "press");
+            say(p, text);
+            break;
         case AITBASE_EVENT_ERROR:
             g_error_request = ev->request;
             snprintf(text, sizeof(text), "error %s %d %s", ev->op, ev->status, ev->detail);
@@ -210,6 +215,14 @@ int main(void) {
 
     EXPECT(deliver("{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"increment\",\"action\":\"plugin.increment\",\"detail\":\"\"}}") == 0, "action");
     expect_update(&next, "action increment plugin.increment");
+
+    EXPECT(deliver("{\"cap\":\"ui\",\"event\":\"key\",\"data\":{\"key\":\"left\",\"gesture\":\"press\"}}") == 0, "key");
+    expect_update(&next, "key left press");
+    EXPECT(deliver("{\"cap\":\"ui\",\"event\":\"key\",\"data\":{\"key\":\"right\",\"gesture\":\"long_press\"}}") == 0, "long key");
+    expect_update(&next, "key right long");
+    EXPECT(deliver("{\"cap\":\"ui\",\"event\":\"key\",\"data\":{\"key\":\"up\",\"gesture\":\"press\"}}") == 0 &&
+           deliver("{\"cap\":\"ui\",\"event\":\"key\",\"data\":{\"key\":\"left\",\"gesture\":\"double\"}}") == 0,
+           "unknown keys and gestures are ignored");
 
     EXPECT(deliver("{\"id\":4,\"status\":-1,\"error\":\"bad_request\",\"result\":{}}") == 0, "error reply");
     expect_update(&next, "error update -1 bad_request");

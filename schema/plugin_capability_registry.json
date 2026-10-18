@@ -172,6 +172,7 @@
     {"cap": "ui", "event": "closed", "summary": "The screen was closed after a close request."},
     {"cap": "ui", "event": "preempted", "summary": "The device took the screen back: LEFT long press, voice assistant, settings. Any sound stops."},
     {"cap": "ui", "event": "action", "summary": "The user activated a focusable widget with RIGHT. data.node and data.action."},
+    {"cap": "ui", "event": "key", "summary": "A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press (a long press comes after a press of the same button). data.key is left or right, data.gesture is press or long_press. LEFT long press is never delivered: it leaves the plugin."},
     {"cap": "ui", "event": "update_rejected", "summary": "An update was refused when the device applied it. data.node and data.detail."},
     {"cap": "audio", "event": "sound_done", "summary": "The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed."}
   ]

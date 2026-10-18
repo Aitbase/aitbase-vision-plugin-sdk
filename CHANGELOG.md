@@ -6,6 +6,7 @@ See and press the device's plugin screen from the computer. Needs device firmwar
 
 - **`screenshot [-o file.png]`** saves the plugin's screen on the device as a PNG; **`press left|right [--long]`** presses its buttons. Both work only while a plugin's own screen shows, with nothing over it; otherwise `DEVICE_NOT_FOREGROUND`.
 - New codes `DEVICE_NOT_FOREGROUND`, `DEVICE_BUSY` and `DEVICE_NO_DISPLAY`. `devices` and `pack-sd` still return `NOT_AVAILABLE`.
+- **Button events (D20):** while its screen shows, a plugin receives `AITBASE_EVENT_KEY` for LEFT press, RIGHT press and RIGHT long press, with the new `event->key` (`AITBASE_KEY_LEFT`, `AITBASE_KEY_RIGHT`) and `event->gesture` (`AITBASE_GESTURE_PRESS`, `AITBASE_GESTURE_LONG_PRESS`). Each comes before the `ACTION` of the same press; a long press comes after a press of the same button; LEFT long press still always leaves and is never delivered. A screen without buttons is driven by these alone. Protocol event `key`. Needs device firmware with D20; older devices just don't send it, and older SDKs ignore it. Rebuild plugins: the event struct grew.
 
 ## 0.7.0 — 2026-10-18
 
