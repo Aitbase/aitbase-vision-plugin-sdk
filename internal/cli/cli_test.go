@@ -93,7 +93,7 @@ func TestPackWithExternalBuildDir(t *testing.T) {
 }
 
 func TestNotAvailableCommands(t *testing.T) {
-	for _, c := range []string{"devices", "screenshot", "press", "pack-sd"} {
+	for _, c := range []string{"devices", "pack-sd"} {
 		code, res := run(t, c)
 		if code != exitNotAvailable || res["ok"] != false {
 			t.Errorf("%s: code %d %v", c, code, res)

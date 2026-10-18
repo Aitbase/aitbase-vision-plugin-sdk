@@ -2,7 +2,7 @@
 
 Build plugins that put their own screen on an AITBASE VISION device.
 
-> **Status: 0.7.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs signed WebAssembly plugins from the SD card. Plugins can show screens, keep small values, make HTTP requests and play sounds ([capabilities](docs/capabilities.md)). Packages are signed `.avp` files; store distribution is not available yet.
+> **Status: 0.8.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs signed WebAssembly plugins from the SD card. Plugins can show screens, keep small values, make HTTP requests and play sounds ([capabilities](docs/capabilities.md)). Packages are signed `.avp` files; store distribution is not available yet.
 
 ## Quick start
 
@@ -132,7 +132,7 @@ Contributors: see [AGENTS.md](AGENTS.md).
 
 These items are planned, not implemented:
 - **More capabilities:** camera, microphone and MCP tools, each behind explicit user permission. Storage, HTTP and sound are available ([docs/capabilities.md](docs/capabilities.md)); later they will also need the owner's approval.
-- **More device tools:** installation from the device's web console, and the CLI commands `screenshot` and `press`. Signed packages, SD card installation, `pair`, `dev` and `logs` are available.
+- **More device tools:** installation from the device's web console, and finding devices on the network (`devices`). Signed packages, SD card installation, `pair`, `dev`, `logs`, `screenshot` and `press` are available.
 - **No Python or C toolchain to install:** the UI compiler built into the CLI, and the WASM toolchain downloaded automatically.
 - **Richer UI:** a larger UI schema (more widgets, styles and bindings).
 

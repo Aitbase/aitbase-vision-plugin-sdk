@@ -72,7 +72,10 @@ There is no simulator, so a successful build does not prove the plugin works. On
 ```sh
 aitbase-plugin dev --json     # build --wasm, pack --wasm, upload, wait until the device runs it
 aitbase-plugin logs --json    # the plugin's log from the device
+aitbase-plugin screenshot --json -o screen.png   # what the plugin's screen shows; look at the PNG
+aitbase-plugin press right --json                # RIGHT activates the focused widget; left moves focus
 ```
+`screenshot` and `press` work only while the plugin's screen shows (`DEVICE_NOT_FOREGROUND` otherwise). After `dev`, wait for `AITBASE_EVENT_OPENED` in the log before taking a screenshot. A LEFT long press (`press left --long`) leaves the plugin.
 `dev` failing with `DEVICE_NOT_PAIRED` means no device is paired, or its token expired: ask the user to run `aitbase-plugin pair <device address>` in their own terminal. Never run `pair` yourself, and never ask for the password.
 
 **Otherwise:**
@@ -82,7 +85,7 @@ aitbase-plugin logs --json    # the plugin's log from the device
 
 If nothing runs, ask the user what the Device Console's Plugins page shows: it lists packages it skipped, with the reason.
 
-The commands `screenshot` and `press` are planned and currently return `NOT_AVAILABLE`. Do not try to work around this. Ask the user what they see on the screen.
+Without a paired device, ask the user what they see on the screen.
 
 ## Security rules
 

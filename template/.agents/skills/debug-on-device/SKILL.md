@@ -39,7 +39,7 @@ Without one, ask the user to open the Device Console's **Advanced → Plugins** 
 
 ## 4. Asking the user
 
-There is no simulator, and this SDK version cannot take screenshots or press buttons remotely. Ask specific questions:
+With a paired device, check the screen yourself: `aitbase-plugin screenshot --json -o screen.png`, look at the PNG, then `aitbase-plugin press right --json` and take another screenshot to see what changed. Without one, ask specific questions:
 - What is on the screen? Does the text change when you press RIGHT?
 - Does LEFT move the highlight between buttons?
 - What does `aitbase/logs/<id>.log` on the SD card say? It has the plugin's own lines, starting with `[<plugin id>]`, and the device's `started`/`ended` lines with the reason, for example a refused module or a trap.

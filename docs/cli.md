@@ -2,7 +2,7 @@
 
 `aitbase-plugin` creates, checks, builds and packages plugins. It is one program with no runtime dependencies, built for Windows, macOS and Linux.
 
-> **Preview.** `init`, `check`, `build`, `pack`, `key`, `toolchain`, `sdk`, `version`, and the device commands `pair`, `dev`, `logs` and `unpair` work today. The device commands need device firmware with the plugin developer routes. `build` needs CMake. A native build also needs a C compiler; `build --wasm` downloads its own. `check` uses Python 3.8+ to compile screens. `devices`, `screenshot`, `press` and `pack-sd` are reserved names that return `NOT_AVAILABLE`.
+> **Preview.** `init`, `check`, `build`, `pack`, `key`, `toolchain`, `sdk`, `version`, and the device commands `pair`, `dev`, `logs`, `screenshot`, `press` and `unpair` work today. The device commands need device firmware with the plugin developer routes. `build` needs CMake. A native build also needs a C compiler; `build --wasm` downloads its own. `check` uses Python 3.8+ to compile screens. `devices` and `pack-sd` are reserved names that return `NOT_AVAILABLE`.
 
 ## Install
 
@@ -79,6 +79,8 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 | `pair <address> [--name <label>]` | Pairs this computer with a device, once. Asks for the Device Console password at a hidden prompt; see [On a device](#on-a-device). |
 | `dev [dir] [--device <address>]` | Builds WebAssembly, packs the signed `.avp`, uploads it to the device's SD card and waits until the device runs it. |
 | `logs [dir] [--follow] [--id <id>] [--device <address>]` | Prints the plugin's log from the device; `--follow` keeps printing new lines. |
+| `screenshot [-o <file.png>] [--device <address>]` | Saves the plugin's screen on the device as a PNG (default `screenshot.png`). |
+| `press left\|right [--long] [--device <address>]` | Presses a button on the device, as the hardware would. |
 | `unpair [--device <address>]` | Revokes this computer's token on the device and forgets the device. |
 
 `check` and `pack` also accept:
@@ -120,6 +122,7 @@ aitbase-plugin logs --follow
 - **The device refuses pairing while it uses its default password.** Change the password on the Device Console once.
 - **The token** that pairing returns is kept in your user configuration folder (`aitbase-plugin/devices.json` there, or `$AITBASE_DEVICES`), readable only by you. It can upload plugins and read their logs, nothing else. It expires after 30 days. The device's Plugins page lists paired computers and revokes them; changing the Device Console password revokes them all.
 - **What `dev` does on the device:** the upload goes into `aitbase/plugins/` on the SD card, like a copied file, so the card must be in and stay there. The device checks the signature and runs it within a few seconds, replacing the plugin that runs. It refuses `aitbase.*` ids and packages signed by another key than the one the plugin was first signed with.
+- **See and press:** `screenshot` saves the device's screen as a PNG and `press left`, `press right` or `press left --long` press its buttons, so you or an agent can check the plugin without looking at the device. Both work only while a plugin's own screen shows, with nothing over it; on any other screen they fail with `DEVICE_NOT_FOREGROUND`. On the plugin screen, LEFT moves the focus, RIGHT activates the focused widget, and a LEFT long press leaves the plugin.
 - **Several devices:** the last one paired is the default; pass `--device <address>` for another.
 - **Plain HTTP:** devices serve the local network over plain HTTP. Don't pair over a network you don't trust.
 
@@ -148,7 +151,7 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 {
   "ok": false,
   "command": "check",
-  "sdk_version": "0.7.0",
+  "sdk_version": "0.8.0",
   "diagnostics": [
     {
       "severity": "error",
@@ -170,6 +173,8 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 - `pair` adds `device`, `token_id`, `expires_at` and `devices_file`; never the token.
 - `dev` adds `device`, `package`, `sha256`, `author`, `plugin_id`, `version`, `file` and `running`.
 - `logs` adds `device`, `plugin_id`, `text` and `next_offset`.
+- `screenshot` adds `device`, `file`, `width` and `height`.
+- `press` adds `device`, `button` and `long`.
 - `unpair` adds `device`.
 
 Exit codes:
@@ -249,4 +254,7 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `DEVICE_PACKAGE_SKIPPED` | The package is on the SD card, but the device skipped it; `message` says why. |
 | `DEVICE_PLUGIN_ENDED` | The plugin started and ended at once; read `aitbase-plugin logs`. |
 | `DEVICE_TIMEOUT` | The package is on the SD card, but the device didn't start it in time. |
+| `DEVICE_NOT_FOREGROUND` | `screenshot` and `press` work only while a plugin's own screen shows on the device. |
+| `DEVICE_BUSY` | The previous press is still being handled. |
+| `DEVICE_NO_DISPLAY` | The device's display is off or not working. |
 | `DEVICE_ERROR` | Another error from the device; `message` has its words. |
