@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	aitbasesdk "github.com/Aitbase/aitbase-vision-plugin-sdk"
+	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/bundled"
 )
 
 type Params struct {
@@ -79,19 +80,5 @@ func Create(dir string, p Params) ([]string, error) {
 	if err != nil {
 		return written, err
 	}
-
-	err = fs.WalkDir(aitbasesdk.Runtime, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		data, err := aitbasesdk.Runtime.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		return write(path.Join("sdk", p), data)
-	})
-	if err != nil {
-		return written, err
-	}
-	return written, write("sdk/VERSION", []byte(aitbasesdk.Version+"\n"))
+	return written, bundled.Files(func(rel string, data []byte) error { return write(path.Join("sdk", rel), data) })
 }

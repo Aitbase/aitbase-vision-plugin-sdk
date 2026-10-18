@@ -2,6 +2,8 @@
 
 ## 0.6.0 — unreleased
 
+- **The SDK comes with the CLI:** a project without an `sdk/` of its own builds with the SDK built into the CLI, unpacked once into the user cache folder. Repositories of plugins no longer need the SDK as a git submodule. `build` passes the SDK directory to CMake as `AITBASE_SDK_DIR` and accepts `--sdk`; new command `sdk` prints the directory (JSON `sdk_dir`, `bundled`); new code `SDK_UNAVAILABLE`. `pack` no longer reads an SDK. See [docs/cli.md](docs/cli.md#which-sdk).
+
 Signed packages. Needs device firmware with the package loader (D12); devices with it no longer run unzipped plugin folders.
 
 - **`pack --wasm` writes a signed `<id>-<version>.avp`**, to copy into `aitbase/plugins/` on the SD card instead of unzipping. It holds `plugin.json`, `<entry>.wasm`, the compiled screens and the sounds at its top level, all stored uncompressed so the device reads them in place, signed with ECDSA P-256 ([docs/package-format.md](docs/package-format.md)). The JSON `sd_dir` is now `aitbase/plugins`; new fields `author`, `signing_key`, `key_created`.

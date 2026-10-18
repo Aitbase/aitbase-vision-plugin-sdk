@@ -237,26 +237,46 @@ func fmtDiags(res map[string]any) string {
 	return string(data)
 }
 
-// A plugin inside a repository of plugins uses the repository's sdk/ without --sdk.
-func TestSDKFoundInParent(t *testing.T) {
+// A plugin inside a repository of plugins uses the repository's sdk/ without --sdk, and a plugin
+// with none uses the SDK built into the CLI.
+func TestSDKFoundInParentOrBundled(t *testing.T) {
+	cache := useTempCache(t)
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "sdk", "include"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(root, "sdk", "include", "aitbase_plugin.h"), []byte("/* sdk */"), 0o644)
 	plugin := filepath.Join(root, "plugins", "p")
 	os.MkdirAll(plugin, 0o755)
-	if got := sdkFlag(plugin, ""); got != filepath.Join(root, "sdk") {
+	got, d := sdkFlag(plugin, "")
+	if d != nil || !strings.HasPrefix(got, cache) {
+		t.Fatalf("sdkFlag = %q, %v; want the bundled SDK in %s", got, d, cache)
+	}
+	if _, err := os.Stat(filepath.Join(got, "include", "aitbase_plugin.h")); err != nil {
+		t.Fatal(err)
+	}
+	if code, res := run(t, "sdk", plugin); code != 0 || res["sdk_dir"] != got || res["bundled"] != true {
+		t.Fatalf("sdk: %d %v", code, res)
+	}
+
+	os.MkdirAll(filepath.Join(root, "sdk", "include"), 0o755)
+	os.WriteFile(filepath.Join(root, "sdk", "include", "aitbase_plugin.h"), []byte("/* sdk */"), 0o644)
+	if got, _ := sdkFlag(plugin, ""); got != filepath.Join(root, "sdk") {
 		t.Fatalf("sdkFlag = %q, want the repository's sdk", got)
 	}
-	if got := sdkFlag(plugin, "custom"); got != "custom" {
+	if got, _ := sdkFlag(plugin, "custom"); got != "custom" {
 		t.Fatalf("--sdk not used as given: %q", got)
 	}
 	os.MkdirAll(filepath.Join(plugin, "sdk", "include"), 0o755)
 	os.WriteFile(filepath.Join(plugin, "sdk", "include", "aitbase_plugin.h"), []byte("/* own */"), 0o644)
-	if got := sdkFlag(plugin, ""); got != filepath.Join(plugin, "sdk") {
+	if got, _ := sdkFlag(plugin, ""); got != filepath.Join(plugin, "sdk") {
 		t.Fatalf("a project's own sdk/ comes first: %q", got)
 	}
+}
+
+// useTempCache points os.UserCacheDir at a temporary directory on every system.
+func useTempCache(t *testing.T) string {
+	dir := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", dir)
+	t.Setenv("LocalAppData", dir)
+	t.Setenv("HOME", dir)
+	return dir
 }
 
 // verifyAVP checks a package the way the device does (control_center/src/plugin_avp.cpp): the
