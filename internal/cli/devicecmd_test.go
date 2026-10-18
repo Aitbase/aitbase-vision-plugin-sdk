@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"image/png"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -37,6 +39,8 @@ type fakeDevice struct {
 	maxChunk      int
 	authHeaders   []string
 	pairPasswords []string
+	foreground    bool // a community plugin's screen shows
+	pressed       []string
 }
 
 func (f *fakeDevice) reply(w http.ResponseWriter, status int, body map[string]any) {
@@ -119,6 +123,25 @@ func (f *fakeDevice) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "logs":
 		f.reply(w, 200, map[string]any{"success": true, "plugin_id": r.URL.Query().Get("id"), "offset": 0,
 			"next_offset": len(f.log), "size": len(f.log), "restarted": false, "text": f.log})
+	case "screenshot":
+		if !f.foreground {
+			f.fail(w, 409, "not_foreground")
+			return
+		}
+		// 2x1: red, green.
+		f.reply(w, 200, map[string]any{"success": true, "width": 2, "height": 1, "format": "rgb565le", "pixels": "APjgBw=="})
+	case "press":
+		var req struct {
+			Button string
+			Long   bool
+		}
+		_ = json.Unmarshal(body, &req)
+		if !f.foreground {
+			f.fail(w, 409, "not_foreground")
+			return
+		}
+		f.pressed = append(f.pressed, fmt.Sprintf("%s long=%v", req.Button, req.Long))
+		f.reply(w, 200, map[string]any{"success": true})
 	case "token":
 		f.revoked = true
 		f.reply(w, 200, map[string]any{"success": true})
@@ -259,5 +282,47 @@ func TestUnreachableDevice(t *testing.T) {
 	client.Address = "127.0.0.1:1"
 	if _, d := deploy(client, []byte("x"), time.Second); d == nil || d.Code != "DEVICE_UNREACHABLE" {
 		t.Fatalf("unreachable: %+v", d)
+	}
+}
+
+func TestScreenshotAndPress(t *testing.T) {
+	f, _ := pairWithFake(t)
+	out := filepath.Join(t.TempDir(), "shot.png")
+	if code, res := run(t, "screenshot", "-o", out); code != exitFailed || !strings.Contains(fmtDiags(res), "DEVICE_NOT_FOREGROUND") {
+		t.Fatalf("screenshot of a core screen: %d %v", code, res)
+	}
+	if code, res := run(t, "press", "right"); code != exitFailed || !strings.Contains(fmtDiags(res), "DEVICE_NOT_FOREGROUND") {
+		t.Fatalf("press on a core screen: %d %v", code, res)
+	}
+	f.foreground = true
+	code, res := run(t, "screenshot", "-o", out)
+	if code != 0 || res["file"] != out || res["width"] != float64(2) {
+		t.Fatalf("screenshot: %d %v", code, res)
+	}
+	file, err := os.Open(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	img, err := png.Decode(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, g, b, _ := img.At(0, 0).RGBA()
+	r2, g2, b2, _ := img.At(1, 0).RGBA()
+	if r>>8 != 0xff || g != 0 || b != 0 || r2 != 0 || g2>>8 != 0xff || b2 != 0 {
+		t.Fatalf("pixels: %v %v", img.At(0, 0), img.At(1, 0))
+	}
+	if code, res := run(t, "press", "left", "--long"); code != 0 || res["long"] != true {
+		t.Fatalf("press: %d %v", code, res)
+	}
+	if code, _ := run(t, "press", "right"); code != 0 {
+		t.Fatal("press right")
+	}
+	if strings.Join(f.pressed, ",") != "left long=true,right long=false" {
+		t.Fatalf("pressed: %v", f.pressed)
+	}
+	if code, _ := run(t, "press", "up"); code != exitUsage {
+		t.Fatal("press up was accepted")
 	}
 }
