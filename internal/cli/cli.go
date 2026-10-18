@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	aitbasesdk "github.com/Aitbase/aitbase-vision-plugin-sdk"
+	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/bundled"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/check"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/pack"
 	"github.com/Aitbase/aitbase-vision-plugin-sdk/internal/project"
@@ -55,6 +56,7 @@ func commands() []command {
 		{"pack", "with --wasm, write the signed dist/<id>-<version>.avp for the SD card: pack [dir] --wasm", runPack},
 		{"key", "show your package signing key (created on first pack): key", runKey},
 		{"toolchain", "download the WebAssembly toolchain (wasi-sdk) and print its path", runToolchain},
+		{"sdk", "print the path of the SDK a project builds with: sdk [dir]", runSDK},
 		{"version", "print the SDK version", runVersion},
 		{"devices", "find devices on the network (not available yet)", notAvailable("devices")},
 		{"pair", "pair with a device (not available yet)", notAvailable("pair")},
@@ -193,29 +195,44 @@ func pathFlag(dir, value, def string) string {
 	return filepath.Join(dir, def)
 }
 
-// sdkFlag resolves the SDK directory: --sdk as given, else the nearest sdk/ holding this SDK in
-// the project directory or one of its parents. A project from `init` has its own sdk/; a plugin
-// in a repository of plugins uses the repository's.
-func sdkFlag(dir, value string) string {
-	if value != "" {
-		return value
-	}
+// localSDK finds the nearest sdk/ holding this SDK in the project directory or one of its parents.
+// A project from `init` has its own sdk/; a plugin in a repository of plugins may use the
+// repository's.
+func localSDK(dir string) (string, bool) {
 	abs, err := filepath.Abs(dir)
-	if err == nil {
-		for d := abs; ; d = filepath.Dir(d) {
-			candidate := filepath.Join(d, "sdk")
-			if _, err := os.Stat(filepath.Join(candidate, "include", "aitbase_plugin.h")); err == nil {
-				if d == abs {
-					return filepath.Join(dir, "sdk")
-				}
-				return candidate
+	if err != nil {
+		return "", false
+	}
+	for d := abs; ; d = filepath.Dir(d) {
+		candidate := filepath.Join(d, "sdk")
+		if _, err := os.Stat(filepath.Join(candidate, "include", "aitbase_plugin.h")); err == nil {
+			if d == abs {
+				return filepath.Join(dir, "sdk"), true
 			}
-			if filepath.Dir(d) == d {
-				break
-			}
+			return candidate, true
+		}
+		if filepath.Dir(d) == d {
+			return "", false
 		}
 	}
-	return filepath.Join(dir, "sdk")
+}
+
+// sdkFlag resolves the SDK directory: --sdk as given, else the nearest sdk/ (localSDK), else the
+// SDK built into the CLI, unpacked in the user cache folder on first use.
+func sdkFlag(dir, value string) (string, *check.Diagnostic) {
+	if value != "" {
+		return value, nil
+	}
+	if local, ok := localSDK(dir); ok {
+		return local, nil
+	}
+	root, err := bundled.Dir()
+	if err != nil {
+		return "", &check.Diagnostic{Severity: check.Error, Code: "SDK_UNAVAILABLE",
+			Message: "cannot unpack the SDK built into the CLI: " + err.Error(),
+			Fix:     "make the user cache folder writable, or pass --sdk <dir>"}
+	}
+	return root, nil
 }
 
 func oneDir(positional []string) (string, error) {
@@ -284,7 +301,13 @@ func runCheck(e env, args []string) int {
 	if err != nil {
 		return usageError(e, *asJSON, "check", err.Error())
 	}
-	sdkDir := sdkFlag(dir, *sdk)
+	sdkDir := ""
+	if !*skipUI {
+		var d *check.Diagnostic
+		if sdkDir, d = sdkFlag(dir, *sdk); d != nil {
+			return e.finish(*asJSON, "check", false, []check.Diagnostic{*d}, nil, "check failed")
+		}
+	}
 	r := check.Project(dir, sdkDir, check.Options{AllowReservedID: *allowReserved, Python: *python, SkipUI: *skipUI})
 	ok := !r.HasErrors()
 	human := "check passed"
@@ -315,6 +338,27 @@ func runToolchain(e env, args []string) int {
 	}
 	return e.finish(*asJSON, "toolchain", true, nil,
 		result{"wasi_sdk": root, "wasi_sdk_version": wasisdk.Version, "toolchain_file": wasisdk.ToolchainFile(root)}, root)
+}
+
+func runSDK(e env, args []string) int {
+	fs, asJSON := newFlags(e, "sdk")
+	pos, err := parse(fs, args)
+	if err != nil {
+		return exitUsage
+	}
+	dir, err := oneDir(pos)
+	if err != nil {
+		return usageError(e, *asJSON, "sdk", err.Error())
+	}
+	_, local := localSDK(dir)
+	root, d := sdkFlag(dir, "")
+	if d != nil {
+		return e.finish(*asJSON, "sdk", false, []check.Diagnostic{*d}, nil, "")
+	}
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	return e.finish(*asJSON, "sdk", true, nil, result{"sdk_dir": root, "bundled": !local}, root)
 }
 
 // signingKey loads or creates the author's key; a diagnostic when it can't.
@@ -350,6 +394,7 @@ func runBuild(e env, args []string) int {
 	fs, asJSON := newFlags(e, "build")
 	buildDir := fs.String("build-dir", "", "CMake build directory (default: <dir>/build, or <dir>/build-wasm with --wasm)")
 	wasm := fs.Bool("wasm", false, "build WebAssembly for the device; downloads wasi-sdk on first use")
+	sdk := fs.String("sdk", "", "SDK directory (default: the nearest sdk/ in <dir> or a parent, else the SDK built into the CLI)")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return exitUsage
@@ -363,9 +408,18 @@ func runBuild(e env, args []string) int {
 		return e.finish(*asJSON, "build", false, []check.Diagnostic{{Severity: check.Error, Code: "CMAKE_NOT_FOUND",
 			Message: "cmake is not installed", Fix: "install CMake 3.13 or later and a C compiler"}}, nil, "")
 	}
-	configure := []string{"-S", dir}
+	sdkDir, d := sdkFlag(dir, *sdk)
+	if d != nil {
+		return e.finish(*asJSON, "build", false, []check.Diagnostic{*d}, nil, "")
+	}
+	if abs, err := filepath.Abs(sdkDir); err == nil {
+		sdkDir = abs
+	}
+	// AITBASE_SDK_DIR tells a plugin's CMakeLists.txt where the SDK is when it has no sdk/ of its
+	// own; a project that doesn't read it must not warn about it.
+	configure := []string{"-S", dir, "--no-warn-unused-cli", "-DAITBASE_SDK_DIR=" + filepath.ToSlash(sdkDir)}
 	out := pathFlag(dir, *buildDir, "build")
-	extra := result{}
+	extra := result{"sdk_dir": sdkDir}
 	if *wasm {
 		out = pathFlag(dir, *buildDir, "build-wasm")
 		root, d := ensureWasiSDK(e)
@@ -409,7 +463,7 @@ func runPack(e env, args []string) int {
 	buildDir := fs.String("build-dir", "", "build directory holding the program and <screen>.ui.json (default: <dir>/build, or <dir>/build-wasm with --wasm)")
 	outDir := fs.String("out", "", "output directory (default: <dir>/dist)")
 	wasm := fs.Bool("wasm", false, "package the WebAssembly build as the signed <id>-<version>.avp for the device's SD card")
-	sdk, python, allowReserved, _ := checkFlags(fs)
+	_, python, allowReserved, _ := checkFlags(fs)
 	pos, err := parse(fs, args)
 	if err != nil {
 		return exitUsage
@@ -418,8 +472,8 @@ func runPack(e env, args []string) int {
 	if err != nil {
 		return usageError(e, *asJSON, "pack", err.Error())
 	}
-	sdkDir := sdkFlag(dir, *sdk)
-	r := check.Project(dir, sdkDir, check.Options{AllowReservedID: *allowReserved, Python: *python, SkipUI: true})
+	// Screens were compiled by the build, so pack needs no SDK.
+	r := check.Project(dir, "", check.Options{AllowReservedID: *allowReserved, Python: *python, SkipUI: true})
 	if r.HasErrors() {
 		return e.finish(*asJSON, "pack", false, r.Diagnostics, nil, "pack failed: fix the check errors first")
 	}
