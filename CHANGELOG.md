@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0 — unreleased
+
+Develop on a device over the network. Needs device firmware with the plugin developer routes (D19).
+
+- **`pair <address>`:** pairs the computer with a device once. It asks for the Device Console password at a hidden prompt, never anywhere else, and keeps only the developer token the device returns, in `aitbase-plugin/devices.json` in the user configuration folder (or `$AITBASE_DEVICES`), owner-only. Devices refuse pairing while they use their default password.
+- **`dev [dir]`:** builds WebAssembly, packs the signed `.avp`, uploads it to the device's SD card and waits until the device runs it.
+- **`logs [dir] [--follow]`** prints the plugin's log from the device; **`unpair`** revokes the token.
+- New codes `PASSWORD_NEEDS_TERMINAL` and `DEVICE_*` ([docs/cli.md](docs/cli.md#diagnostic-codes)). `devices`, `screenshot`, `press` and `pack-sd` still return `NOT_AVAILABLE`.
+- New dependency: `golang.org/x/term`, for the hidden password prompt.
+
 ## 0.6.0 — 2026-10-18
 
 - **The SDK comes with the CLI:** a project without an `sdk/` of its own builds with the SDK built into the CLI, unpacked once into the user cache folder. Repositories of plugins no longer need the SDK as a git submodule. `build` passes the SDK directory to CMake as `AITBASE_SDK_DIR` and accepts `--sdk`; new command `sdk` prints the directory (JSON `sdk_dir`, `bundled`); new code `SDK_UNAVAILABLE`. `pack` no longer reads an SDK. See [docs/cli.md](docs/cli.md#which-sdk).
