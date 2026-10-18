@@ -36,7 +36,7 @@ var pollInterval = 500 * time.Millisecond
 
 // deviceCodes maps the device's error codes to CLI codes and what to do about them.
 var deviceCodes = map[string]struct{ code, fix string }{
-	"default_password":   {"DEVICE_DEFAULT_PASSWORD", "change the Device Console password on the device's web page (Settings), then pair again"},
+	"default_password":   {"DEVICE_DEFAULT_PASSWORD", "change the password on the Device Console's Password page, then pair again"},
 	"password_incorrect": {"DEVICE_PASSWORD_INCORRECT", "run `aitbase-plugin pair` again and type the Device Console password"},
 	"rate_limited":       {"DEVICE_RATE_LIMITED", "wait, then try again"},
 	"unauthorized":       {"DEVICE_NOT_PAIRED", "the token expired or was revoked: run `aitbase-plugin pair <address>` again"},
