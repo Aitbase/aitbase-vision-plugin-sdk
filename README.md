@@ -62,7 +62,7 @@ A plugin is a set of callbacks. The runtime connects to the device, calls `aitba
 
 The device owns the screen:
 - **Rendering:** it validates and draws the plugin's UI itself.
-- **Buttons:** LEFT moves focus, RIGHT activates the focused widget, and a LEFT long press always leaves.
+- **Buttons:** LEFT moves focus, RIGHT activates the focused widget, and a LEFT long press always leaves. The plugin also hears LEFT press, RIGHT press and RIGHT long press as `AITBASE_EVENT_KEY`.
 - **Taking the screen back:** this happens at any time, for example for the voice assistant.
 
 A plugin never touches LVGL, files or drivers.

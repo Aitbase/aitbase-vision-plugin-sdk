@@ -80,6 +80,7 @@ The device never sends a message longer than the plugin's `rx_max`. A result tha
 | `closed` | The screen was closed after a `close` request. | |
 | `preempted` | The device took the screen back: LEFT long press, voice assistant, settings… | |
 | `action` | The user activated a focusable widget with RIGHT. | `node`, `action` |
+| `key` | A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press, before the `action` of the same press. A long press comes after a press of the same button; LEFT long press is never sent. | `key`: `left` or `right`; `gesture`: `press` or `long_press` |
 | `update_rejected` | An update was refused when the device applied it. | `node`, `detail` |
 
 `cap` `audio`:

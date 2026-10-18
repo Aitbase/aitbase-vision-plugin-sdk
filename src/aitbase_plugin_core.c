@@ -236,7 +236,7 @@ static aitbase_event_kind_t kind_from_name(const char *name) {
         {"opened", AITBASE_EVENT_OPENED},     {"rejected", AITBASE_EVENT_REJECTED},
         {"closed", AITBASE_EVENT_CLOSED},     {"preempted", AITBASE_EVENT_PREEMPTED},
         {"action", AITBASE_EVENT_ACTION},     {"update_rejected", AITBASE_EVENT_UPDATE_REJECTED},
-        {"sound_done", AITBASE_EVENT_SOUND_DONE},
+        {"sound_done", AITBASE_EVENT_SOUND_DONE}, {"key", AITBASE_EVENT_KEY},
     };
     for (size_t i = 0; i < sizeof(kinds) / sizeof(kinds[0]); ++i) {
         if (strcmp(name, kinds[i].name) == 0) return kinds[i].kind;
@@ -343,6 +343,16 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
             copy_field(out.action, sizeof(out.action), data, "action");
             copy_field(out.detail, sizeof(out.detail), data, "detail");
             out.request = cJSON_IsNumber(request) ? (uint32_t)request->valuedouble : 0;
+            if (out.kind == AITBASE_EVENT_KEY) {
+                const char *key = string_or_empty(data, "key");
+                const char *gesture = string_or_empty(data, "gesture");
+                out.key = strcmp(key, "left") == 0 ? AITBASE_KEY_LEFT : strcmp(key, "right") == 0 ? AITBASE_KEY_RIGHT : AITBASE_KEY_NONE;
+                out.gesture = strcmp(gesture, "press") == 0        ? AITBASE_GESTURE_PRESS
+                              : strcmp(gesture, "long_press") == 0 ? AITBASE_GESTURE_LONG_PRESS
+                                                                   : AITBASE_GESTURE_NONE;
+                /* A button or gesture from a newer device: ignore it, like an unknown event. */
+                if (out.key == AITBASE_KEY_NONE || out.gesture == AITBASE_GESTURE_NONE) out.kind = AITBASE_EVENT_NONE;
+            }
         }
     }
     /* Strings in the event point into msg, which lives until the callback returns. */
@@ -373,6 +383,7 @@ const char *aitbase_event_kind_name(aitbase_event_kind_t kind) {
         case AITBASE_EVENT_TIMER: return "timer";
         case AITBASE_EVENT_RESULT: return "result";
         case AITBASE_EVENT_SOUND_DONE: return "sound_done";
+        case AITBASE_EVENT_KEY: return "key";
         default: return "none";
     }
 }
