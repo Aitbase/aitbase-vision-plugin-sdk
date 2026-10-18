@@ -71,7 +71,25 @@ typedef enum aitbase_event_kind {
     AITBASE_EVENT_RESULT = 9,          /* a storage or HTTP request succeeded; see request, op, text, code */
     AITBASE_EVENT_SOUND_DONE = 10,     /* the sound started by request ended; detail is "finished",
                                           "stopped" or "failed" */
+    AITBASE_EVENT_KEY = 11,            /* a button was pressed on the plugin's screen; see key, gesture.
+                                          Since SDK 0.8 */
 } aitbase_event_kind_t;
+
+/* The device's buttons, in AITBASE_EVENT_KEY. */
+typedef enum aitbase_key {
+    AITBASE_KEY_NONE = 0,
+    AITBASE_KEY_LEFT = 1,
+    AITBASE_KEY_RIGHT = 2,
+} aitbase_key_t;
+
+/* How a button was pressed. A long press always comes after a press of the same button: the
+ * device can't know at press-down that the user will hold it. LEFT long press always leaves the
+ * plugin and is never delivered; RIGHT long press is. */
+typedef enum aitbase_gesture {
+    AITBASE_GESTURE_NONE = 0,
+    AITBASE_GESTURE_PRESS = 1,
+    AITBASE_GESTURE_LONG_PRESS = 2,
+} aitbase_gesture_t;
 
 typedef struct aitbase_event {
     aitbase_event_kind_t kind;
@@ -91,6 +109,9 @@ typedef struct aitbase_event {
     int code;          /* RESULT: storage.get: 1 found, 0 missing; http.request: the HTTP status */
     int truncated;     /* RESULT of http.request: 1 when the body was cut to fit */
     const char *location; /* RESULT of http.request: the redirect target of a 3xx, else "" */
+    /* Since SDK 0.8. */
+    aitbase_key_t key;         /* KEY: which button */
+    aitbase_gesture_t gesture; /* KEY: press or long press */
 } aitbase_event_t;
 
 typedef enum aitbase_log_level {
