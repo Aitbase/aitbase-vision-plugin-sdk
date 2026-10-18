@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 — unreleased
+## 0.6.0 — 2026-10-18
 
 - **The SDK comes with the CLI:** a project without an `sdk/` of its own builds with the SDK built into the CLI, unpacked once into the user cache folder. Repositories of plugins no longer need the SDK as a git submodule. `build` passes the SDK directory to CMake as `AITBASE_SDK_DIR` and accepts `--sdk`; new command `sdk` prints the directory (JSON `sdk_dir`, `bundled`); new code `SDK_UNAVAILABLE`. `pack` no longer reads an SDK. See [docs/cli.md](docs/cli.md#which-sdk).
 
@@ -11,7 +11,7 @@ Signed packages. Needs device firmware with the package loader (D12); devices wi
 - **No Developer mode:** devices with this firmware run signed packages from the SD card without a switch, and show no DEV badge; docs and template updated.
 - **Native `pack`** (without `--wasm`) now writes `<id>-<version>-native.zip`; devices never run native code from the SD card.
 
-## 0.5.0 — unreleased
+## 0.5.0 — not released separately; included in 0.6.0
 
 Storage, HTTP and sound through the device's capability broker. Needs device firmware with the broker (D4); older firmware answers these requests with `unknown_op`.
 
