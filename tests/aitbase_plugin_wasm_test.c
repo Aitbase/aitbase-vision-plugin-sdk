@@ -24,7 +24,10 @@ static void say(aitbase_plugin_t *p, const char *text) {
     aitbase_ui_set_text(p, "status.title", "title", text);
 }
 
+static char g_trigger[16];
+
 int aitbase_on_start(aitbase_plugin_t *p) {
+    snprintf(g_trigger, sizeof(g_trigger), "%s", aitbase_trigger(p));
     return aitbase_ui_open(p, "demo", 99999) == AITBASE_OK ? 0 : 1;
 }
 
@@ -189,11 +192,12 @@ int main(void) {
     EXPECT(strcmp(str(cJSON_GetObjectItem(req, "args"), "plugin"), "test.plugin") == 0, "hello carries the plugin id");
     EXPECT(num(cJSON_GetObjectItem(req, "args"), "rx_max") == (int)AITBASE_LIMIT_RX_MAX, "hello declares the receive buffer");
     EXPECT(g_sent_count == 1, "nothing before the handshake reply");
-    snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"protocol\":1}}", num(req, "id"));
+    snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"protocol\":1,\"trigger\":\"schedule\"}}", num(req, "id"));
     cJSON_Delete(req);
 
     /* The reply runs aitbase_on_start, which opens the screen read through package_read. */
     EXPECT(deliver(line) == 0, "hello reply continues");
+    EXPECT(strcmp(g_trigger, "schedule") == 0, "aitbase_trigger() tells on_start why the device started the plugin");
     req = take(&next);
     EXPECT(req && strcmp(str(req, "op"), "open") == 0, "open after the handshake");
     EXPECT(strcmp(str(cJSON_GetObjectItem(cJSON_GetObjectItem(req, "args"), "document"), "format"), "aitbase.plugin-ui") == 0,

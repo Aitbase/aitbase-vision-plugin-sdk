@@ -63,6 +63,12 @@ func TestManifestErrors(t *testing.T) {
 		{"missing screen", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","ui":{"screens":["other"]},"requested_capabilities":["ui"]}`, goodSource, "SCREEN_MISSING"},
 		{"source id", goodManifest, `AITBASE_PLUGIN_ID("alice.other");`, "SOURCE_ID_MISMATCH"},
 		{"no source id", goodManifest, `int x;`, "SOURCE_ID_MISSING"},
+		{"unknown trigger", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"boot"}]}`, goodSource, "TRIGGER_UNKNOWN"},
+		{"schedule too often", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":5}]}`, goodSource, "TRIGGER_SCHEDULE"},
+		{"schedule not whole", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":15.5}]}`, goodSource, "TRIGGER_SCHEDULE"},
+		{"schedule missing minutes", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule"}]}`, goodSource, "TRIGGER_SCHEDULE"},
+		{"two schedules", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":15},{"event":"schedule","every_min":30}]}`, goodSource, "TRIGGER_SCHEDULE"},
+		{"too many triggers", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":15},{},{},{},{}]}`, goodSource, "TRIGGER_FORMAT"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -71,6 +77,19 @@ func TestManifestErrors(t *testing.T) {
 				t.Fatalf("want error %s, got %+v", c.want, r.Diagnostics)
 			}
 		})
+	}
+}
+
+func TestScheduleTrigger(t *testing.T) {
+	m := `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":60}]}`
+	r := Project(writeProject(t, m, goodSource), "", Options{SkipUI: true})
+	if r.HasErrors() || len(r.Manifest.Triggers) != 1 || *r.Manifest.Triggers[0].EveryMin != 60 {
+		t.Fatalf("a valid schedule: %+v", r.Diagnostics)
+	}
+	for _, d := range r.Diagnostics {
+		if d.Code == "MANIFEST_UNKNOWN_FIELD" {
+			t.Fatal("triggers is a known field")
+		}
 	}
 }
 

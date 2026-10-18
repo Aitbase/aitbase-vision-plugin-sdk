@@ -218,6 +218,10 @@ void aitbase_plugin_stop(aitbase_plugin_t *plugin) {
     if (plugin) plugin->stop = 1;
 }
 
+const char *aitbase_trigger(aitbase_plugin_t *plugin) {
+    return plugin ? plugin->trigger : "";
+}
+
 void aitbase_log(aitbase_plugin_t *plugin, aitbase_log_level_t level, const char *fmt, ...) {
     char line[256];
     va_list ap;
@@ -319,6 +323,7 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
         if (strcmp(op, "hello") == 0) {
             if (code == 0) {
                 plugin->ready = 1;
+                copy_field(plugin->trigger, sizeof(plugin->trigger), cJSON_GetObjectItemCaseSensitive(msg, "result"), "trigger");
             } else {
                 aitbase_log(plugin, AITBASE_LOG_ERROR, "device refused the plugin: %s", string_or_empty(msg, "error"));
                 rc = AITBASE_ERR_PROTOCOL;
