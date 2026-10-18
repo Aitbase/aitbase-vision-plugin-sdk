@@ -37,16 +37,30 @@ type Diagnostic struct {
 // Manifest is the draft plugin.json. Fields are optional here so that a missing field is a
 // diagnostic, not a decode failure.
 type Manifest struct {
-	ID                    string   `json:"id"`
-	Name                  string   `json:"name"`
-	Version               string   `json:"version"`
-	APIVersion            *int     `json:"api_version"`
-	Description           string   `json:"description"`
-	Entry                 string   `json:"entry"`
-	UI                    *UI      `json:"ui"`
-	RequestedCapabilities []string `json:"requested_capabilities"`
-	Sounds                []string `json:"sounds"`
+	ID                    string    `json:"id"`
+	Name                  string    `json:"name"`
+	Version               string    `json:"version"`
+	APIVersion            *int      `json:"api_version"`
+	Description           string    `json:"description"`
+	Entry                 string    `json:"entry"`
+	UI                    *UI       `json:"ui"`
+	RequestedCapabilities []string  `json:"requested_capabilities"`
+	Sounds                []string  `json:"sounds"`
+	Triggers              []Trigger `json:"triggers"`
 }
+
+// Trigger starts the plugin without the user opening it (D21 in the device app). Devices support
+// one kind: {"event": "schedule", "every_min": N}.
+type Trigger struct {
+	Event    string   `json:"event"`
+	EveryMin *float64 `json:"every_min"`
+}
+
+// The schedule limits the device enforces; a package outside them is skipped.
+const (
+	ScheduleMinMinutes = 15
+	ScheduleMaxMinutes = 1440
+)
 
 type UI struct {
 	Screens []string `json:"screens"`
@@ -131,7 +145,7 @@ var (
 	sourceIDRegexp = regexp.MustCompile(`AITBASE_PLUGIN_ID\(\s*"([^"]*)"\s*\)`)
 	uiErrorPattern = regexp.MustCompile(`^(UI_[A-Z_]+) at (\S+): (.*)$`)
 	knownFields    = map[string]bool{"id": true, "name": true, "version": true, "api_version": true,
-		"description": true, "entry": true, "ui": true, "requested_capabilities": true, "sounds": true}
+		"description": true, "entry": true, "ui": true, "requested_capabilities": true, "sounds": true, "triggers": true}
 )
 
 // Project checks the plugin project rooted at dir. sdkDir is the SDK copy that holds the UI
@@ -217,6 +231,27 @@ func checkManifest(r *Result, dir string, opt Options) *Manifest {
 				}
 			}
 			seen[s] = true
+		}
+	}
+
+	if len(m.Triggers) > 4 {
+		r.add(Error, "TRIGGER_FORMAT", file+"#triggers", "at most 4 triggers", "remove some")
+	}
+	schedules := 0
+	for _, t := range m.Triggers {
+		p := file + "#triggers"
+		switch {
+		case t.Event != "schedule":
+			r.add(Error, "TRIGGER_UNKNOWN", p, fmt.Sprintf("unknown trigger %q; devices support \"schedule\"", t.Event),
+				`use {"event": "schedule", "every_min": 60}`)
+		case t.EveryMin == nil || *t.EveryMin != float64(int(*t.EveryMin)) ||
+			*t.EveryMin < ScheduleMinMinutes || *t.EveryMin > ScheduleMaxMinutes:
+			r.add(Error, "TRIGGER_SCHEDULE", p, "a schedule needs every_min, a whole number of minutes from 15 to 1440",
+				`for example {"event": "schedule", "every_min": 60}`)
+		default:
+			if schedules++; schedules > 1 {
+				r.add(Error, "TRIGGER_SCHEDULE", p, "only one schedule", "keep one schedule trigger")
+			}
 		}
 	}
 

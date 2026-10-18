@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — unreleased
+
+Plugins that start by themselves, and know why they started. Needs device firmware with triggers (D21); older devices ignore `triggers` and don't say why.
+
+- **Schedules:** `"triggers": [{"event": "schedule", "every_min": N}]` in `plugin.json` (15 to 1440 minutes, one schedule). The device starts the plugin that often while it is idle and no other plugin runs; a scheduled run without a screen is ended after 30 s. `check` validates it: new codes `TRIGGER_FORMAT`, `TRIGGER_UNKNOWN`, `TRIGGER_SCHEDULE`.
+- **`aitbase_trigger(p)`:** why the device started the plugin: `"autorun"`, `"voice"`, `"shortcut"` (the owner's RIGHT long press on the home screen, set on the Plugins page) or `"schedule"`; `""` on older devices. The protocol's `hello` reply carries `trigger`.
+
 ## 0.8.0 — 2026-10-18
 
 See and press the device's plugin screen from the computer. Needs device firmware with the developer routes' screenshot and press (D19 step 2).

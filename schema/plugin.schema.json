@@ -55,6 +55,20 @@
       "uniqueItems": true,
       "items": {"type": "string", "maxLength": 32, "pattern": "^[a-z][a-z0-9_]*$"}
     },
+    "triggers": {
+      "description": "Starts the plugin without the user opening it. One kind: a schedule, every every_min minutes (15 to 1440) while the device is idle. aitbase_trigger() returns \"schedule\" for such a run.",
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["event", "every_min"],
+        "additionalProperties": false,
+        "properties": {
+          "event": {"const": "schedule"},
+          "every_min": {"type": "integer", "minimum": 15, "maximum": 1440}
+        }
+      }
+    },
     "requested_capabilities": {
       "description": "Capabilities the plugin uses. See docs/capabilities.md. During the preview the device grants every capability a plugin requests.",
       "type": "array",
