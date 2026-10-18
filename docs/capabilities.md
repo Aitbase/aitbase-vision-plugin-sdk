@@ -122,6 +122,7 @@ ASCII without spaces.
 | `ui` | `closed` | The screen was closed after a close request. |
 | `ui` | `preempted` | The device took the screen back: LEFT long press, voice assistant, settings. Any sound stops. |
 | `ui` | `action` | The user activated a focusable widget with RIGHT. data.node and data.action. |
+| `ui` | `key` | A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press (a long press comes after a press of the same button). data.key is left or right, data.gesture is press or long_press. LEFT long press is never delivered: it leaves the plugin. |
 | `ui` | `update_rejected` | An update was refused when the device applied it. data.node and data.detail. |
 | `audio` | `sound_done` | The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed. |
 

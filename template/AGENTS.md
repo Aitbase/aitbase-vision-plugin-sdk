@@ -36,8 +36,9 @@ The device has two physical buttons and no touchscreen.
 - LEFT moves focus to the next button on screen.
 - RIGHT activates the focused button. The plugin gets `AITBASE_EVENT_ACTION`.
 - A LEFT long press always leaves the plugin. The plugin gets `AITBASE_EVENT_PREEMPTED` and should stop.
+- The plugin also hears the buttons themselves while its screen shows: `AITBASE_EVENT_KEY` with `ev->key` (`AITBASE_KEY_LEFT` or `AITBASE_KEY_RIGHT`) and `ev->gesture` (`AITBASE_GESTURE_PRESS` or `AITBASE_GESTURE_LONG_PRESS`). It comes before the `ACTION` of the same press. A long press always comes after a press of the same button. LEFT long press is never delivered.
 
-Design every screen for this: a few large buttons in a sensible order, no text input, no scrolling lists.
+Design every screen for this. With buttons on the screen: a few large ones in a sensible order. Without any: the screen is driven by `AITBASE_EVENT_KEY` alone, for a game or a stopwatch (RIGHT press, RIGHT long press and LEFT press). No text input, no scrolling lists.
 
 ## Project layout
 
