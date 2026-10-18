@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0 — unreleased
+## 0.8.0 — 2026-10-18
 
 See and press the device's plugin screen from the computer. Needs device firmware with the developer routes' screenshot and press (D19 step 2).
 
