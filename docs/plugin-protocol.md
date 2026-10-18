@@ -44,7 +44,7 @@ Every operation, its arguments and limits, and the capability it needs are in [c
 
 Under the supervisor, the `plugin` field in `hello` must be the identity the supervisor assigned; otherwise the device answers `identity_mismatch` and stops the plugin. On the development socket it is taken as given.
 
-The `hello` reply's result has `protocol`, `api_version`, the `rx_max` the device will respect, and `grants`, the capabilities the plugin holds (for example `"ui, storage, http"`).
+The `hello` reply's result has `protocol`, `api_version`, the `rx_max` the device will respect, `grants`, the capabilities the plugin holds (for example `"ui, storage, http"`), and `trigger`, why the device started the plugin: `autorun`, `voice`, `shortcut` or `schedule` (absent on older devices).
 
 ## Replies (device → plugin)
 

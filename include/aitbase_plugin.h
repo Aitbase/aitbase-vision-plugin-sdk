@@ -204,6 +204,15 @@ int aitbase_audio_stop(aitbase_plugin_t *plugin);
 int aitbase_timer_set(aitbase_plugin_t *plugin, uint32_t interval_ms);
 /* Stops the plugin after the current callback returns; its screen is closed. */
 void aitbase_plugin_stop(aitbase_plugin_t *plugin);
+/* Why the device started the plugin, from aitbase_on_start on (since SDK 0.9):
+ *   "autorun"  a new or changed package on the SD card, or `aitbase-plugin dev`;
+ *   "voice"    the user asked the assistant to open it;
+ *   "shortcut" the owner's button shortcut (RIGHT long press on the home screen);
+ *   "schedule" the manifest's schedule ("triggers"): the user didn't ask, so do the work and stop,
+ *              or open the screen only when there is something to show. A scheduled run without a
+ *              screen is ended after 30 s;
+ *   ""         an older device, which doesn't say. */
+const char *aitbase_trigger(aitbase_plugin_t *plugin);
 /* Writes a line to the plugin log on the device. */
 void aitbase_log(aitbase_plugin_t *plugin, aitbase_log_level_t level, const char *fmt, ...)
 #if defined(__GNUC__)
