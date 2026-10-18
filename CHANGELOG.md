@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 — unreleased
+## 0.7.0 — 2026-10-18
 
 Develop on a device over the network. Needs device firmware with the plugin developer routes (D19).
 
