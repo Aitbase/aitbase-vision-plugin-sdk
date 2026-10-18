@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 — unreleased
+
+See and press the device's plugin screen from the computer. Needs device firmware with the developer routes' screenshot and press (D19 step 2).
+
+- **`screenshot [-o file.png]`** saves the plugin's screen on the device as a PNG; **`press left|right [--long]`** presses its buttons. Both work only while a plugin's own screen shows, with nothing over it; otherwise `DEVICE_NOT_FOREGROUND`.
+- New codes `DEVICE_NOT_FOREGROUND`, `DEVICE_BUSY` and `DEVICE_NO_DISPLAY`. `devices` and `pack-sd` still return `NOT_AVAILABLE`.
+
 ## 0.7.0 — 2026-10-18
 
 Develop on a device over the network. Needs device firmware with the plugin developer routes (D19).

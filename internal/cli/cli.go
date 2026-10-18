@@ -63,8 +63,8 @@ func commands() []command {
 		{"dev", "build, pack, upload to the paired device and wait until it runs: dev [dir]", runDev},
 		{"logs", "print the plugin's log from the device: logs [dir] [--follow]", runLogs},
 		{"unpair", "revoke this computer's token on the device and forget it: unpair", runUnpair},
-		{"screenshot", "capture the plugin screen (not available yet)", notAvailable("screenshot")},
-		{"press", "press a device button (not available yet)", notAvailable("press")},
+		{"screenshot", "save the plugin's screen on the device as a PNG: screenshot [-o file.png]", runScreenshot},
+		{"press", "press a button on the device's plugin screen: press left|right [--long]", runPress},
 		{"pack-sd", "copy the package to an SD card (not available yet)", notAvailable("pack-sd")},
 	}
 }
