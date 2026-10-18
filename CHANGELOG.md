@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 — unreleased
+## 0.9.0 — 2026-10-18
 
 Plugins that start by themselves, and know why they started. Needs device firmware with triggers (D21); older devices ignore `triggers` and don't say why.
 
