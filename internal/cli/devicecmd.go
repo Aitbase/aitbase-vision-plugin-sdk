@@ -6,6 +6,9 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,6 +53,9 @@ var deviceCodes = map[string]struct{ code, fix string }{
 	"write_failed":       {"DEVICE_UPLOAD_FAILED", "check the SD card: it may be full or write-protected"},
 	"package_too_large":  {"DEVICE_UPLOAD_FAILED", "a package is at most 4 MiB"},
 	"not_found":          {"DEVICE_NOT_SUPPORTED", "update the device's firmware: it has no plugin developer routes"},
+	"not_foreground":     {"DEVICE_NOT_FOREGROUND", "open the plugin's screen first: run `aitbase-plugin dev`, or ask the user to open it; screenshot and press only reach a plugin's own screen"},
+	"busy":               {"DEVICE_BUSY", "wait a second, then press again"},
+	"no_display":         {"DEVICE_NO_DISPLAY", "the device's display is off or not working"},
 }
 
 // deviceDiagnostic turns an error from the device client into a diagnostic.
@@ -260,6 +266,74 @@ func deploy(client *device.Client, pkg []byte, timeout time.Duration) (*device.C
 	return nil, &check.Diagnostic{Severity: check.Error, Code: "DEVICE_TIMEOUT",
 		Message: fmt.Sprintf("%s is on the device's SD card, but it didn't start within %s", done.File, timeout),
 		Fix:     "another plugin or the assistant may hold the screen; check the device, or `aitbase-plugin logs`"}
+}
+
+// toImage converts the device's RGB565 pixels to an image.
+func toImage(s *device.Screen) *image.NRGBA {
+	img := image.NewNRGBA(image.Rect(0, 0, s.Width, s.Height))
+	for i := 0; i < s.Width*s.Height; i++ {
+		v := uint16(s.Pixels[2*i]) | uint16(s.Pixels[2*i+1])<<8
+		r, g, b := uint8(v>>11&0x1f), uint8(v>>5&0x3f), uint8(v&0x1f)
+		img.SetNRGBA(i%s.Width, i/s.Width, color.NRGBA{R: r<<3 | r>>2, G: g<<2 | g>>4, B: b<<3 | b>>2, A: 0xff})
+	}
+	return img
+}
+
+func runScreenshot(e env, args []string) int {
+	fs, asJSON := newFlags(e, "screenshot")
+	addrFlag := fs.String("device", "", "device address (default: the paired device)")
+	out := fs.String("o", "screenshot.png", "PNG file to write")
+	if _, err := parse(fs, args); err != nil {
+		return exitUsage
+	}
+	client, d := pickDevice(*addrFlag)
+	if d != nil {
+		return e.finish(*asJSON, "screenshot", false, []check.Diagnostic{*d}, nil, "")
+	}
+	screen, err := client.Screenshot()
+	if err != nil {
+		return e.finish(*asJSON, "screenshot", false, []check.Diagnostic{deviceDiagnostic(err)}, nil, "")
+	}
+	f, err := os.Create(*out)
+	if err == nil {
+		err = png.Encode(f, toImage(screen))
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}
+	if err != nil {
+		return e.finish(*asJSON, "screenshot", false, []check.Diagnostic{{Severity: check.Error, Code: "WRITE_FAILED",
+			Path: *out, Message: err.Error()}}, nil, "")
+	}
+	return e.finish(*asJSON, "screenshot", true, nil,
+		result{"device": client.Address, "file": *out, "width": screen.Width, "height": screen.Height},
+		fmt.Sprintf("wrote %s (%dx%d)", *out, screen.Width, screen.Height))
+}
+
+func runPress(e env, args []string) int {
+	fs, asJSON := newFlags(e, "press")
+	addrFlag := fs.String("device", "", "device address (default: the paired device)")
+	long := fs.Bool("long", false, "a long press (LEFT long press leaves the plugin)")
+	pos, err := parse(fs, args)
+	if err != nil {
+		return exitUsage
+	}
+	if len(pos) != 1 || (pos[0] != "left" && pos[0] != "right") {
+		return usageError(e, *asJSON, "press", "usage: press left|right [--long]")
+	}
+	client, d := pickDevice(*addrFlag)
+	if d != nil {
+		return e.finish(*asJSON, "press", false, []check.Diagnostic{*d}, nil, "")
+	}
+	if err := client.Press(pos[0], *long); err != nil {
+		return e.finish(*asJSON, "press", false, []check.Diagnostic{deviceDiagnostic(err)}, nil, "")
+	}
+	what := pos[0]
+	if *long {
+		what += " (long)"
+	}
+	return e.finish(*asJSON, "press", true, nil, result{"device": client.Address, "button": pos[0], "long": *long},
+		"pressed "+what)
 }
 
 func runLogs(e env, args []string) int {

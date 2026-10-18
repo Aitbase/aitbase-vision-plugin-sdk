@@ -222,6 +222,32 @@ func (c *Client) Logs(id string, offset int64) (*Log, error) {
 	return &l, nil
 }
 
+// Screen is the plugin's screen as the device drew it.
+type Screen struct {
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+	Format string `json:"format"`
+	Pixels []byte `json:"pixels"` // base64 in JSON; RGB565 little-endian, rows top to bottom
+}
+
+// Screenshot captures the screen, only while a community plugin's screen shows.
+func (c *Client) Screenshot() (*Screen, error) {
+	var s Screen
+	if err := c.do(http.MethodGet, "screenshot", "", "", nil, &s); err != nil {
+		return nil, err
+	}
+	if s.Format != "rgb565le" || s.Width <= 0 || s.Height <= 0 || len(s.Pixels) != s.Width*s.Height*2 {
+		return nil, &Error{Code: "bad_reply", Message: "the device sent a screenshot the CLI can't read"}
+	}
+	return &s, nil
+}
+
+// Press presses "left" or "right" on the device, only while a community plugin's screen shows.
+func (c *Client) Press(button string, long bool) error {
+	body, _ := json.Marshal(map[string]any{"button": button, "long": long})
+	return c.do(http.MethodPost, "press", "", "application/json", body, nil)
+}
+
 // Revoke revokes the client's token on the device.
 func (c *Client) Revoke() error {
 	return c.do(http.MethodDelete, "token", "", "", nil, nil)
