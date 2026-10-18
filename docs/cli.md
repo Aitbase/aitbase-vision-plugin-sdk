@@ -2,7 +2,7 @@
 
 `aitbase-plugin` creates, checks, builds and packages plugins. It is one program with no runtime dependencies, built for Windows, macOS and Linux.
 
-> **Preview.** `init`, `check`, `build`, `pack`, `key`, `toolchain` and `version` work today. `build` needs CMake. A native build also needs a C compiler; `build --wasm` downloads its own. `check` uses Python 3.8+ to compile screens. The device commands (`devices`, `pair`, `dev`, `logs`, `screenshot`, `press`, `pack-sd`) are reserved names that return `NOT_AVAILABLE` until device firmware supports them.
+> **Preview.** `init`, `check`, `build`, `pack`, `key`, `toolchain`, `sdk`, `version`, and the device commands `pair`, `dev`, `logs` and `unpair` work today. The device commands need device firmware with the plugin developer routes. `build` needs CMake. A native build also needs a C compiler; `build --wasm` downloads its own. `check` uses Python 3.8+ to compile screens. `devices`, `screenshot`, `press` and `pack-sd` are reserved names that return `NOT_AVAILABLE`.
 
 ## Install
 
@@ -76,6 +76,10 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 | `toolchain` | Downloads wasi-sdk if needed and prints its path, for running CMake yourself or setting up an editor. |
 | `sdk [dir]` | Prints the SDK directory the project builds with (see [Which SDK](#which-sdk)), for running CMake yourself. |
 | `version` | Prints the SDK version. |
+| `pair <address> [--name <label>]` | Pairs this computer with a device, once. Asks for the Device Console password at a hidden prompt; see [On a device](#on-a-device). |
+| `dev [dir] [--device <address>]` | Builds WebAssembly, packs the signed `.avp`, uploads it to the device's SD card and waits until the device runs it. |
+| `logs [dir] [--follow] [--id <id>] [--device <address>]` | Prints the plugin's log from the device; `--follow` keeps printing new lines. |
+| `unpair [--device <address>]` | Revokes this computer's token on the device and forgets the device. |
 
 `check` and `pack` also accept:
 - `--sdk <dir>`: the SDK holding the UI compiler (see [Which SDK](#which-sdk)); `pack` doesn't need one and ignores it;
@@ -100,6 +104,24 @@ add_subdirectory(${AITBASE_SDK_DIR} ${CMAKE_BINARY_DIR}/aitbase-sdk)
 ```
 
 To run CMake yourself, pass `-DAITBASE_SDK_DIR="$(aitbase-plugin sdk)"`.
+
+## On a device
+
+Instead of copying the `.avp` to the SD card yourself, pair the computer with the device once, then let `dev` build, upload and start the plugin:
+
+```sh
+aitbase-plugin pair 192.168.1.50   # you type the Device Console password, once
+aitbase-plugin dev                  # build --wasm, pack --wasm, upload, wait until it runs
+aitbase-plugin logs --follow
+```
+
+- **The address** is the device's IP address on your network, as the Device Console's address bar shows it. The computer and the device must be on the same network.
+- **Pairing asks for the password at a hidden prompt, and nowhere else:** not as a flag, an environment variable or a file. If you use an AI coding agent, run `pair` yourself; the agent can then run `dev` and `logs`. Without a terminal, `pair` fails with `PASSWORD_NEEDS_TERMINAL`.
+- **The device refuses pairing while it uses its default password.** Change the password on the Device Console once.
+- **The token** that pairing returns is kept in your user configuration folder (`aitbase-plugin/devices.json` there, or `$AITBASE_DEVICES`), readable only by you. It can upload plugins and read their logs, nothing else. It expires after 30 days. The device's Plugins page lists paired computers and revokes them; changing the Device Console password revokes them all.
+- **What `dev` does on the device:** the upload goes into `aitbase/plugins/` on the SD card, like a copied file, so the card must be in and stay there. The device checks the signature and runs it within a few seconds, replacing the plugin that runs. It refuses `aitbase.*` ids and packages signed by another key than the one the plugin was first signed with.
+- **Several devices:** the last one paired is the default; pass `--device <address>` for another.
+- **Plain HTTP:** devices serve the local network over plain HTTP. Don't pair over a network you don't trust.
 
 ## WebAssembly
 
@@ -126,7 +148,7 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 {
   "ok": false,
   "command": "check",
-  "sdk_version": "0.6.0",
+  "sdk_version": "0.7.0",
   "diagnostics": [
     {
       "severity": "error",
@@ -145,6 +167,10 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 - `sdk` adds `sdk_dir` and `bundled` (true for the SDK built into the CLI).
 - `init` adds `dir`, `id` and `files`.
 - `build` adds `build_dir`, `sdk_dir` and `wasm`, and with `--wasm` also `wasi_sdk`.
+- `pair` adds `device`, `token_id`, `expires_at` and `devices_file`; never the token.
+- `dev` adds `device`, `package`, `sha256`, `author`, `plugin_id`, `version`, `file` and `running`.
+- `logs` adds `device`, `plugin_id`, `text` and `next_offset`.
+- `unpair` adds `device`.
 
 Exit codes:
 
@@ -208,3 +234,19 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `WRITE_FAILED` | The package could not be written. |
 | `SIGNING_KEY` | The signing key could not be read or created. Restore your backup, or point `AITBASE_SIGNING_KEY` at it. |
 | `NOT_AVAILABLE` | The command needs device support that does not exist yet. |
+| `PASSWORD_NEEDS_TERMINAL` | `pair` runs only in an interactive terminal, where it asks for the Device Console password. |
+| `DEVICE_UNREACHABLE` | Nothing answers at the device address. |
+| `DEVICE_NOT_SUPPORTED` | The device's firmware has no plugin developer routes. |
+| `DEVICE_NOT_PAIRED` | No device is paired, the address isn't, or its token expired or was revoked: pair again. |
+| `DEVICE_STORE` | The paired devices file could not be read or written. |
+| `DEVICE_DEFAULT_PASSWORD` | The device refuses pairing while it uses its default password. |
+| `DEVICE_PASSWORD_INCORRECT` | The Device Console password is not correct. |
+| `DEVICE_RATE_LIMITED` | Too many wrong passwords; `fix` says how long to wait. |
+| `DEVICE_NO_SD_CARD` | The device has no SD card with an `aitbase/` folder. |
+| `DEVICE_UPLOAD_FAILED` | The upload didn't arrive intact, or the SD card couldn't be written. |
+| `DEVICE_PACKAGE_REFUSED` | The device refused the package: its signature, contents or id. |
+| `DEVICE_AUTHOR_CHANGED` | The plugin id is pinned to another signing key on the device. |
+| `DEVICE_PACKAGE_SKIPPED` | The package is on the SD card, but the device skipped it; `message` says why. |
+| `DEVICE_PLUGIN_ENDED` | The plugin started and ended at once; read `aitbase-plugin logs`. |
+| `DEVICE_TIMEOUT` | The package is on the SD card, but the device didn't start it in time. |
+| `DEVICE_ERROR` | Another error from the device; `message` has its words. |

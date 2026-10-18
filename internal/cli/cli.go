@@ -59,9 +59,10 @@ func commands() []command {
 		{"sdk", "print the path of the SDK a project builds with: sdk [dir]", runSDK},
 		{"version", "print the SDK version", runVersion},
 		{"devices", "find devices on the network (not available yet)", notAvailable("devices")},
-		{"pair", "pair with a device (not available yet)", notAvailable("pair")},
-		{"dev", "upload and reload on a device (not available yet)", notAvailable("dev")},
-		{"logs", "stream plugin logs (not available yet)", notAvailable("logs")},
+		{"pair", "pair with a device once, with its Device Console password: pair <address>", runPair},
+		{"dev", "build, pack, upload to the paired device and wait until it runs: dev [dir]", runDev},
+		{"logs", "print the plugin's log from the device: logs [dir] [--follow]", runLogs},
+		{"unpair", "revoke this computer's token on the device and forget it: unpair", runUnpair},
 		{"screenshot", "capture the plugin screen (not available yet)", notAvailable("screenshot")},
 		{"press", "press a device button (not available yet)", notAvailable("press")},
 		{"pack-sd", "copy the package to an SD card (not available yet)", notAvailable("pack-sd")},
@@ -403,14 +404,24 @@ func runBuild(e env, args []string) int {
 	if err != nil {
 		return usageError(e, *asJSON, "build", err.Error())
 	}
-	cmake, err := exec.LookPath("cmake")
-	if err != nil {
-		return e.finish(*asJSON, "build", false, []check.Diagnostic{{Severity: check.Error, Code: "CMAKE_NOT_FOUND",
-			Message: "cmake is not installed", Fix: "install CMake 3.13 or later and a C compiler"}}, nil, "")
-	}
-	sdkDir, d := sdkFlag(dir, *sdk)
+	extra, d := buildProject(e, dir, *buildDir, *sdk, *wasm)
 	if d != nil {
 		return e.finish(*asJSON, "build", false, []check.Diagnostic{*d}, nil, "")
+	}
+	return e.finish(*asJSON, "build", true, nil, extra, "build finished in "+extra["build_dir"].(string))
+}
+
+// buildProject configures and builds dir with CMake; build output goes to e.stderr, so that --json
+// keeps stdout to one object.
+func buildProject(e env, dir, buildDir, sdk string, wasm bool) (result, *check.Diagnostic) {
+	cmake, err := exec.LookPath("cmake")
+	if err != nil {
+		return nil, &check.Diagnostic{Severity: check.Error, Code: "CMAKE_NOT_FOUND",
+			Message: "cmake is not installed", Fix: "install CMake 3.13 or later and a C compiler"}
+	}
+	sdkDir, d := sdkFlag(dir, sdk)
+	if d != nil {
+		return nil, d
 	}
 	if abs, err := filepath.Abs(sdkDir); err == nil {
 		sdkDir = abs
@@ -418,13 +429,13 @@ func runBuild(e env, args []string) int {
 	// AITBASE_SDK_DIR tells a plugin's CMakeLists.txt where the SDK is when it has no sdk/ of its
 	// own; a project that doesn't read it must not warn about it.
 	configure := []string{"-S", dir, "--no-warn-unused-cli", "-DAITBASE_SDK_DIR=" + filepath.ToSlash(sdkDir)}
-	out := pathFlag(dir, *buildDir, "build")
+	out := pathFlag(dir, buildDir, "build")
 	extra := result{"sdk_dir": sdkDir}
-	if *wasm {
-		out = pathFlag(dir, *buildDir, "build-wasm")
+	if wasm {
+		out = pathFlag(dir, buildDir, "build-wasm")
 		root, d := ensureWasiSDK(e)
 		if d != nil {
-			return e.finish(*asJSON, "build", false, []check.Diagnostic{*d}, nil, "")
+			return nil, d
 		}
 		// Forward slashes: CMake reads backslashes in these values as escapes (C:\Users -> \U).
 		configure = append(configure, "-DCMAKE_TOOLCHAIN_FILE="+filepath.ToSlash(wasisdk.ToolchainFile(root)),
@@ -432,30 +443,29 @@ func runBuild(e env, args []string) int {
 		// Visual Studio generators can't use the wasi-sdk toolchain; Ninja can, on every system.
 		if runtime.GOOS == "windows" {
 			if _, err := exec.LookPath("ninja"); err != nil {
-				return e.finish(*asJSON, "build", false, []check.Diagnostic{{Severity: check.Error, Code: "NINJA_NOT_FOUND",
-					Message: "building WebAssembly on Windows needs Ninja", Fix: "install Ninja (winget install Ninja-build.Ninja) and retry"}}, nil, "")
+				return nil, &check.Diagnostic{Severity: check.Error, Code: "NINJA_NOT_FOUND",
+					Message: "building WebAssembly on Windows needs Ninja", Fix: "install Ninja (winget install Ninja-build.Ninja) and retry"}
 			}
 			configure = append(configure, "-G", "Ninja")
 		}
 		extra["wasi_sdk"] = root
 	}
 	configure = append(configure, "-B", out)
-	// Build output goes to stderr so that --json keeps stdout to one object.
 	for _, step := range [][]string{configure, {"--build", out}} {
 		cmd := exec.Command(cmake, step...)
 		cmd.Stdout, cmd.Stderr = e.stderr, e.stderr
 		if err := cmd.Run(); err != nil {
 			fix := "read the compiler output above"
-			if *wasm {
+			if wasm {
 				fix += "; if the build directory was configured natively before, delete it or pass another --build-dir"
 			}
-			return e.finish(*asJSON, "build", false, []check.Diagnostic{{Severity: check.Error, Code: "BUILD_FAILED",
-				Message: "cmake " + strings.Join(step, " ") + " failed: " + err.Error(), Fix: fix}}, nil, "")
+			return nil, &check.Diagnostic{Severity: check.Error, Code: "BUILD_FAILED",
+				Message: "cmake " + strings.Join(step, " ") + " failed: " + err.Error(), Fix: fix}
 		}
 	}
 	extra["build_dir"] = out
-	extra["wasm"] = *wasm
-	return e.finish(*asJSON, "build", true, nil, extra, "build finished in "+out)
+	extra["wasm"] = wasm
+	return extra, nil
 }
 
 func runPack(e env, args []string) int {
@@ -530,10 +540,18 @@ func runPack(e env, args []string) int {
 // sounds, signed with the author's key (package format 1, docs/package-format.md). The module is
 // stripped of custom sections and checked against the device's host ABI first.
 func packWasm(e env, asJSON bool, dir, build, outDir string, r *check.Result) int {
+	extra, text, d := writeWasmPackage(dir, build, outDir, r)
+	if d != nil {
+		return e.finish(asJSON, "pack", false, append(r.Diagnostics, *d), nil, "pack failed")
+	}
+	return e.finish(asJSON, "pack", true, r.Diagnostics, extra, text)
+}
+
+// writeWasmPackage writes the signed .avp and returns its JSON fields and the text for people.
+func writeWasmPackage(dir, build, outDir string, r *check.Result) (result, string, *check.Diagnostic) {
 	m := r.Manifest
-	diags := r.Diagnostics
-	fail := func(d check.Diagnostic) int {
-		return e.finish(asJSON, "pack", false, append(diags, d), nil, "pack failed")
+	fail := func(d check.Diagnostic) (result, string, *check.Diagnostic) {
+		return nil, "", &d
 	}
 	modulePath := filepath.Join(build, m.Entry)
 	module, err := os.ReadFile(modulePath)
@@ -596,10 +614,8 @@ func packWasm(e env, asJSON bool, dir, build, outDir string, r *check.Result) in
 	if created {
 		text += fmt.Sprintf("\nCreated your signing key at %s. Back it up: devices refuse updates to your plugins signed with another key.", keyPath)
 	}
-	return e.finish(asJSON, "pack", true, diags,
-		result{"package": out, "sha256": digest, "bytes": len(data), "module_bytes": len(module), "sd_dir": pack.SDPluginsDir,
-			"author": fp, "signing_key": keyPath, "key_created": created},
-		text)
+	return result{"package": out, "sha256": digest, "bytes": len(data), "module_bytes": len(module), "sd_dir": pack.SDPluginsDir,
+		"author": fp, "signing_key": keyPath, "key_created": created}, text, nil
 }
 
 func notAvailable(cmd string) func(e env, args []string) int {
