@@ -70,20 +70,36 @@ go install github.com/Aitbase/aitbase-vision-plugin-sdk/cmd/aitbase-plugin@lates
 |---|---|
 | `init <dir> --id <id> [--name <name>]` | Creates a plugin project: code, a screen, `AGENTS.md`, agent skills and a copy of the SDK in `sdk/`. |
 | `check [dir]` | Validates `plugin.json`, ids, file names and screens. |
-| `build [dir] [--wasm] [--build-dir <path>]` | Configures and builds with CMake. Build output goes to stderr. Without `--wasm`: a native build for the development bridge, in `<dir>/build`. With `--wasm`: WebAssembly for the device, in `<dir>/build-wasm`; see [WebAssembly](#webassembly). |
+| `build [dir] [--wasm] [--build-dir <path>] [--sdk <dir>]` | Configures and builds with CMake, passing the SDK directory as `AITBASE_SDK_DIR` (see [Which SDK](#which-sdk)). Build output goes to stderr. Without `--wasm`: a native build for the development bridge, in `<dir>/build`. With `--wasm`: WebAssembly for the device, in `<dir>/build-wasm`; see [WebAssembly](#webassembly). |
 | `pack [dir] [--wasm] [--build-dir <path>] [--out <path>]` | With `--wasm`: reads `<dir>/build-wasm` and writes the signed `<id>-<version>.avp` for the device's SD card. Without it: reads a native build from `<dir>/build` and writes `<id>-<version>-native.zip`, which devices don't run. Both go to the output directory (default `<dir>/dist`) and print their SHA-256. |
 | `key` | Shows your signing key's path and author fingerprint, creating the key if it doesn't exist yet. |
 | `toolchain` | Downloads wasi-sdk if needed and prints its path, for running CMake yourself or setting up an editor. |
+| `sdk [dir]` | Prints the SDK directory the project builds with (see [Which SDK](#which-sdk)), for running CMake yourself. |
 | `version` | Prints the SDK version. |
 
 `check` and `pack` also accept:
-- `--sdk <dir>`: the SDK holding the UI compiler. The default is the nearest `sdk/` in the project directory or a parent, so a plugin in a repository of plugins uses the repository's SDK;
+- `--sdk <dir>`: the SDK holding the UI compiler (see [Which SDK](#which-sdk)); `pack` doesn't need one and ignores it;
 - `--python <path>`: the Python 3 interpreter;
 - `--allow-reserved-id`: allow the `aitbase.*` id namespace (official plugins only).
 
 `check` also accepts `--skip-ui`, which skips compiling screens.
 
 Flags may come before or after the directory. Paths given to `--sdk`, `--build-dir` and `--out` are relative to the current directory, or absolute; only the defaults are inside the project.
+
+## Which SDK
+
+`check`, `build` and `sdk` use, in order:
+1. `--sdk <dir>`, when given;
+2. the nearest `sdk/` in the project directory or a parent, such as the copy `init` writes;
+3. the SDK built into the CLI. The first time, the CLI unpacks it into your user cache folder (`aitbase-plugin/sdk-<version>-<digest>` there); later commands reuse it.
+
+So a project needs no copy of the SDK and no git submodule: the CLI's version is the SDK version. `build` passes the directory to CMake as `AITBASE_SDK_DIR`, which a plugin without its own `sdk/` adds:
+
+```cmake
+add_subdirectory(${AITBASE_SDK_DIR} ${CMAKE_BINARY_DIR}/aitbase-sdk)
+```
+
+To run CMake yourself, pass `-DAITBASE_SDK_DIR="$(aitbase-plugin sdk)"`.
 
 ## WebAssembly
 
@@ -126,8 +142,9 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 - `pack` adds `package`, `sha256` and `bytes`; with `--wasm` also `module_bytes`, `sd_dir`, `author` (the key's fingerprint), `signing_key` and `key_created`.
 - `key` adds `path`, `fingerprint` and `created`.
 - `toolchain` adds `wasi_sdk`, `wasi_sdk_version` and `toolchain_file`.
+- `sdk` adds `sdk_dir` and `bundled` (true for the SDK built into the CLI).
 - `init` adds `dir`, `id` and `files`.
-- `build` adds `build_dir` and `wasm`, and with `--wasm` also `wasi_sdk`.
+- `build` adds `build_dir`, `sdk_dir` and `wasm`, and with `--wasm` also `wasi_sdk`.
 
 Exit codes:
 
@@ -175,6 +192,7 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `UI_*` | Any other `UI_` code comes from the UI compiler; see [UI XML](ui-xml.md). |
 | `USAGE` | The command line is wrong. |
 | `INIT_FAILED` | `init` could not create the project, for example because the directory is not empty. |
+| `SDK_UNAVAILABLE` | The CLI could not unpack its built-in SDK into the user cache folder. |
 | `CMAKE_NOT_FOUND` | CMake is not installed. |
 | `BUILD_FAILED` | CMake configure or build failed; the compiler output is on stderr. |
 | `BUILD_OUTPUT_MISSING` | `pack` could not find the program or a compiled screen. Run `build` first (`build --wasm` for `pack --wasm`). |

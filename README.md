@@ -24,7 +24,7 @@ The new project is ready for AI coding agents:
 - **Task skills** in `.agents/skills/` and `.claude/skills/`.
 - **`--json` output** on every command, with stable [diagnostic codes](docs/cli.md#diagnostic-codes).
 
-The project also includes a copy of this SDK in `sdk/`, so it builds without git or network access.
+The project also includes a copy of this SDK in `sdk/`, so it builds without git or network access. A project without one, such as a repository of plugins, builds with the SDK built into the CLI ([Which SDK](docs/cli.md#which-sdk)).
 
 **Platforms:**
 - `init`, `check` and `pack` run on Windows, macOS and Linux.
@@ -93,10 +93,10 @@ For complete plugins, see [aitbase-vision-plugins](https://github.com/Aitbase/ai
 
 ## Using the SDK in a plugin project
 
-Add the SDK as a git submodule pinned to a release tag:
+With the CLI, `aitbase-plugin build` passes its SDK to CMake as `AITBASE_SDK_DIR`, so a project needs no copy of it ([Which SDK](docs/cli.md#which-sdk)). Without the CLI, use a copy of this repository at a release tag in `sdk/` instead:
 
 ```cmake
-add_subdirectory(sdk)                                  # this repository
+add_subdirectory(${AITBASE_SDK_DIR} ${CMAKE_BINARY_DIR}/aitbase-sdk)  # or add_subdirectory(sdk)
 add_executable(counter src/main.c)                     # no main(): the SDK provides it
 target_link_libraries(counter PRIVATE aitbase::plugin)
 aitbase_plugin_add_ui(counter SCREENS counter)         # ui/screens/counter.xml -> counter.ui.json
