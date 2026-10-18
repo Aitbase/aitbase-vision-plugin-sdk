@@ -68,18 +68,25 @@ Fix every `error` before continuing. Do not silence a check by removing the feat
 
 There is no simulator, so a successful build does not prove the plugin works. Only the device shows that.
 
-To try it on the user's device:
+**When the user has paired a device** (`aitbase-plugin pair`, which they run themselves):
+```sh
+aitbase-plugin dev --json     # build --wasm, pack --wasm, upload, wait until the device runs it
+aitbase-plugin logs --json    # the plugin's log from the device
+```
+`dev` failing with `DEVICE_NOT_PAIRED` means no device is paired, or its token expired: ask the user to run `aitbase-plugin pair <device address>` in their own terminal. Never run `pair` yourself, and never ask for the password.
+
+**Otherwise:**
 1. The user copies `dist/<id>-<version>.avp` into `aitbase/plugins/` on the device's SD card (creating the folders if needed). Don't unzip it.
-2. Within a few seconds the device runs the newest plugin on the card. A newer copy replaces the running one. Never ask for the Device Console password.
+2. Within a few seconds the device runs the newest plugin on the card. A newer copy replaces the running one.
 3. The plugin's log is on the card, in `aitbase/logs/<id>.log`, and on the Device Console's Plugins page.
 
 If nothing runs, ask the user what the Device Console's Plugins page shows: it lists packages it skipped, with the reason.
 
-The commands `dev`, `logs`, `screenshot` and `press` are planned and currently return `NOT_AVAILABLE`. Do not try to work around this. Tell the user what to check on the device, and ask them what they see and what the log says.
+The commands `screenshot` and `press` are planned and currently return `NOT_AVAILABLE`. Do not try to work around this. Ask the user what they see on the screen.
 
 ## Security rules
 
-- Never ask the user for the device password, and never put it in a file, command or environment variable. When device pairing exists, the user runs `aitbase-plugin pair` themselves.
+- Never ask the user for the device password, and never put it in a file, command or environment variable. The user runs `aitbase-plugin pair` themselves, in their own terminal; it asks for the password at a hidden prompt.
 - Do not use an id starting with `aitbase.`. It is reserved for official plugins.
 
 ## Skills

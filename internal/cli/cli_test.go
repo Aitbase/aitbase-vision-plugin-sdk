@@ -93,7 +93,7 @@ func TestPackWithExternalBuildDir(t *testing.T) {
 }
 
 func TestNotAvailableCommands(t *testing.T) {
-	for _, c := range []string{"devices", "pair", "dev", "logs", "screenshot", "press", "pack-sd"} {
+	for _, c := range []string{"devices", "screenshot", "press", "pack-sd"} {
 		code, res := run(t, c)
 		if code != exitNotAvailable || res["ok"] != false {
 			t.Errorf("%s: code %d %v", c, code, res)
@@ -135,7 +135,7 @@ func TestCodesDocumented(t *testing.T) {
 	}
 	used := map[string]bool{}
 	codeRe := regexp.MustCompile(`"([A-Z][A-Z_]{3,})"`)
-	for _, f := range []string{"../check/check.go", "../pack/pack.go", "cli.go"} {
+	for _, f := range []string{"../check/check.go", "../pack/pack.go", "cli.go", "devicecmd.go"} {
 		src, _ := os.ReadFile(f)
 		for _, m := range codeRe.FindAllSubmatch(src, -1) {
 			used[string(m[1])] = true

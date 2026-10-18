@@ -27,7 +27,9 @@ The device reports problems as events. Make sure `aitbase_on_event` logs these, 
 
 ## 3. Nothing runs on the device
 
-Ask the user to open the Device Console's **Advanced → Plugins** page:
+With a paired device, `aitbase-plugin dev --json` reports what happened: `DEVICE_PACKAGE_SKIPPED` and `DEVICE_PLUGIN_ENDED` carry the device's reason in `message`, and `aitbase-plugin logs --json` returns the log. Every `DEVICE_*` code has a `fix`. For `DEVICE_NOT_PAIRED`, ask the user to run `aitbase-plugin pair <device address>` themselves.
+
+Without one, ask the user to open the Device Console's **Advanced → Plugins** page:
 - **The package is listed as skipped:** the reason says why:
   - "unzipped plugin folders don't run": the user unzipped it. Copy the `.avp` file itself into `aitbase/plugins/`.
   - "signature does not match": the file was damaged or only partly copied. Copy it again.
@@ -37,7 +39,7 @@ Ask the user to open the Device Console's **Advanced → Plugins** page:
 
 ## 4. Asking the user
 
-There is no simulator, and this SDK version cannot read logs or take screenshots remotely. Ask specific questions:
+There is no simulator, and this SDK version cannot take screenshots or press buttons remotely. Ask specific questions:
 - What is on the screen? Does the text change when you press RIGHT?
 - Does LEFT move the highlight between buttons?
 - What does `aitbase/logs/<id>.log` on the SD card say? It has the plugin's own lines, starting with `[<plugin id>]`, and the device's `started`/`ended` lines with the reason, for example a refused module or a trap.
