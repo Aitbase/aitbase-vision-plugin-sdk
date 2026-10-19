@@ -9,8 +9,5 @@
     "screens": [
       "main"
     ]
-  },
-  "requested_capabilities": [
-    "ui"
-  ]
+  }
 }

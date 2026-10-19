@@ -5,32 +5,33 @@
 What a plugin can ask the device to do. Plugins call `aitbase_plugin.h`; this page lists the
 protocol operations behind it, the limits the device enforces, and every error code.
 
-## Grants
+## Capabilities
 
-List the capabilities your plugin needs in `requested_capabilities` in `plugin.json`. An
-operation whose capability isn't listed fails with `no_grant`. During the preview the device
-grants a plugin everything it requests; owner approval of sensitive ones comes later.
+Every plugin may use every `community` capability: there is nothing to list or request (D32).
+`module` capabilities are for firmware feature modules only. What protects the device is in
+the rules of each operation: sound only while the plugin's screen shows, HTTP to public hosts
+only, sizes and rate limits.
 
 | Capability | Class | Rate limit | What it allows |
 |---|---|---|---|
-| `ui` | standard | none | Show the plugin's own screens and update them. Always granted. |
-| `storage` | standard | 20/s, bursts of 40 | Keep small text values across runs, in a store only this plugin can reach. Needs an SD card. |
-| `http` | sensitive | 1/s, bursts of 5 | Make HTTP and HTTPS requests to public internet hosts. Local network, loopback and reserved addresses are refused. |
-| `audio.output` | sensitive | 5/s, bursts of 10 | Play tones and the package's own sounds on the speaker, only while the plugin's screen is visible. |
-| `schedule` | sensitive | 1/s, bursts of 5 | Ring the device at set times, with the entry's label and a built-in sound; the device shows its own alarm screen, titled with the plugin's name. A community plugin needs the owner's "Allow alarms" on the Device Console (D26) and holds at most 4 entries, 5 minutes apart. |
-| `settings` | official | 10/s, bursts of 20 | Keep the module's settings on internal flash. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
-| `status` | official | 10/s, bursts of 20 | Publish the module's status for the device and other modules. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
-| `idle.face` | standard | 1/s, bursts of 5 | Fill in the plugin's idle face (D22), the home screen face the owner may choose on the Device Console. |
-| `audio.stream` | sensitive | 5/s, bursts of 10 | Stream continuous audio to the speaker, such as a radio or a podcast, only while the plugin's screen is visible (D28). Alarms, calls and the voice assistant pause it. |
-| `audio.background` | official | 10/s, bursts of 20 | Keep an audio stream playing after the plugin's screen closes (D29). Firmware feature modules only; the owner stops it with LEFT long press. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
-| `net` | official | 1/s, bursts of 1 | Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, and only where the target's kernel gate is installed. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
-| `assistant.tools` | sensitive | 5/s, bursts of 10 | Answer the voice assistant through the tools the plugin declares in assistant_tools (D31). The assistant reads the reply, labelled as the plugin's output; the device may start the plugin without a screen to answer. |
+| `ui` | community | none | Show the plugin's own screens and update them. |
+| `storage` | community | 20/s, bursts of 40 | Keep small text values across runs, in a store only this plugin can reach. Needs an SD card. |
+| `http` | community | 1/s, bursts of 5 | Make HTTP and HTTPS requests to public internet hosts. Local network, loopback and reserved addresses are refused. |
+| `audio.output` | community | 5/s, bursts of 10 | Play tones and the package's own sounds on the speaker, only while the plugin's screen is visible. |
+| `schedule` | community | 1/s, bursts of 5 | Ring the device at set times, with the entry's label and a built-in sound; the device shows its own alarm screen, titled with the plugin's name. A community plugin holds at most 4 entries, 5 minutes apart, and each ring stops after 60 s (D26, D32). |
+| `settings` | module | 10/s, bursts of 20 | Keep the module's settings on internal flash. Firmware feature modules only (D25). Firmware feature modules only. |
+| `status` | module | 10/s, bursts of 20 | Publish the module's status for the device and other modules. Firmware feature modules only (D25). Firmware feature modules only. |
+| `idle.face` | community | 1/s, bursts of 5 | Fill in the plugin's idle face (D22), the home screen face the owner may choose on the Device Console. |
+| `audio.stream` | community | 5/s, bursts of 10 | Stream continuous audio to the speaker, such as a radio or a podcast, only while the plugin's screen is visible (D28). Alarms, calls and the voice assistant pause it. |
+| `audio.background` | module | 10/s, bursts of 20 | Keep an audio stream playing after the plugin's screen closes (D29). Firmware feature modules only; the owner stops it with LEFT long press. Firmware feature modules only. |
+| `net` | module | 1/s, bursts of 1 | Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, and only where the target's kernel gate is installed. Firmware feature modules only. |
+| `assistant.tools` | community | 5/s, bursts of 10 | Answer the voice assistant through the tools the plugin declares in assistant_tools (D31). The assistant reads the reply, labelled as the plugin's output; the device may start the plugin without a screen to answer. |
 
 ## Operations
 
 ### `ui.open`
 
-Needs `ui`. Opens a compiled screen. With wait_ms, waits up to that long for the device to become idle (voice start, D11).
+Capability `ui`. Opens a compiled screen. With wait_ms, waits up to that long for the device to become idle (voice start, D11).
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -40,7 +41,7 @@ Needs `ui`. Opens a compiled screen. With wait_ms, waits up to that long for the
 
 ### `ui.update`
 
-Needs `ui`. Sets a bound value on the open screen.
+Capability `ui`. Sets a bound value on the open screen.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -51,11 +52,11 @@ Needs `ui`. Sets a bound value on the open screen.
 
 ### `ui.close`
 
-Needs `ui`. Closes the open screen.
+Capability `ui`. Closes the open screen.
 
 ### `ui.template`
 
-Needs `ui`. Opens one of the device's screen templates with the plugin's text (D27): status (title, optional emoji, an OK button), alert (an icon, title, OK) or menu (title and 1 to 4 items). RIGHT on OK gives the action template.ok; RIGHT on item N gives template.itemN. Like open, it replaces the plugin's screen, waits like open with wait_ms, and is preempted by the device.
+Capability `ui`. Opens one of the device's screen templates with the plugin's text (D27): status (title, optional emoji, an OK button), alert (an icon, title, OK) or menu (title and 1 to 4 items). RIGHT on OK gives the action template.ok; RIGHT on item N gives template.itemN. Like open, it replaces the plugin's screen, waits like open with wait_ms, and is preempted by the device.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -71,7 +72,7 @@ Needs `ui`. Opens one of the device's screen templates with the plugin's text (D
 
 ### `storage.get`
 
-Needs `storage`. Reads a value. The result has found (true or false) and value.
+Capability `storage`. Reads a value. The result has found (true or false) and value.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -79,7 +80,7 @@ Needs `storage`. Reads a value. The result has found (true or false) and value.
 
 ### `storage.set`
 
-Needs `storage`. Stores a text value under a key, replacing any earlier value. Values may contain tabs and newlines, but no other control characters.
+Capability `storage`. Stores a text value under a key, replacing any earlier value. Values may contain tabs and newlines, but no other control characters.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -88,7 +89,7 @@ Needs `storage`. Stores a text value under a key, replacing any earlier value. V
 
 ### `storage.delete`
 
-Needs `storage`. Removes a key. Removing a missing key succeeds.
+Capability `storage`. Removes a key. Removing a missing key succeeds.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -96,11 +97,11 @@ Needs `storage`. Removes a key. Removing a missing key succeeds.
 
 ### `storage.keys`
 
-Needs `storage`. Lists the stored keys. The result has keys, an array of strings.
+Capability `storage`. Lists the stored keys. The result has keys, an array of strings.
 
 ### `http.request`
 
-Needs `http`. Makes one HTTP request and returns status, content_type, body (text, cut to fit) and truncated. Redirects are returned, not followed. One request at a time.
+Capability `http`. Makes one HTTP request and returns status, content_type, body (text, cut to fit) and truncated. Redirects are returned, not followed. One request at a time.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -112,7 +113,7 @@ Needs `http`. Makes one HTTP request and returns status, content_type, body (tex
 
 ### `audio.tone`
 
-Needs `audio.output`. Plays a sine tone, replacing any sound playing. A sound_done event follows.
+Capability `audio.output`. Plays a sine tone, replacing any sound playing. A sound_done event follows.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -122,7 +123,7 @@ Needs `audio.output`. Plays a sine tone, replacing any sound playing. A sound_do
 
 ### `audio.play`
 
-Needs `audio.output`. Plays sounds/<sound>.wav from the package (16 kHz, mono, 16-bit PCM, at most 10 s), replacing any sound playing. A sound_done event follows.
+Capability `audio.output`. Plays sounds/<sound>.wav from the package (16 kHz, mono, 16-bit PCM, at most 10 s), replacing any sound playing. A sound_done event follows.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -131,11 +132,11 @@ Needs `audio.output`. Plays sounds/<sound>.wav from the package (16 kHz, mono, 1
 
 ### `audio.stop`
 
-Needs `audio.output`. Stops the sound playing, if any.
+Capability `audio.output`. Stops the sound playing, if any.
 
 ### `audio.stream_open`
 
-Needs `audio.stream`. Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow. background (D29, audio.background) keeps it playing after the screen closes; it needs no screen, and title names it on the core's screen after the package's name.
+Capability `audio.stream`. Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow. background (D29, audio.background) keeps it playing after the screen closes; it needs no screen, and title names it on the core's screen after the package's name.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -145,11 +146,11 @@ Needs `audio.stream`. Opens the plugin's audio stream at rate Hz (D28): 16-bit m
 
 ### `audio.stream_close`
 
-Needs `audio.stream`. Plays out the frames already sent, then closes the stream. A stream_state event with state stopped and reason closed follows.
+Capability `audio.stream`. Plays out the frames already sent, then closes the stream. A stream_state event with state stopped and reason closed follows.
 
 ### `schedule.set`
 
-Needs `schedule`. Adds or replaces the plugin's entry with this id. A ringing entry makes the device ring at due_epoch with its label, even if the plugin isn't running then (D23).
+Capability `schedule`. Adds or replaces the plugin's entry with this id. A ringing entry makes the device ring once at due_epoch with its label, whether or not the plugin runs (D23, C14). An entry whose time passed while the device was off never rings.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -161,7 +162,7 @@ Needs `schedule`. Adds or replaces the plugin's entry with this id. A ringing en
 
 ### `schedule.cancel`
 
-Needs `schedule`. Removes the plugin's entry with this id. The result has found.
+Capability `schedule`. Removes the plugin's entry with this id. The result has found.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -169,11 +170,11 @@ Needs `schedule`. Removes the plugin's entry with this id. The result has found.
 
 ### `schedule.list`
 
-Needs `schedule`. The plugin's own entries: entries is a list of {id, due_epoch, rings, label}.
+Capability `schedule`. The plugin's own entries: entries is a list of {id, due_epoch, rings, label}.
 
 ### `schedule.ring`
 
-Needs `schedule`. Rings the entry that schedule.due just announced, with its label. Without it the device rings anyway after a short grace period (C14).
+Capability `schedule`. Does nothing and succeeds: the device rings every due entry itself, at once, with its label (C14). Kept for plugins built for SDK 0.10.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -181,11 +182,11 @@ Needs `schedule`. Rings the entry that schedule.due just announced, with its lab
 
 ### `settings.get`
 
-Needs `settings`. The module's settings: found, and values, an object of string values.
+Capability `settings`. The module's settings: found, and values, an object of string values.
 
 ### `settings.set`
 
-Needs `settings`. Replaces the module's settings: at most 64 keys of [a-z0-9_] up to 32 bytes, string values up to 512 bytes.
+Capability `settings`. Replaces the module's settings: at most 64 keys of [a-z0-9_] up to 32 bytes, string values up to 512 bytes.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -193,11 +194,11 @@ Needs `settings`. Replaces the module's settings: at most 64 keys of [a-z0-9_] u
 
 ### `settings.erase`
 
-Needs `settings`. Removes the module's settings.
+Capability `settings`. Removes the module's settings.
 
 ### `status.publish`
 
-Needs `status`. Publishes a status value under the module's own prefix: key is <module>.<name>.
+Capability `status`. Publishes a status value under the module's own prefix: key is <module>.<name>.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -206,7 +207,7 @@ Needs `status`. Publishes a status value under the module's own prefix: key is <
 
 ### `face.set`
 
-Needs `idle.face`. Sets a value of the plugin's idle face (D22): the labels its face document binds to key. The device keeps the values, so the face shows them after a reboot without the plugin running. Works whether or not the owner has chosen the face.
+Capability `idle.face`. Sets a value of the plugin's idle face (D22): the labels its face document binds to key. The device keeps the values, so the face shows them after a reboot without the plugin running. Works whether or not the owner has chosen the face.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -215,7 +216,7 @@ Needs `idle.face`. Sets a value of the plugin's idle face (D22): the labels its 
 
 ### `tool.reply`
 
-Needs `assistant.tools`. Answers the tool.call event with this call id (D31), once. The device removes control, bidirectional-override and zero-width characters before the assistant reads the text.
+Capability `assistant.tools`. Answers the tool.call event with this call id (D31), once. The device removes control, bidirectional-override and zero-width characters before the assistant reads the text.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -240,7 +241,7 @@ or zero-width characters.
 | `ui` | `update_rejected` | An update was refused when the device applied it. data.node and data.detail. |
 | `audio` | `sound_done` | The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed. |
 | `audio` | `stream_state` | The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). user means LEFT long press ended a background stream (D29). |
-| `schedule` | `due` | An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings. |
+| `schedule` | `due` | An entry of this plugin was due. data.id names it; if it rings, the device has already rung it. |
 | `tool` | `call` | The assistant calls one of the plugin's assistant_tools (D31): data.call (a number), data.tool and data.args, already checked against the manifest. Answer with tool.reply within assistant_tool_timeout_ms. |
 | `module` | `action` | A declared action of the module's screen (data.action snooze or stop), or a request from the core: the music module's play, with data.url and data.title, and stop (D29). |
 
@@ -275,7 +276,7 @@ or zero-width characters.
 | `speaker_busy` | -3 | An alarm, a call or the voice assistant holds the speaker, or another plugin is streaming (D28). |
 | `streaming` | -3 | The plugin's audio stream is open; sounds wait until it closes. |
 | `no_memory` | -4 | The device ran out of memory. |
-| `no_grant` | -5 | plugin.json doesn't list the capability this operation needs in requested_capabilities. |
+| `no_grant` | -5 | No longer returned (D32): every plugin may use every community capability. Devices before D32 returned it when plugin.json didn't list the capability in requested_capabilities. |
 | `destination_blocked` | -5 | The URL isn't http or https, or its host resolves to a loopback, private, link-local or other non-public address. |
 | `not_foreground` | -6 | Sound plays only while the plugin's screen is visible. |
 | `no_channel` | -6 | The plugin has no working audio channel: it doesn't hold audio.stream, or an earlier malformed frame ended the channel for this run (D28). |
@@ -287,9 +288,10 @@ or zero-width characters.
 | `network_error` | -8 | DNS, connection or transfer failure. |
 | `tls_error` | -8 | The server's TLS certificate couldn't be verified. |
 | `module_only` | -5 | Only a firmware feature module (D25) may use this operation. |
+| `no_screen` | -6 | A firmware feature module has no screen (D25): ui operations aren't available to it. |
 | `too_many` | -7 | The plugin already holds the most scheduler entries it may: 8 for a firmware module, 4 for a community plugin. |
 | `too_close` | -7 | Another entry of this plugin is due within 5 minutes of this one (community plugins, D26). |
-| `not_allowed` | -5 | The owner hasn't turned on "Allow alarms" for this plugin on the Device Console (D26). |
+| `not_allowed` | -5 | No longer returned (D32 dropped "Allow alarms"). Devices before D32 returned it until the owner allowed a plugin's alarms (D26). |
 | `not_due` | -2 | No entry of this plugin is due to ring now. |
 | `tool_unknown` | -1 | plugins.call named a tool the plugin doesn't declare in assistant_tools, or tool.reply named no call waiting for this plugin's reply: a second reply, or a reply to another call (D31). |
 | `tool_timeout` | -8 | The plugin didn't reply to plugins.call within assistant_tool_timeout_ms (D31). |
