@@ -97,7 +97,7 @@ const SupportedAPIVersion = 1
 
 // Capabilities the device accepts today come from its capability registry (D4); these are
 // planned but not available yet.
-var availableCapabilities = registryCapabilities()
+var availableCapabilities, firmwareOnlyCapabilities = registryCapabilities()
 var plannedCapabilities = map[string]bool{
 	"camera.capture": true, "camera.preview": true, "microphone.capture": true, "mcp": true,
 }
@@ -108,10 +108,14 @@ var registryLimits = struct {
 	SampleRate    int `json:"audio_sample_rate"`
 }{}
 
-func registryCapabilities() map[string]bool {
+// registryCapabilities returns what a plugin may request, and the device's capabilities that only
+// firmware plugins may hold (class "official", or "community": false).
+func registryCapabilities() (map[string]bool, map[string]bool) {
 	var reg struct {
 		Grants []struct {
-			Name string `json:"name"`
+			Name      string `json:"name"`
+			Class     string `json:"class"`
+			Community *bool  `json:"community"`
 		} `json:"grants"`
 		Limits json.RawMessage `json:"limits"`
 	}
@@ -121,11 +125,15 @@ func registryCapabilities() map[string]bool {
 	if err := json.Unmarshal(reg.Limits, &registryLimits); err != nil {
 		panic("schema/plugin_capability_registry.json limits: " + err.Error())
 	}
-	caps := map[string]bool{}
+	caps, firmware := map[string]bool{}, map[string]bool{}
 	for _, g := range reg.Grants {
-		caps[g.Name] = true
+		if g.Class == "official" || (g.Community != nil && !*g.Community) {
+			firmware[g.Name] = true
+		} else {
+			caps[g.Name] = true
+		}
 	}
-	return caps
+	return caps, firmware
 }
 
 // AvailableCapabilities lists what a plugin can request, sorted.
@@ -283,6 +291,8 @@ func checkManifest(r *Result, dir string, opt Options) *Manifest {
 		case availableCapabilities[c]:
 			hasUI = hasUI || c == "ui"
 			hasAudio = hasAudio || c == "audio.output"
+		case firmwareOnlyCapabilities[c]:
+			r.add(Error, "CAPABILITY_FIRMWARE_ONLY", p, fmt.Sprintf("capability %q is only for plugins that ship in the device firmware", c), "remove it; this SDK version supports: "+supported)
 		case plannedCapabilities[c]:
 			r.add(Error, "CAPABILITY_UNAVAILABLE", p, fmt.Sprintf("capability %q is planned but no device supports it yet", c), "remove it; this SDK version supports: "+supported)
 		default:

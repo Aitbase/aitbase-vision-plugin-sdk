@@ -204,6 +204,7 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `SCREEN_NAME` | A screen name is invalid or listed twice. |
 | `SCREEN_MISSING` | A listed screen has no `ui/screens/<name>.xml`. |
 | `CAPABILITY_UNAVAILABLE` | The capability is planned but no device supports it yet. |
+| `CAPABILITY_FIRMWARE_ONLY` | The capability exists on the device but only plugins that ship in its firmware may hold it (`schedule`, `settings`, `status`). |
 | `CAPABILITY_UNKNOWN` | The capability does not exist. |
 | `CAPABILITY_UI_MISSING` | The plugin has screens but does not request `ui`. |
 | `CAPABILITY_AUDIO_MISSING` | The plugin lists sounds but does not request `audio.output`. |
