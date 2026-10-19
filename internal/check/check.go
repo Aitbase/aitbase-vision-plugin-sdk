@@ -44,7 +44,6 @@ type Manifest struct {
 	Description           string    `json:"description"`
 	Entry                 string    `json:"entry"`
 	UI                    *UI       `json:"ui"`
-	RequestedCapabilities []string  `json:"requested_capabilities"`
 	Sounds                []string  `json:"sounds"`
 	Triggers              []Trigger `json:"triggers"`
 	IdleFace              string    `json:"idle_face"`
@@ -96,13 +95,6 @@ func (r *Result) add(sev Severity, code, p, msg, fix string) {
 
 const SupportedAPIVersion = 1
 
-// Capabilities the device accepts today come from its capability registry (D4); these are
-// planned but not available yet.
-var availableCapabilities, firmwareOnlyCapabilities = registryCapabilities()
-var plannedCapabilities = map[string]bool{
-	"camera.capture": true, "camera.preview": true, "microphone.capture": true, "mcp": true,
-}
-
 // Limits from the registry that check enforces before a package reaches a device.
 var registryLimits = struct {
 	SoundBytesMax      int `json:"audio_sound_bytes_max"`
@@ -115,15 +107,9 @@ var registryLimits = struct {
 	ToolEnumValuesMax  int `json:"assistant_tool_enum_values_max"`
 }{}
 
-// registryCapabilities returns what a plugin may request, and the device's capabilities that only
-// firmware plugins may hold (class "official", or "community": false).
-func registryCapabilities() (map[string]bool, map[string]bool) {
+// The registry's limits, read once.
+func init() {
 	var reg struct {
-		Grants []struct {
-			Name      string `json:"name"`
-			Class     string `json:"class"`
-			Community *bool  `json:"community"`
-		} `json:"grants"`
 		Limits json.RawMessage `json:"limits"`
 	}
 	if err := json.Unmarshal(aitbasesdk.CapabilityRegistry, &reg); err != nil {
@@ -132,25 +118,6 @@ func registryCapabilities() (map[string]bool, map[string]bool) {
 	if err := json.Unmarshal(reg.Limits, &registryLimits); err != nil {
 		panic("schema/plugin_capability_registry.json limits: " + err.Error())
 	}
-	caps, firmware := map[string]bool{}, map[string]bool{}
-	for _, g := range reg.Grants {
-		if g.Class == "official" || (g.Community != nil && !*g.Community) {
-			firmware[g.Name] = true
-		} else {
-			caps[g.Name] = true
-		}
-	}
-	return caps, firmware
-}
-
-// AvailableCapabilities lists what a plugin can request, sorted.
-func AvailableCapabilities() []string {
-	names := make([]string, 0, len(availableCapabilities))
-	for c := range availableCapabilities {
-		names = append(names, c)
-	}
-	sort.Strings(names)
-	return names
 }
 
 var (
@@ -302,33 +269,14 @@ func checkManifest(r *Result, dir string, opt Options) *Manifest {
 		seenSound[s] = true
 	}
 
-	hasUI, hasAudio := false, false
-	supported := strings.Join(AvailableCapabilities(), ", ")
-	for _, c := range m.RequestedCapabilities {
-		p := file + "#requested_capabilities"
-		switch {
-		case availableCapabilities[c]:
-			hasUI = hasUI || c == "ui"
-			hasAudio = hasAudio || c == "audio.output"
-		case firmwareOnlyCapabilities[c]:
-			r.add(Error, "CAPABILITY_FIRMWARE_ONLY", p, fmt.Sprintf("capability %q is only for plugins that ship in the device firmware", c), "remove it; this SDK version supports: "+supported)
-		case plannedCapabilities[c]:
-			r.add(Error, "CAPABILITY_UNAVAILABLE", p, fmt.Sprintf("capability %q is planned but no device supports it yet", c), "remove it; this SDK version supports: "+supported)
-		default:
-			r.add(Error, "CAPABILITY_UNKNOWN", p, fmt.Sprintf("capability %q does not exist", c), "remove it; this SDK version supports: "+supported)
-		}
+	// D32 (devices after 2026-10-20, SDK 0.11): every plugin may use every capability, so there is
+	// nothing to request. An old list still works; it is only noise.
+	if _, ok := raw["requested_capabilities"]; ok {
+		r.add(Warning, "CAPABILITIES_IGNORED", file+"#requested_capabilities",
+			"requested_capabilities is no longer needed: devices let every plugin use every capability",
+			"remove requested_capabilities from plugin.json")
 	}
-	requestsTools := false
-	for _, c := range m.RequestedCapabilities {
-		requestsTools = requestsTools || c == "assistant.tools"
-	}
-	checkAssistantTools(r, file, raw["assistant_tools"], requestsTools)
-	if len(m.Sounds) > 0 && !hasAudio {
-		r.add(Error, "CAPABILITY_AUDIO_MISSING", file+"#requested_capabilities", "the plugin has sounds but does not request \"audio.output\"", `add "audio.output" to requested_capabilities`)
-	}
-	if m.UI != nil && len(m.UI.Screens) > 0 && !hasUI {
-		r.add(Error, "CAPABILITY_UI_MISSING", file+"#requested_capabilities", "the plugin has screens but does not request \"ui\"", `add "ui" to requested_capabilities`)
-	}
+	checkAssistantTools(r, file, raw["assistant_tools"])
 	return &m
 }
 

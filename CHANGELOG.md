@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.0 — unreleased
+
+An open plugin model (device decision D32): fewer rules for plugin authors. Needs device firmware with D32; older devices still need `requested_capabilities`.
+
+- **No permission list.** Every plugin may use every capability: screens, storage, HTTP, sounds and audio streams, alarms, idle faces and assistant tools. `requested_capabilities` is no longer needed. `check` warns `CAPABILITIES_IGNORED` when it is there, and an old list still works. The template and `examples/weather` drop it, and the schema no longer requires it.
+- **What the device still enforces** is in each call's rules, not in a list: sound only while the plugin's screen shows, HTTP to public hosts only, sizes and rate limits, and LEFT long press always leaving.
+- **Removed: `aitbase_granted()`** and the runtime's copy of `hello.grants`. Code that called it no longer builds. A firmware feature module doesn't need it: the device only sends it work it may do.
+- **Alarms:** any plugin may set them. There is no owner "Allow alarms" any more, and `not_allowed` is no longer returned. The device rings a due alarm at once, once, and never rings one whose time passed while it was off. `aitbase_schedule_ring()` does nothing and sends nothing; it is kept so 0.10 code builds.
+- **`check` codes retired:** `CAPABILITY_UNAVAILABLE`, `CAPABILITY_FIRMWARE_ONLY`, `CAPABILITY_UNKNOWN`, `CAPABILITY_UI_MISSING`, `CAPABILITY_AUDIO_MISSING` and `TOOLS_GRANT_MISSING`.
+- **Errors:** devices with D32 answer `module_only` for firmware-only operations and the new `no_screen` for a module's `ui`. They never answer `no_grant`.
+
 ## 0.10.0 — 2026-10-20
 
 For plugins that ship in the device firmware (feature modules, D23/D25), plus screen templates (D27), idle faces (D22), alarms (D26), audio streams (D28) and assistant tools (D31) for every plugin.

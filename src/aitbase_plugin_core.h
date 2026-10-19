@@ -41,7 +41,6 @@ struct aitbase_plugin {
     char rx[AITBASE_RX_BUFFER];
     char ui_dir[256];
     char trigger[16]; /* hello's reply: why the device started the plugin */
-    char grants[512]; /* hello's reply: the capabilities the device granted, "ui, storage" */
 };
 
 /* --- Implemented by the transport ------------------------------------------------------------ */
