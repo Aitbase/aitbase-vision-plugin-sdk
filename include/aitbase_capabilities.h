@@ -27,6 +27,7 @@
 #define AITBASE_CAP_AUDIO_STREAM "audio.stream"
 #define AITBASE_CAP_AUDIO_BACKGROUND "audio.background"
 #define AITBASE_CAP_HTTP_STREAM "http.stream"
+#define AITBASE_CAP_NET "net"
 
 /* Device limits. */
 #define AITBASE_LIMIT_RX_DEFAULT 4096u

@@ -120,6 +120,13 @@
       "rate_per_s": 1,
       "burst": 10,
       "summary": "Stream an HTTP(S) response body to the plugin in frames on its http channel (D29). Firmware feature modules only; one stream at a time."
+    },
+    {
+      "name": "net",
+      "class": "official",
+      "rate_per_s": 1,
+      "burst": 1,
+      "summary": "Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, and only where the target's kernel gate is installed."
     }
   ],
   "limits": {
