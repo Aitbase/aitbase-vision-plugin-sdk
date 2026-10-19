@@ -17,7 +17,7 @@ grants a plugin everything it requests; owner approval of sensitive ones comes l
 | `storage` | standard | 20/s, bursts of 40 | Keep small text values across runs, in a store only this plugin can reach. Needs an SD card. |
 | `http` | sensitive | 1/s, bursts of 5 | Make HTTP and HTTPS requests to public internet hosts. Local network, loopback and reserved addresses are refused. |
 | `audio.output` | sensitive | 5/s, bursts of 10 | Play tones and the package's own sounds on the speaker, only while the plugin's screen is visible. |
-| `schedule` | sensitive | 1/s, bursts of 5 | Ring the device at set times, with the entry's label and a built-in sound; the device shows its own alarm screen. Firmware feature modules only for now (D23). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
+| `schedule` | sensitive | 1/s, bursts of 5 | Ring the device at set times, with the entry's label and a built-in sound; the device shows its own alarm screen, titled with the plugin's name. A community plugin needs the owner's "Allow alarms" on the Device Console (D26) and holds at most 4 entries, 5 minutes apart. |
 | `settings` | official | 10/s, bursts of 20 | Keep the module's settings on internal flash. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `status` | official | 10/s, bursts of 20 | Publish the module's status for the device and other modules. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `idle.face` | standard | 1/s, bursts of 5 | Fill in the plugin's idle face (D22), the home screen face the owner may choose on the Device Console. |
@@ -254,7 +254,9 @@ or zero-width characters.
 | `network_error` | -8 | DNS, connection or transfer failure. |
 | `tls_error` | -8 | The server's TLS certificate couldn't be verified. |
 | `module_only` | -5 | Only a firmware feature module (D25) may use this operation. |
-| `too_many` | -7 | The plugin already holds the most scheduler entries it may (8). |
+| `too_many` | -7 | The plugin already holds the most scheduler entries it may: 8 for a firmware module, 4 for a community plugin. |
+| `too_close` | -7 | Another entry of this plugin is due within 5 minutes of this one (community plugins, D26). |
+| `not_allowed` | -5 | The owner hasn't turned on "Allow alarms" for this plugin on the Device Console (D26). |
 | `not_due` | -2 | No entry of this plugin is due to ring now. |
 
 ## Limits
@@ -279,6 +281,9 @@ or zero-width characters.
 | `schedule_entries_max` | 8 |
 | `schedule_ahead_s_max` | 31622400 |
 | `schedule_late_s_max` | 300 |
+| `schedule_community_entries_max` | 4 |
+| `schedule_community_spacing_s` | 300 |
+| `schedule_community_ring_s` | 60 |
 | `settings_keys_max` | 64 |
 | `settings_key_max` | 32 |
 | `settings_value_max` | 512 |
