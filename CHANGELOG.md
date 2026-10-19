@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.0 — unreleased
+## 0.11.0 — 2026-10-20
 
 An open plugin model (device decision D32): fewer rules for plugin authors. Needs device firmware with D32; older devices still need `requested_capabilities`.
 
