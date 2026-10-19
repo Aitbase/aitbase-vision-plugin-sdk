@@ -52,6 +52,7 @@ The project also includes a copy of this SDK in `sdk/`, so it builds without git
 | `cmake/AitbasePluginUi.cmake` | `aitbase_plugin_add_ui()`, which compiles screens as part of a CMake build. |
 | `cmd/aitbase-plugin/` | The `aitbase-plugin` CLI ([reference](docs/cli.md)). |
 | `template/` | The project that `aitbase-plugin init` creates, including its agent instructions and skills. |
+| `examples/` | Sample plugins: `weather` answers the voice assistant through an assistant tool (D31). |
 | `schema/plugin.schema.json` | The `plugin.json` manifest schema (draft). |
 | `docs/package-format.md` | The `.avp` package format (draft) and SD card layout. |
 | `llms.txt` | An index of these docs for AI agents. |

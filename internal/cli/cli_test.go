@@ -135,7 +135,7 @@ func TestCodesDocumented(t *testing.T) {
 	}
 	used := map[string]bool{}
 	codeRe := regexp.MustCompile(`"([A-Z][A-Z_]{3,})"`)
-	for _, f := range []string{"../check/check.go", "../pack/pack.go", "cli.go", "devicecmd.go"} {
+	for _, f := range []string{"../check/check.go", "../check/tools.go", "../pack/pack.go", "cli.go", "devicecmd.go"} {
 		src, _ := os.ReadFile(f)
 		for _, m := range codeRe.FindAllSubmatch(src, -1) {
 			used[string(m[1])] = true

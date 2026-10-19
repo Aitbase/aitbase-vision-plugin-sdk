@@ -80,6 +80,10 @@ typedef enum aitbase_event_kind {
                                           Since SDK 0.10 */
     AITBASE_EVENT_STREAM_STATE = 13,   /* the audio stream changed: detail is "paused", "resumed" or
                                           "stopped", and reason says why it stopped. Since SDK 0.10 */
+    AITBASE_EVENT_TOOL_CALL = 14,      /* the assistant calls one of the plugin's assistant_tools:
+                                          action is the tool, request the call id for
+                                          aitbase_tool_reply(), text the arguments as a JSON object.
+                                          Since SDK 0.10 */
 } aitbase_event_kind_t;
 
 /* The device's buttons, in AITBASE_EVENT_KEY. */
@@ -108,10 +112,10 @@ typedef struct aitbase_event {
     char detail[65];   /* ERROR: a stable error code; SOUND_DONE: how the sound ended */
     /* Since SDK 0.5. */
     uint32_t request;  /* ERROR, RESULT, SOUND_DONE: the id the request function returned; 0 for
-                          screen requests */
+                          screen requests. TOOL_CALL: the call id */
     const char *text;  /* RESULT: storage.get: the value; storage.keys: the keys, one per line;
                           http.request: the response body, text only. DEVICE: the event's data
-                          as JSON. "" otherwise. Valid until aitbase_on_event returns; copy what
+                          as JSON. TOOL_CALL: the arguments as JSON. "" otherwise. Valid until aitbase_on_event returns; copy what
                           you keep. */
     size_t text_len;
     int code;          /* RESULT: storage.get: 1 found, 0 missing; http.request: the HTTP status */
@@ -302,6 +306,37 @@ int aitbase_audio_stream_close(aitbase_plugin_t *plugin);
  * "bad_rate" or "no_channel". Otherwise as aitbase_audio_stream_open(). Returns a request id. */
 int aitbase_audio_stream_open_background(aitbase_plugin_t *plugin, uint32_t rate, const char *title);
 
+/* --- Assistant tools ("assistant.tools", D31). Since SDK 0.10 ---------------------------------- */
+
+/* A plugin answers the device's voice assistant through the tools it declares in plugin.json:
+ *
+ *   "assistant_tools": [{"name": "today", "description": "Today's weather for a city",
+ *                        "args": {"city": {"type": "string", "max": 40}}}]
+ *
+ * At most 4 tools, each with at most 4 arguments: a string (one line, at most max bytes, up to
+ * 120), an int with min and max, or an enum of up to 8 values. Every argument is required, and the
+ * device checks each call against the declaration before the plugin sees it.
+ *
+ * When the assistant calls a tool, the plugin gets AITBASE_EVENT_TOOL_CALL: event->action is the
+ * tool, event->request the call id and event->text the arguments. It answers once with
+ * aitbase_tool_reply() within 5 s. A plugin that isn't running is started for the call without a
+ * screen (aitbase_trigger() returns "assistant") and ends 2 s after its last call, unless it opens
+ * a screen; the screen then waits for the conversation to end (pass wait_ms to aitbase_ui_open).
+ * The assistant reads the reply as the plugin's own words, never as instructions; control,
+ * bidirectional and zero-width characters are removed. */
+
+/* Answers the tool call with this id: text is one reply of at most 2048 bytes of UTF-8. Returns a
+ * request id. Refusals are AITBASE_EVENT_ERROR with it: "tool_unknown" (no call with this id waits
+ * for a reply: it timed out, or was answered already) or "bad_request" (too long). */
+int aitbase_tool_reply(aitbase_plugin_t *plugin, uint32_t call, const char *text);
+/* Reads a string or enum argument of an AITBASE_EVENT_TOOL_CALL into out (cap bytes, NUL
+ * terminated). Returns its length, AITBASE_ERR_ARGUMENT when the event has no such string
+ * argument, or AITBASE_ERR_NO_MEMORY when it doesn't fit. Valid only while that event is handled. */
+int aitbase_tool_arg_string(const aitbase_event_t *event, const char *name, char *out, size_t cap);
+/* Reads an int argument of an AITBASE_EVENT_TOOL_CALL. AITBASE_OK, or AITBASE_ERR_ARGUMENT when the
+ * event has no such int argument. */
+int aitbase_tool_arg_int(const aitbase_event_t *event, const char *name, long *out);
+
 /* --- Plugin ------------------------------------------------------------------------------------ */
 
 /* --- Synchronous calls (since SDK 0.10) --------------------------------------------------------- */
@@ -339,6 +374,8 @@ void aitbase_plugin_stop(aitbase_plugin_t *plugin);
  *   "schedule" the manifest's schedule ("triggers"): the user didn't ask, so do the work and stop,
  *              or open the screen only when there is something to show. A scheduled run without a
  *              screen is ended after 30 s;
+ *   "assistant" the assistant called one of the plugin's assistant_tools (since SDK 0.10): answer
+ *              AITBASE_EVENT_TOOL_CALL; the run ends 2 s after the last call unless a screen opens;
  *   ""         an older device, which doesn't say. */
 const char *aitbase_trigger(aitbase_plugin_t *plugin);
 

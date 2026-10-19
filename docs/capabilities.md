@@ -24,6 +24,7 @@ grants a plugin everything it requests; owner approval of sensitive ones comes l
 | `audio.stream` | sensitive | 5/s, bursts of 10 | Stream continuous audio to the speaker, such as a radio or a podcast, only while the plugin's screen is visible (D28). Alarms, calls and the voice assistant pause it. |
 | `audio.background` | official | 10/s, bursts of 20 | Keep an audio stream playing after the plugin's screen closes (D29). Firmware feature modules only; the owner stops it with LEFT long press. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `net` | official | 1/s, bursts of 1 | Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, and only where the target's kernel gate is installed. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
+| `assistant.tools` | sensitive | 5/s, bursts of 10 | Answer the voice assistant through the tools the plugin declares in assistant_tools (D31). The assistant reads the reply, labelled as the plugin's output; the device may start the plugin without a screen to answer. |
 
 ## Operations
 
@@ -212,6 +213,15 @@ Needs `idle.face`. Sets a value of the plugin's idle face (D22): the labels its 
 | `key` | enum | `face.1`, `face.2`, `face.3`, `face.4`, `face.5`, `face.6`, `face.7`, `face.8`, `face.9`, `face.10`, `face.11`, `face.12`, `face.13`, `face.14`, `face.15`, `face.16` |
 | `value` | string | at most 64 bytes; charset `label` |
 
+### `tool.reply`
+
+Needs `assistant.tools`. Answers the tool.call event with this call id (D31), once. The device removes control, bidirectional-override and zero-width characters before the assistant reads the text.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `call` | int | 1 to 2147483647 |
+| `text` | string | at most 2048 bytes |
+
 Charsets: `name` is `[a-z][a-z0-9_]*`; `key` is letters, digits, `.`, `_` and `-`; `text` is
 UTF-8 without control characters other than tab, newline and carriage return; `url` is printable
 ASCII without spaces; `label` is one line of UTF-8 text without control, bidirectional-override
@@ -231,6 +241,7 @@ or zero-width characters.
 | `audio` | `sound_done` | The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed. |
 | `audio` | `stream_state` | The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). user means LEFT long press ended a background stream (D29). |
 | `schedule` | `due` | An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings. |
+| `tool` | `call` | The assistant calls one of the plugin's assistant_tools (D31): data.call (a number), data.tool and data.args, already checked against the manifest. Answer with tool.reply within assistant_tool_timeout_ms. |
 | `module` | `action` | A declared action of the module's screen (data.action snooze or stop), or a request from the core: the music module's play, with data.url and data.title, and stop (D29). |
 
 ## Status codes
@@ -280,6 +291,9 @@ or zero-width characters.
 | `too_close` | -7 | Another entry of this plugin is due within 5 minutes of this one (community plugins, D26). |
 | `not_allowed` | -5 | The owner hasn't turned on "Allow alarms" for this plugin on the Device Console (D26). |
 | `not_due` | -2 | No entry of this plugin is due to ring now. |
+| `tool_unknown` | -1 | plugins.call named a tool the plugin doesn't declare in assistant_tools, or tool.reply named no call waiting for this plugin's reply: a second reply, or a reply to another call (D31). |
+| `tool_timeout` | -8 | The plugin didn't reply to plugins.call within assistant_tool_timeout_ms (D31). |
+| `tool_busy` | -3 | Another plugins.call is running; the device takes one at a time (D31). |
 
 ## Limits
 
@@ -313,3 +327,11 @@ or zero-width characters.
 | `settings_keys_max` | 64 |
 | `settings_key_max` | 32 |
 | `settings_value_max` | 512 |
+| `assistant_tools_max` | 4 |
+| `assistant_tool_args_max` | 4 |
+| `assistant_tool_name_max` | 24 |
+| `assistant_tool_description_max` | 120 |
+| `assistant_tool_string_max` | 120 |
+| `assistant_tool_enum_values_max` | 8 |
+| `assistant_tool_timeout_ms` | 5000 |
+| `assistant_tool_reply_max` | 2048 |

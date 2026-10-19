@@ -22,3 +22,9 @@ target_link_libraries(aitbase_plugin_wasm_test PRIVATE m)
 set_target_properties(aitbase_plugin_wasm_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED YES)
 target_compile_options(aitbase_plugin_wasm_test PRIVATE -Wall -Wextra -Werror)
 add_test(NAME aitbase_plugin_wasm_test COMMAND aitbase_plugin_wasm_test)
+
+# The assistant tools sample (D31) builds against this SDK.
+add_executable(example_weather ${PROJECT_SOURCE_DIR}/examples/weather/src/main.c)
+target_link_libraries(example_weather PRIVATE aitbase_plugin)
+set_target_properties(example_weather PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED YES)
+target_compile_options(example_weather PRIVATE -Wall -Wextra -Werror)
