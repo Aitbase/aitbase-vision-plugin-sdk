@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0 — unreleased
+
+For plugins that ship in the device firmware (feature modules, D23/D25). Community plugins see no change except a new `check` code.
+
+- **`aitbase_call(p, cap, op, args_json, timeout_ms, &reply)`:** sends any operation and waits for its reply: the result object as JSON in your buffer, or the device's status and error code. Messages that arrive meanwhile are delivered after the current callback returns, in order. New statuses `AITBASE_ERR_TIMEOUT` and `AITBASE_ERR_UNSUPPORTED`. **Native runtime only:** in WASM it returns `AITBASE_ERR_UNSUPPORTED` and sends nothing.
+- **`AITBASE_EVENT_DEVICE`:** events of capabilities other than `ui` and `audio`, with `op` = `"<cap>.<event>"` (for example `schedule.due`, `module.action`) and `text` = their data as JSON. Before 0.10, a `module.action` event looked like a UI `ACTION`. The event struct is unchanged.
+- **Capabilities:** the registry adds `schedule`, `settings` and `status` (D23, D25), with `schedule.*`, `settings.*` and `status.publish`. They are for firmware plugins only: `check` reports the new `CAPABILITY_FIRMWARE_ONLY` when a plugin requests them.
+
 ## 0.9.0 — 2026-10-18
 
 Plugins that start by themselves, and know why they started. Needs device firmware with triggers (D21); older devices ignore `triggers` and don't say why.

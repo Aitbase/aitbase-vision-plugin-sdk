@@ -13,6 +13,8 @@
 
 #include "aitbase_plugin.h"
 
+struct cJSON;
+
 #define AITBASE_PROTOCOL_VERSION 1
 #define AITBASE_MAX_UI_BYTES 16384u
 /* Receive buffer: the longest device message the plugin accepts. Sent as rx_max in hello; the
@@ -47,6 +49,12 @@ struct aitbase_plugin {
 int aitbase_transport_send(aitbase_plugin_t *plugin, const char *message, size_t len);
 /* Writes one formatted log line. */
 void aitbase_transport_log(aitbase_log_level_t level, const char *text);
+/* Waits up to timeout_ms for the reply to request id and returns it parsed in *reply (the caller
+ * deletes it), leaving every other message where the runtime will deliver it later. Returns a
+ * status; the WASM runtime returns AITBASE_ERR_UNSUPPORTED. */
+int aitbase_transport_take_reply(aitbase_plugin_t *plugin, uint32_t id, uint32_t timeout_ms, struct cJSON **reply);
+/* Nonzero when the transport can wait for a reply (aitbase_call). */
+int aitbase_transport_can_wait(void);
 /* Copies the compiled screen <screen>.ui.json into buf. Sets *len; returns a status. */
 int aitbase_transport_read_screen(aitbase_plugin_t *plugin, const char *screen, char *buf, size_t cap,
                                   size_t *len);

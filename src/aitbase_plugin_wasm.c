@@ -48,6 +48,17 @@ void aitbase_transport_log(aitbase_log_level_t level, const char *text) {
     aitbase_host_log((int32_t)level, text, (uint32_t)strlen(text));
 }
 
+/* The WASM host ABI has no blocking receive: synchronous calls are native only. */
+int aitbase_transport_can_wait(void) { return 0; }
+
+int aitbase_transport_take_reply(aitbase_plugin_t *plugin, uint32_t id, uint32_t timeout_ms, struct cJSON **reply) {
+    (void)plugin;
+    (void)id;
+    (void)timeout_ms;
+    (void)reply;
+    return AITBASE_ERR_UNSUPPORTED;
+}
+
 int aitbase_transport_read_screen(aitbase_plugin_t *plugin, const char *screen, char *buf, size_t cap,
                                   size_t *len) {
     char name[48];

@@ -10,6 +10,7 @@
 #include "aitbase_plugin.h"
 #include "aitbase_plugin_core.h"
 #include "aitbase_plugin_runtime.h"
+#include "cJSON.h"
 
 #include <errno.h>
 #include <poll.h>
@@ -89,6 +90,46 @@ int aitbase_timer_set(aitbase_plugin_t *plugin, uint32_t interval_ms) {
     plugin->timer_ms = interval_ms;
     plugin->timer_due = interval_ms ? now_ms() + interval_ms : 0;
     return AITBASE_OK;
+}
+
+int aitbase_transport_can_wait(void) { return 1; }
+
+/* Waits for the reply to request id (aitbase_call). Complete lines that aren't it stay in the
+ * receive buffer, in order, for drain_messages() once the current callback returns. */
+int aitbase_transport_take_reply(aitbase_plugin_t *plugin, uint32_t id, uint32_t timeout_ms, struct cJSON **reply) {
+    const long long deadline = now_ms() + timeout_ms;
+    for (;;) {
+        size_t off = 0;
+        char *newline;
+        while ((newline = (char *)memchr(plugin->rx + off, '\n', plugin->used - off)) != NULL) {
+            const size_t len = (size_t)(newline - (plugin->rx + off));
+            cJSON *msg = cJSON_ParseWithLength(plugin->rx + off, len);
+            const cJSON *msg_id = cJSON_GetObjectItemCaseSensitive(msg, "id");
+            if (cJSON_IsNumber(msg_id) && (uint32_t)msg_id->valuedouble == id &&
+                cJSON_GetObjectItemCaseSensitive(msg, "status")) {
+                memmove(plugin->rx + off, newline + 1, plugin->used - off - len - 1);
+                plugin->used -= len + 1;
+                *reply = msg;
+                return AITBASE_OK;
+            }
+            cJSON_Delete(msg);
+            off += len + 1;
+        }
+        if (plugin->used == sizeof(plugin->rx)) return AITBASE_ERR_PROTOCOL;
+        const long long left = deadline - now_ms();
+        if (left <= 0) return AITBASE_ERR_TIMEOUT;
+        struct pollfd pfd;
+        pfd.fd = plugin->fd;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+        const int ready = poll(&pfd, 1, (int)left);
+        if (ready < 0 && errno == EINTR) continue;
+        if (ready <= 0) continue;
+        const ssize_t n = recv(plugin->fd, plugin->rx + plugin->used, sizeof(plugin->rx) - plugin->used, 0);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) return AITBASE_ERR_IO;
+        plugin->used += (size_t)n;
+    }
 }
 
 /* Handles every complete line in the receive buffer. Returns 0 or a negative status. */
@@ -183,6 +224,11 @@ int aitbase_plugin_run(int argc, char **argv) {
     const long long hello_deadline = now_ms() + AITBASE_HELLO_TIMEOUT_MS;
 
     while (status == 0 && !plugin->stop && !g_signal) {
+        /* Messages an aitbase_call() set aside while it waited come first. */
+        if (plugin->used && memchr(plugin->rx, '\n', plugin->used)) {
+            if (drain_messages(plugin) < 0) status = 1;
+            continue;
+        }
         int wait = AITBASE_IDLE_POLL_MS;
         const long long now = now_ms();
         if (!plugin->ready) {

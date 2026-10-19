@@ -89,4 +89,13 @@ The device never sends a message longer than the plugin's `rx_max`. A result tha
 |---|---|---|
 | `sound_done` | The sound started by request `request` ended. | `request`, `detail`: `finished`, `stopped` or `failed` |
 
-A message is a reply if it has an `id`, and an event if it has an `event`. Clients must ignore events and fields they don't know, so newer devices can add them.
+`cap` `schedule` and `module` (firmware feature modules only; community plugins never receive them):
+
+| `event` | Meaning | `data` |
+|---|---|---|
+| `schedule.due` | An entry the plugin set with `schedule.set` is due. Ring it with `schedule.ring`, or the device rings it itself after a short grace period. | `id` |
+| `module.action` | A declared action of the module's screen. | `action`: `snooze` or `stop` |
+
+A message is a reply if it has an `id`, and an event if it has an `event`. Clients must ignore events and fields they don't know, so newer devices can add them. Since SDK 0.10, the C runtime delivers events of capabilities other than `ui` and `audio` as `AITBASE_EVENT_DEVICE`: `op` is `"<cap>.<event>"` and `text` is `data` as JSON.
+
+Since SDK 0.10, `aitbase_call()` sends a request and waits for its reply in the native runtime; messages that arrive meanwhile are delivered afterwards, in order. The WASM runtime returns `AITBASE_ERR_UNSUPPORTED`, because the [WASM host ABI](wasm-abi.md) has no blocking receive.
