@@ -257,10 +257,11 @@
     },
     {
       "cap": "audio", "op": "stream_open", "grant": "audio.stream", "adapter": "audio",
-      "summary": "Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow. background (D29, audio.background) keeps it playing after the screen closes; it needs no screen.",
+      "summary": "Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow. background (D29, audio.background) keeps it playing after the screen closes; it needs no screen, and title names it on the core's screen after the package's name.",
       "args": {
         "rate": {"type": "int", "min": 8000, "max": 48000},
-        "background": {"type": "bool", "optional": true}
+        "background": {"type": "bool", "optional": true},
+        "title": {"type": "string", "max": 48, "charset": "label", "optional": true}
       }
     },
     {
