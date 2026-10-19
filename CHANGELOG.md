@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.11.1 — 2026-10-20
+
+Documentation only; no API or behavior change.
 
 - **Docs:** `net` is granted to every firmware feature module, on every target (device decision D34). There is no kernel gate precondition any more.
 
