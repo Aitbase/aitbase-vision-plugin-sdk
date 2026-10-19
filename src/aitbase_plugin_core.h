@@ -63,9 +63,6 @@ int aitbase_transport_read_screen(aitbase_plugin_t *plugin, const char *screen, 
 /* Sends one audio stream frame of len bytes (D28): returns len when it is taken, 0 while the
  * device's buffer is full, or a negative status. Never blocks. */
 int aitbase_transport_audio_write(aitbase_plugin_t *plugin, const void *pcm, size_t len);
-/* Reads one HTTP stream frame (D29) into buf, waiting up to timeout_ms: the frame's length, 0 when
- * none came in time, or a negative status (see aitbase_http_stream_read). */
-int aitbase_transport_http_stream_read(void *buf, size_t cap, int timeout_ms);
 
 /* --- Provided by the core -------------------------------------------------------------------- */
 
