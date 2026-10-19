@@ -170,6 +170,15 @@ int aitbase_storage_keys(aitbase_plugin_t *plugin) {
     return storage_request(plugin, "keys", NULL, NULL);
 }
 
+int aitbase_face_set(aitbase_plugin_t *plugin, const char *key, const char *value) {
+    if (!plugin || !key || !value) return AITBASE_ERR_ARGUMENT;
+    cJSON *args = cJSON_CreateObject();
+    if (!args) return AITBASE_ERR_NO_MEMORY;
+    cJSON_AddStringToObject(args, "key", key);
+    cJSON_AddStringToObject(args, "value", value);
+    return send_request(plugin, "face", "set", args);
+}
+
 int aitbase_http_request(aitbase_plugin_t *plugin, const aitbase_http_request_t *request) {
     if (!plugin || !request || !request->url) return AITBASE_ERR_ARGUMENT;
     cJSON *args = cJSON_CreateObject();

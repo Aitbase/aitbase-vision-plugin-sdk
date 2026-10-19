@@ -191,6 +191,21 @@ int aitbase_storage_delete(aitbase_plugin_t *plugin, const char *key);
 /* RESULT: text = the keys, separated by newlines. */
 int aitbase_storage_keys(aitbase_plugin_t *plugin);
 
+/* --- Idle face ("idle.face"): the plugin's face for the home screen (since SDK 0.10) ----------- */
+
+/* A plugin may offer one of its screens as the device's home screen face, in place of the clock:
+ * "idle_face": "<screen>" in plugin.json, naming one of ui.screens (device decision D22). The owner
+ * chooses it on the Device Console; the device then shows it display only, under its own "Plugin"
+ * badge, without running the plugin. A face has no buttons or actions, at most 24 widgets and
+ * 8 KiB compiled; `aitbase-plugin check` tells. Its labels bind to "face.1" to "face.16"
+ * (<lv_label bind_text="face.1"/>). */
+
+/* Sets the text of the face's labels bound to key ("face.1" to "face.16"): one line of at most 64
+ * bytes, no control or invisible characters. The device keeps the value (on the SD card), so the
+ * face shows it after a reboot, and keeps it whether or not the owner has chosen the face yet.
+ * At most 1 a second with bursts of 5. Silent on success. */
+int aitbase_face_set(aitbase_plugin_t *plugin, const char *key, const char *value);
+
 /* --- HTTP ("http"): requests to public internet hosts ------------------------------------------- */
 
 /* The device makes the request. http:// and https:// only; hosts that resolve to local,

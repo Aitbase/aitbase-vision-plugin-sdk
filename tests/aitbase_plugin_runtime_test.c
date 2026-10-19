@@ -56,6 +56,10 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
                 aitbase_ui_template(p, &tpl, 45000);
                 break;
             }
+            if (strcmp(ev->node, "face") == 0) {
+                aitbase_face_set(p, "face.1", "21 C");
+                break;
+            }
             if (strcmp(ev->node, "call") == 0 || strcmp(ev->node, "call_timeout") == 0) {
                 /* A synchronous call (since 0.10): the result comes back here, before any event. */
                 char result[128];
@@ -249,6 +253,18 @@ int main(void) {
                    strcmp(str(targs, "item1"), "Tea") == 0 && strcmp(str(targs, "item2"), "Coffee") == 0 &&
                    cJSON_GetObjectItem(targs, "item3") == NULL && num(targs, "wait_ms") == 30000,
                "aitbase_ui_template sends ui.template with the items in order and the wait capped");
+    }
+    if (req) reply_ok(dev, req);
+    cJSON_Delete(req);
+
+    /* aitbase_face_set: the plugin's idle face values (since 0.10). */
+    device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"face\",\"action\":\"x\",\"detail\":\"\"}}");
+    req = next_request(dev, 2000);
+    {
+        const cJSON *fargs = cJSON_GetObjectItem(req, "args");
+        EXPECT(req && strcmp(str(req, "cap"), "face") == 0 && strcmp(str(req, "op"), "set") == 0 &&
+                   strcmp(str(fargs, "key"), "face.1") == 0 && strcmp(str(fargs, "value"), "21 C") == 0,
+               "aitbase_face_set sends face.set");
     }
     if (req) reply_ok(dev, req);
     cJSON_Delete(req);

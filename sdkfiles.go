@@ -23,3 +23,9 @@ var Runtime embed.FS
 //
 //go:embed schema/plugin_capability_registry.json
 var CapabilityRegistry []byte
+
+// UIRegistry is the device's plugin UI registry: widgets, bindings and limits, the idle face
+// bounds (D22) among them.
+//
+//go:embed schema/plugin_ui_registry.json
+var UIRegistry []byte
