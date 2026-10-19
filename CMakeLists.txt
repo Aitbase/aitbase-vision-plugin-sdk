@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(aitbase_vision_plugin_sdk VERSION 0.10.0 LANGUAGES C)
+project(aitbase_vision_plugin_sdk VERSION 0.11.0 LANGUAGES C)
 
 # Usable standalone (tests) or as a subdirectory/submodule of a plugin project.
 option(AITBASE_PLUGIN_SDK_TESTS "Build the SDK tests" ${PROJECT_IS_TOP_LEVEL})
