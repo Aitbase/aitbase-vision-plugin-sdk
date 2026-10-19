@@ -231,7 +231,7 @@ or zero-width characters.
 | `audio` | `sound_done` | The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed. |
 | `audio` | `stream_state` | The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). user means LEFT long press ended a background stream (D29). |
 | `schedule` | `due` | An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings. |
-| `module` | `action` | A declared action of the module's screen. data.action is snooze or stop. |
+| `module` | `action` | A declared action of the module's screen (data.action snooze or stop), or a request from the core: the music module's play, with data.url and data.title, and stop (D29). |
 
 ## Status codes
 
