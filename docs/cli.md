@@ -212,6 +212,11 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `TRIGGER_UNKNOWN` | A trigger's `event` is not one devices support (`schedule`). |
 | `TRIGGER_SCHEDULE` | A schedule needs `every_min`, a whole number from 15 to 1440, and only one schedule is allowed. |
 | `IDLE_FACE_SCREEN` | `idle_face` doesn't name one of `ui.screens`. |
+| `TOOLS_FORMAT` | `assistant_tools` isn't a list of at most 4 tools, or a tool has fields other than `name`, `description` and `args`. |
+| `TOOLS_GRANT_MISSING` | The plugin declares `assistant_tools` but doesn't request `assistant.tools`. |
+| `TOOL_NAME` | A tool's name isn't lowercase letters, digits and `_` starting with a letter (at most 24), or is declared twice. |
+| `TOOL_DESCRIPTION` | A tool has no description, or it isn't one line of at most 120 bytes without control or invisible characters. |
+| `TOOL_ARG` | A tool has more than 4 arguments, or an argument isn't a `string` (`max` 1 to 120), an `int` (`min` and `max`) or an `enum` (1 to 8 values). |
 | `IDLE_FACE_BOUNDS` | The `idle_face` screen can't be a face: it has a button or action, binds a key other than `face.1` to `face.16`, or has more than 24 widgets or 8 KiB compiled. |
 | `SOUND_NAME` | A sound name is not lowercase letters, digits and `_` (at most 32), or is listed twice. |
 | `SOUND_MISSING` | A listed sound has no `sounds/<name>.wav`. |

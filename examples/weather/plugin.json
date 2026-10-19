@@ -1,0 +1,21 @@
+{
+  "id": "example.weather",
+  "name": "Weather",
+  "version": "0.1.0",
+  "api_version": 1,
+  "description": "Answers the assistant's weather questions with a one-line forecast from wttr.in.",
+  "entry": "weather",
+  "requested_capabilities": [
+    "http",
+    "assistant.tools"
+  ],
+  "assistant_tools": [
+    {
+      "name": "today",
+      "description": "Today's weather for a city",
+      "args": {
+        "city": {"type": "string", "max": 40}
+      }
+    }
+  ]
+}

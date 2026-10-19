@@ -41,7 +41,10 @@
     {"code": "too_many", "status": "limit", "summary": "The plugin already holds the most scheduler entries it may: 8 for a firmware module, 4 for a community plugin."},
     {"code": "too_close", "status": "limit", "summary": "Another entry of this plugin is due within 5 minutes of this one (community plugins, D26)."},
     {"code": "not_allowed", "status": "denied", "summary": "The owner hasn't turned on \"Allow alarms\" for this plugin on the Device Console (D26)."},
-    {"code": "not_due", "status": "stale", "summary": "No entry of this plugin is due to ring now."}
+    {"code": "not_due", "status": "stale", "summary": "No entry of this plugin is due to ring now."},
+    {"code": "tool_unknown", "status": "invalid", "summary": "plugins.call named a tool the plugin doesn't declare in assistant_tools, or tool.reply named no call waiting for this plugin's reply: a second reply, or a reply to another call (D31)."},
+    {"code": "tool_timeout", "status": "failed", "summary": "The plugin didn't reply to plugins.call within assistant_tool_timeout_ms (D31)."},
+    {"code": "tool_busy", "status": "busy", "summary": "Another plugins.call is running; the device takes one at a time (D31)."}
   ],
   "grants": [
     {
@@ -119,6 +122,13 @@
       "rate_per_s": 1,
       "burst": 1,
       "summary": "Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, and only where the target's kernel gate is installed."
+    },
+    {
+      "name": "assistant.tools",
+      "class": "sensitive",
+      "rate_per_s": 5,
+      "burst": 10,
+      "summary": "Answer the voice assistant through the tools the plugin declares in assistant_tools (D31). The assistant reads the reply, labelled as the plugin's output; the device may start the plugin without a screen to answer."
     }
   ],
   "limits": {
@@ -149,7 +159,15 @@
     "schedule_community_ring_s": 60,
     "settings_keys_max": 64,
     "settings_key_max": 32,
-    "settings_value_max": 512
+    "settings_value_max": 512,
+    "assistant_tools_max": 4,
+    "assistant_tool_args_max": 4,
+    "assistant_tool_name_max": 24,
+    "assistant_tool_description_max": 120,
+    "assistant_tool_string_max": 120,
+    "assistant_tool_enum_values_max": 8,
+    "assistant_tool_timeout_ms": 5000,
+    "assistant_tool_reply_max": 2048
   },
   "ops": [
     {
@@ -327,6 +345,14 @@
         "key": {"type": "enum", "values": ["face.1", "face.2", "face.3", "face.4", "face.5", "face.6", "face.7", "face.8", "face.9", "face.10", "face.11", "face.12", "face.13", "face.14", "face.15", "face.16"]},
         "value": {"type": "string", "max": 64, "charset": "label"}
       }
+    },
+    {
+      "cap": "tool", "op": "reply", "grant": "assistant.tools", "adapter": "tool",
+      "summary": "Answers the tool.call event with this call id (D31), once. The device removes control, bidirectional-override and zero-width characters before the assistant reads the text.",
+      "args": {
+        "call": {"type": "int", "min": 1, "max": 2147483647},
+        "text": {"type": "string", "max": 2048}
+      }
     }
   ],
   "events": [
@@ -340,6 +366,7 @@
     {"cap": "audio", "event": "sound_done", "summary": "The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed."},
     {"cap": "audio", "event": "stream_state", "summary": "The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). user means LEFT long press ended a background stream (D29)."},
     {"cap": "schedule", "event": "due", "summary": "An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings."},
+    {"cap": "tool", "event": "call", "summary": "The assistant calls one of the plugin's assistant_tools (D31): data.call (a number), data.tool and data.args, already checked against the manifest. Answer with tool.reply within assistant_tool_timeout_ms."},
     {"cap": "module", "event": "action", "summary": "A declared action of the module's screen (data.action snooze or stop), or a request from the core: the music module's play, with data.url and data.title, and stop (D29)."}
   ]
 }
