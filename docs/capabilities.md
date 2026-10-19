@@ -134,12 +134,13 @@ Needs `audio.output`. Stops the sound playing, if any.
 
 ### `audio.stream_open`
 
-Needs `audio.stream`. Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow. background (D29, audio.background) keeps it playing after the screen closes; it needs no screen.
+Needs `audio.stream`. Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow. background (D29, audio.background) keeps it playing after the screen closes; it needs no screen, and title names it on the core's screen after the package's name.
 
 | Argument | Type | Bounds |
 |---|---|---|
 | `rate` | int | 8000 to 48000 |
 | `background` | bool | optional |
+| `title` | string | at most 48 bytes; charset `label`; optional |
 
 ### `audio.stream_close`
 
