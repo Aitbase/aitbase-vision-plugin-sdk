@@ -72,11 +72,13 @@ The source of truth is `schema/plugin_ui_registry.json`.
 | `x`, `y`, `width`, `height` | Integer pixels (`240` or `240px`). `%` and `content` are not accepted yet. |
 | `style_pad_all` | Integer pixels. |
 | `style_bg_color`, `style_text_color` | Platform color tokens only: `#surface`, `#on_surface`, `#accent`, `#control`, or their exact `0xRRGGBB` values. |
-| `lv_label` | `text` (at most 80 bytes); `bind_text` (a platform subject: `title`). |
+| `lv_label` | `text` (at most 80 bytes); `bind_text` (a platform subject: `title`, or `face.1` to `face.16` for an idle face). |
 | `lv_image` | `src` is the name of an image declared in `globals.xml`: `<images><file name="logo" src_path="assets/logo.rgb565"/></images>`. |
 | `lv_button` | Must contain exactly one `<event_cb trigger="clicked" callback="aitbase_action" user_data="<action>"/>`, where `<action>` is a registered action (`plugin.increment`). |
 
 The platform constants and subjects are listed in `schema/aitbase_globals.xml`. Plugins can't define their own colors, fonts or subjects.
+
+**Idle faces.** A screen named in `plugin.json`'s `idle_face` may be shown on the device's home screen instead of the clock, when the owner chooses it. It must be display only: no `lv_button` and no `<event_cb>`, labels bound only to `face.1` to `face.16` (set with `aitbase_face_set`), at most 24 widgets and 8 KiB compiled. The device draws its "Plugin" badge in the top right corner, over the face. `aitbase-plugin check` reports `IDLE_FACE_BOUNDS` otherwise.
 
 Images are RGB565: `uint16 width`, `uint16 height`, then pixels. They must be at most 32×32 and 8 KB.
 

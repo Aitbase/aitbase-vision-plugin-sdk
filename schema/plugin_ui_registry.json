@@ -13,7 +13,11 @@
     "max_asset_bytes": 8192,
     "max_image_dimension": 32,
     "max_pending_updates": 16,
-    "max_events": 16
+    "max_events": 16,
+    "max_face_bytes": 8192,
+    "max_face_nodes": 24,
+    "max_face_keys": 16,
+    "max_face_value": 64
   },
   "int_props": {
     "x": [-320, 320],
@@ -34,6 +38,22 @@
   "events": ["activate"],
   "actions": ["plugin.increment", "template.ok", "template.item1", "template.item2", "template.item3", "template.item4"],
   "bindings": [
-    {"widget": "label", "property": "text", "key": "title", "type": "string"}
+    {"widget": "label", "property": "text", "key": "title", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.1", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.2", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.3", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.4", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.5", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.6", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.7", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.8", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.9", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.10", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.11", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.12", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.13", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.14", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.15", "type": "string"},
+    {"widget": "label", "property": "text", "key": "face.16", "type": "string"}
   ]
 }

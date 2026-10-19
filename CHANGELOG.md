@@ -2,11 +2,12 @@
 
 ## 0.10.0 — unreleased
 
-For plugins that ship in the device firmware (feature modules, D23/D25). Community plugins see no change except a new `check` code.
+For plugins that ship in the device firmware (feature modules, D23/D25), plus screen templates (D27) and idle faces (D22) for every plugin.
 
 - **`aitbase_call(p, cap, op, args_json, timeout_ms, &reply)`:** sends any operation and waits for its reply: the result object as JSON in your buffer, or the device's status and error code. Messages that arrive meanwhile are delivered after the current callback returns, in order. New statuses `AITBASE_ERR_TIMEOUT` and `AITBASE_ERR_UNSUPPORTED`. **Native runtime only:** in WASM it returns `AITBASE_ERR_UNSUPPORTED` and sends nothing.
 - **`AITBASE_EVENT_DEVICE`:** events of capabilities other than `ui` and `audio`, with `op` = `"<cap>.<event>"` (for example `schedule.due`, `module.action`) and `text` = their data as JSON. Before 0.10, a `module.action` event looked like a UI `ACTION`. The event struct is unchanged.
 - **`aitbase_ui_template(p, &tpl, wait_ms)`:** shows one of the device's own screen layouts with your text, no compiled screen needed: `status` (title, emoji, OK), `alert` (icon, title, OK) or `menu` (title and up to 4 items). RIGHT gives `template.ok` or `template.itemN` as an `ACTION`. Works in WASM and native plugins. Needs device firmware with D27; older devices answer `unknown_op`.
+- **Idle faces (D22):** `"idle_face": "<screen>"` in `plugin.json` offers one of `ui.screens` as the device's home screen face. The owner chooses it on the Device Console, and the device shows it in place of its clock, display only and under its own "Plugin" badge, without running the plugin. Labels bind to the new platform subjects `face.1` to `face.16`. **`aitbase_face_set(p, key, value)`** sets them, at most 64 bytes, and needs the new capability `idle.face`. The device keeps the values, so they show after a reboot. `check` validates the face: new codes `IDLE_FACE_SCREEN` and `IDLE_FACE_BOUNDS` (no buttons or actions, only `face.N` bindings, at most 24 widgets and 8 KiB compiled). Needs device firmware with D22; older devices skip the key and answer `face.set` with `unknown_op`.
 - **Capabilities:** the registry adds `schedule`, `settings` and `status` (D23, D25), with `schedule.*`, `settings.*` and `status.publish`. They are for firmware plugins only: `check` reports the new `CAPABILITY_FIRMWARE_ONLY` when a plugin requests them.
 
 ## 0.9.0 — 2026-10-18
