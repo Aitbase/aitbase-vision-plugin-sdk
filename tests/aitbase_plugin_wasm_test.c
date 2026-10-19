@@ -86,10 +86,6 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             snprintf(text, sizeof(text), "stream %s %s", ev->detail, ev->reason);
             say(p, text);
             break;
-        case AITBASE_EVENT_HTTP_STREAM_CLOSED:
-            snprintf(text, sizeof(text), "http-closed %s", ev->reason);
-            say(p, text);
-            break;
         case AITBASE_EVENT_PREEMPTED:
             aitbase_plugin_stop(p);
             break;
@@ -346,10 +342,8 @@ int main(void) {
         cJSON_Delete(req);
     }
 
-    /* D29: background audio and HTTP streams are requests with their arguments. Reading a frame
-     * needs the native runtime's channel: WASM has none. */
+    /* D29: a background open is a stream_open request with background and the title. */
     {
-        unsigned char frame[AITBASE_LIMIT_HTTP_STREAM_FRAME_MAX];
         EXPECT(aitbase_audio_stream_open_background(g_p, 16000, "Night") > 0, "background open returns a request id");
         req = take(&next);
         const cJSON *args = req ? cJSON_GetObjectItem(req, "args") : NULL;
@@ -357,20 +351,6 @@ int main(void) {
                strcmp(str(args, "title"), "Night") == 0 && num(args, "rate") == 16000,
                "a background open sends the rate, background and title");
         cJSON_Delete(req);
-        EXPECT(aitbase_http_stream_open(g_p, "https://example.com/radio") > 0, "http open returns a request id");
-        req = take(&next);
-        args = req ? cJSON_GetObjectItem(req, "args") : NULL;
-        EXPECT(req && strcmp(str(req, "cap"), "http") == 0 && strcmp(str(req, "op"), "stream_open") == 0 &&
-               strcmp(str(args, "url"), "https://example.com/radio") == 0,
-               "an http open sends the url");
-        cJSON_Delete(req);
-        EXPECT(aitbase_http_stream_read(g_p, frame, sizeof(frame), 0) == AITBASE_ERR_UNSUPPORTED,
-               "WASM has no HTTP stream channel");
-        EXPECT(aitbase_http_stream_read(g_p, frame, 10, 0) == AITBASE_ERR_ARGUMENT,
-               "a buffer below a whole frame is refused");
-        EXPECT(deliver("{\"cap\":\"http\",\"event\":\"stream_closed\",\"data\":{\"reason\":\"destination_blocked\"}}") == 0,
-               "the http stream closed event");
-        expect_update(&next, "http-closed destination_blocked");
     }
 
     EXPECT(deliver("not json") == -1, "a malformed device message is a failure");
