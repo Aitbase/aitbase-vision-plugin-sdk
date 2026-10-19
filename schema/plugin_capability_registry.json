@@ -32,7 +32,10 @@
     {"code": "too_large", "status": "limit", "summary": "The result is larger than the plugin can receive."},
     {"code": "timeout", "status": "failed", "summary": "The HTTP request didn't finish in time."},
     {"code": "network_error", "status": "failed", "summary": "DNS, connection or transfer failure."},
-    {"code": "tls_error", "status": "failed", "summary": "The server's TLS certificate couldn't be verified."}
+    {"code": "tls_error", "status": "failed", "summary": "The server's TLS certificate couldn't be verified."},
+    {"code": "module_only", "status": "denied", "summary": "Only a firmware feature module (D25) may use this operation."},
+    {"code": "too_many", "status": "limit", "summary": "The plugin already holds the most scheduler entries it may (8)."},
+    {"code": "not_due", "status": "stale", "summary": "No entry of this plugin is due to ring now."}
   ],
   "grants": [
     {
@@ -61,6 +64,28 @@
       "rate_per_s": 5,
       "burst": 10,
       "summary": "Play tones and the package's own sounds on the speaker, only while the plugin's screen is visible."
+    },
+    {
+      "name": "schedule",
+      "class": "sensitive",
+      "community": false,
+      "rate_per_s": 1,
+      "burst": 5,
+      "summary": "Ring the device at set times, with the entry's label and a built-in sound; the device shows its own alarm screen. Firmware feature modules only for now (D23)."
+    },
+    {
+      "name": "settings",
+      "class": "official",
+      "rate_per_s": 10,
+      "burst": 20,
+      "summary": "Keep the module's settings on internal flash. Firmware feature modules only (D25)."
+    },
+    {
+      "name": "status",
+      "class": "official",
+      "rate_per_s": 10,
+      "burst": 20,
+      "summary": "Publish the module's status for the device and other modules. Firmware feature modules only (D25)."
     }
   ],
   "limits": {
@@ -78,7 +103,13 @@
     "http_timeout_ms_default": 10000,
     "http_timeout_ms_max": 15000,
     "audio_sound_bytes_max": 327680,
-    "audio_sample_rate": 16000
+    "audio_sample_rate": 16000,
+    "schedule_entries_max": 8,
+    "schedule_ahead_s_max": 31622400,
+    "schedule_late_s_max": 300,
+    "settings_keys_max": 64,
+    "settings_key_max": 32,
+    "settings_value_max": 512
   },
   "ops": [
     {
@@ -164,6 +195,61 @@
       "cap": "audio", "op": "stop", "grant": "audio.output", "adapter": "audio",
       "summary": "Stops the sound playing, if any.",
       "args": {}
+    },
+    {
+      "cap": "schedule", "op": "set", "grant": "schedule", "adapter": "schedule",
+      "summary": "Adds or replaces the plugin's entry with this id. A ringing entry makes the device ring at due_epoch with its label, even if the plugin isn't running then (D23).",
+      "args": {
+        "id": {"type": "string", "max": 14, "charset": "name"},
+        "due_epoch": {"type": "int", "min": 1, "max": 2147483647},
+        "rings": {"type": "bool"},
+        "label": {"type": "string", "max": 48, "charset": "label"},
+        "sound": {"type": "enum", "values": ["alarm"], "optional": true}
+      }
+    },
+    {
+      "cap": "schedule", "op": "cancel", "grant": "schedule", "adapter": "schedule", "result": true,
+      "summary": "Removes the plugin's entry with this id. The result has found.",
+      "args": {
+        "id": {"type": "string", "max": 14, "charset": "name"}
+      }
+    },
+    {
+      "cap": "schedule", "op": "list", "grant": "schedule", "adapter": "schedule", "result": true,
+      "summary": "The plugin's own entries: entries is a list of {id, due_epoch, rings, label}.",
+      "args": {}
+    },
+    {
+      "cap": "schedule", "op": "ring", "grant": "schedule", "adapter": "schedule",
+      "summary": "Rings the entry that schedule.due just announced, with its label. Without it the device rings anyway after a short grace period (C14).",
+      "args": {
+        "id": {"type": "string", "max": 14, "charset": "name"}
+      }
+    },
+    {
+      "cap": "settings", "op": "get", "grant": "settings", "adapter": "settings", "result": true,
+      "summary": "The module's settings: found, and values, an object of string values.",
+      "args": {}
+    },
+    {
+      "cap": "settings", "op": "set", "grant": "settings", "adapter": "settings",
+      "summary": "Replaces the module's settings: at most 64 keys of [a-z0-9_] up to 32 bytes, string values up to 512 bytes.",
+      "args": {
+        "values": {"type": "object"}
+      }
+    },
+    {
+      "cap": "settings", "op": "erase", "grant": "settings", "adapter": "settings",
+      "summary": "Removes the module's settings.",
+      "args": {}
+    },
+    {
+      "cap": "status", "op": "publish", "grant": "status", "adapter": "status",
+      "summary": "Publishes a status value under the module's own prefix: key is <module>.<name>.",
+      "args": {
+        "key": {"type": "string", "max": 48, "charset": "key"},
+        "value": {"type": "string", "max": 256, "charset": "text"}
+      }
     }
   ],
   "events": [
@@ -174,6 +260,8 @@
     {"cap": "ui", "event": "action", "summary": "The user activated a focusable widget with RIGHT. data.node and data.action."},
     {"cap": "ui", "event": "key", "summary": "A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press (a long press comes after a press of the same button). data.key is left or right, data.gesture is press or long_press. LEFT long press is never delivered: it leaves the plugin."},
     {"cap": "ui", "event": "update_rejected", "summary": "An update was refused when the device applied it. data.node and data.detail."},
-    {"cap": "audio", "event": "sound_done", "summary": "The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed."}
+    {"cap": "audio", "event": "sound_done", "summary": "The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed."},
+    {"cap": "schedule", "event": "due", "summary": "An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings."},
+    {"cap": "module", "event": "action", "summary": "A declared action of the module's screen. data.action is snooze or stop."}
   ]
 }

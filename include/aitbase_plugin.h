@@ -56,6 +56,8 @@ typedef enum aitbase_status {
     AITBASE_ERR_PROTOCOL = -4,  /* the device speaks an unsupported protocol */
     AITBASE_ERR_NO_MEMORY = -5,
     AITBASE_ERR_NOT_FOUND = -6, /* no compiled screen with that name in the plugin package */
+    AITBASE_ERR_TIMEOUT = -7,     /* aitbase_call(): no reply in time. Since SDK 0.10 */
+    AITBASE_ERR_UNSUPPORTED = -8, /* not available in this runtime (aitbase_call() in WASM). Since SDK 0.10 */
 } aitbase_status_t;
 
 typedef enum aitbase_event_kind {
@@ -73,6 +75,9 @@ typedef enum aitbase_event_kind {
                                           "stopped" or "failed" */
     AITBASE_EVENT_KEY = 11,            /* a button was pressed on the plugin's screen; see key, gesture.
                                           Since SDK 0.8 */
+    AITBASE_EVENT_DEVICE = 12,         /* an event this SDK has no kind for: op is "<cap>.<event>",
+                                          e.g. "schedule.due"; text is its data as a JSON object.
+                                          Since SDK 0.10 */
 } aitbase_event_kind_t;
 
 /* The device's buttons, in AITBASE_EVENT_KEY. */
@@ -103,8 +108,9 @@ typedef struct aitbase_event {
     uint32_t request;  /* ERROR, RESULT, SOUND_DONE: the id the request function returned; 0 for
                           screen requests */
     const char *text;  /* RESULT: storage.get: the value; storage.keys: the keys, one per line;
-                          http.request: the response body, text only. "" otherwise. Valid until
-                          aitbase_on_event returns; copy what you keep. */
+                          http.request: the response body, text only. DEVICE: the event's data
+                          as JSON. "" otherwise. Valid until aitbase_on_event returns; copy what
+                          you keep. */
     size_t text_len;
     int code;          /* RESULT: storage.get: 1 found, 0 missing; http.request: the HTTP status */
     int truncated;     /* RESULT of http.request: 1 when the body was cut to fit */
@@ -199,6 +205,30 @@ int aitbase_audio_play(aitbase_plugin_t *plugin, const char *sound, uint32_t vol
 int aitbase_audio_stop(aitbase_plugin_t *plugin);
 
 /* --- Plugin ------------------------------------------------------------------------------------ */
+
+/* --- Synchronous calls (since SDK 0.10) --------------------------------------------------------- */
+
+/* The device's answer to aitbase_call(). Set result and result_cap to receive the result. */
+typedef struct aitbase_reply {
+    int status;         /* 0, or the device's status, AITBASE_DEVICE_* */
+    char error[65];     /* the device's stable error code when status is not 0 */
+    char *result;       /* your buffer for the result object, as JSON text; may be NULL */
+    size_t result_cap;
+    size_t result_len;  /* the result's length; larger than result_cap - 1 when it didn't fit */
+} aitbase_reply_t;
+
+/* Sends <cap>.<op> with args (a JSON object as text, or NULL for none) and waits up to timeout_ms
+ * for the device's reply: for operations that have no function of their own, for example the
+ * firmware feature module operations schedule.*, settings.* and status.publish.
+ *
+ * Returns AITBASE_OK when the device replied (check reply->status), AITBASE_ERR_TIMEOUT,
+ * AITBASE_ERR_IO, AITBASE_ERR_ARGUMENT, or AITBASE_ERR_NO_MEMORY when the result didn't fit
+ * (reply->result_len says how much it needed). Events that arrive while it waits are delivered
+ * after the current callback returns, in order. Don't call it before aitbase_on_start.
+ *
+ * Native runtime only: in WASM it returns AITBASE_ERR_UNSUPPORTED. */
+int aitbase_call(aitbase_plugin_t *plugin, const char *cap, const char *op, const char *args_json,
+                 uint32_t timeout_ms, aitbase_reply_t *reply);
 
 /* Delivers AITBASE_EVENT_TIMER every interval_ms (minimum 10). 0 stops the timer. */
 int aitbase_timer_set(aitbase_plugin_t *plugin, uint32_t interval_ms);
