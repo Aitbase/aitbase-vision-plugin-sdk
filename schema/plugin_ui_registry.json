@@ -32,7 +32,7 @@
     "image": {"props": ["src"], "children": false, "requires_action": false}
   },
   "events": ["activate"],
-  "actions": ["plugin.increment"],
+  "actions": ["plugin.increment", "template.ok", "template.item1", "template.item2", "template.item3", "template.item4"],
   "bindings": [
     {"widget": "label", "property": "text", "key": "title", "type": "string"}
   ]

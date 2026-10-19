@@ -6,6 +6,7 @@ For plugins that ship in the device firmware (feature modules, D23/D25). Communi
 
 - **`aitbase_call(p, cap, op, args_json, timeout_ms, &reply)`:** sends any operation and waits for its reply: the result object as JSON in your buffer, or the device's status and error code. Messages that arrive meanwhile are delivered after the current callback returns, in order. New statuses `AITBASE_ERR_TIMEOUT` and `AITBASE_ERR_UNSUPPORTED`. **Native runtime only:** in WASM it returns `AITBASE_ERR_UNSUPPORTED` and sends nothing.
 - **`AITBASE_EVENT_DEVICE`:** events of capabilities other than `ui` and `audio`, with `op` = `"<cap>.<event>"` (for example `schedule.due`, `module.action`) and `text` = their data as JSON. Before 0.10, a `module.action` event looked like a UI `ACTION`. The event struct is unchanged.
+- **`aitbase_ui_template(p, &tpl, wait_ms)`:** shows one of the device's own screen layouts with your text, no compiled screen needed: `status` (title, emoji, OK), `alert` (icon, title, OK) or `menu` (title and up to 4 items). RIGHT gives `template.ok` or `template.itemN` as an `ACTION`. Works in WASM and native plugins. Needs device firmware with D27; older devices answer `unknown_op`.
 - **Capabilities:** the registry adds `schedule`, `settings` and `status` (D23, D25), with `schedule.*`, `settings.*` and `status.publish`. They are for firmware plugins only: `check` reports the new `CAPABILITY_FIRMWARE_ONLY` when a plugin requests them.
 
 ## 0.9.0 — 2026-10-18
