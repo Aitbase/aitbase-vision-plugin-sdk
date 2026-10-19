@@ -49,6 +49,12 @@
         }
       }
     },
+    "idle_face": {
+      "description": "One of ui.screens, offered as the device's home screen face (since SDK 0.10). The owner chooses it on the Device Console; the device shows it display only (no buttons or actions, at most 24 widgets and 8 KiB compiled) under its own badge. Its labels bind to face.1 to face.16, set with aitbase_face_set (needs idle.face).",
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
     "sounds": {
       "description": "Sounds in sounds/<name>.wav (16 kHz, mono, 16-bit PCM, at most 10 s), played with aitbase_audio_play(p, \"<name>\", ...). Needs audio.output.",
       "type": "array",
@@ -73,7 +79,7 @@
       "description": "Capabilities the plugin uses. See docs/capabilities.md. During the preview the device grants every capability a plugin requests.",
       "type": "array",
       "uniqueItems": true,
-      "items": {"enum": ["ui", "storage", "http", "audio.output"]}
+      "items": {"enum": ["ui", "storage", "http", "audio.output", "idle.face"]}
     }
   }
 }

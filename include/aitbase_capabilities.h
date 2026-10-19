@@ -23,6 +23,7 @@
 #define AITBASE_CAP_SCHEDULE "schedule"
 #define AITBASE_CAP_SETTINGS "settings"
 #define AITBASE_CAP_STATUS "status"
+#define AITBASE_CAP_IDLE_FACE "idle.face"
 
 /* Device limits. */
 #define AITBASE_LIMIT_RX_DEFAULT 4096u

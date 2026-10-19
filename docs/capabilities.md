@@ -20,6 +20,7 @@ grants a plugin everything it requests; owner approval of sensitive ones comes l
 | `schedule` | sensitive | 1/s, bursts of 5 | Ring the device at set times, with the entry's label and a built-in sound; the device shows its own alarm screen. Firmware feature modules only for now (D23). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `settings` | official | 10/s, bursts of 20 | Keep the module's settings on internal flash. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `status` | official | 10/s, bursts of 20 | Publish the module's status for the device and other modules. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
+| `idle.face` | standard | 1/s, bursts of 5 | Fill in the plugin's idle face (D22), the home screen face the owner may choose on the Device Console. |
 
 ## Operations
 
@@ -184,6 +185,15 @@ Needs `status`. Publishes a status value under the module's own prefix: key is <
 |---|---|---|
 | `key` | string | at most 48 bytes; charset `key` |
 | `value` | string | at most 256 bytes; charset `text` |
+
+### `face.set`
+
+Needs `idle.face`. Sets a value of the plugin's idle face (D22): the labels its face document binds to key. The device keeps the values, so the face shows them after a reboot without the plugin running. Works whether or not the owner has chosen the face.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `key` | enum | `face.1`, `face.2`, `face.3`, `face.4`, `face.5`, `face.6`, `face.7`, `face.8`, `face.9`, `face.10`, `face.11`, `face.12`, `face.13`, `face.14`, `face.15`, `face.16` |
+| `value` | string | at most 64 bytes; charset `label` |
 
 Charsets: `name` is `[a-z][a-z0-9_]*`; `key` is letters, digits, `.`, `_` and `-`; `text` is
 UTF-8 without control characters other than tab, newline and carriage return; `url` is printable

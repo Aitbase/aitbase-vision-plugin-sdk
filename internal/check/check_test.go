@@ -1,8 +1,10 @@
 package check
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -70,6 +72,8 @@ func TestManifestErrors(t *testing.T) {
 		{"schedule not whole", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":15.5}]}`, goodSource, "TRIGGER_SCHEDULE"},
 		{"schedule missing minutes", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule"}]}`, goodSource, "TRIGGER_SCHEDULE"},
 		{"two schedules", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":15},{"event":"schedule","every_min":30}]}`, goodSource, "TRIGGER_SCHEDULE"},
+		{"idle face not listed", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","ui":{"screens":["main"]},"idle_face":"face","requested_capabilities":["ui"]}`, goodSource, "IDLE_FACE_SCREEN"},
+		{"idle face without screens", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","idle_face":"main","requested_capabilities":["idle.face"]}`, goodSource, "IDLE_FACE_SCREEN"},
 		{"too many triggers", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":15},{},{},{},{}]}`, goodSource, "TRIGGER_FORMAT"},
 	}
 	for _, c := range cases {
@@ -179,6 +183,43 @@ func TestWavProblem(t *testing.T) {
 	} {
 		if WavProblem(data) == "" {
 			t.Errorf("%s was accepted", name)
+		}
+	}
+}
+
+func TestIdleFace(t *testing.T) {
+	m := `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","ui":{"screens":["main"]},"idle_face":"main","requested_capabilities":["ui","idle.face"]}`
+	r := Project(writeProject(t, m, goodSource), "", Options{SkipUI: true})
+	if r.HasErrors() || r.Manifest.IdleFace != "main" {
+		t.Fatalf("a listed idle face with idle.face: %+v", r.Diagnostics)
+	}
+	for _, d := range r.Diagnostics {
+		if d.Code == "MANIFEST_UNKNOWN_FIELD" {
+			t.Fatal("idle_face is a known field")
+		}
+	}
+}
+
+func TestFaceProblem(t *testing.T) {
+	doc := func(children string, nodes int) []byte {
+		return []byte(`{"format":"aitbase.plugin-ui","version":1,"screen":"face","tree":{"id":"root","type":"container","props":{},"children":[` +
+			children + `]},"assets":{},"limits":{"nodes":` + strconv.Itoa(nodes) + `,"max_depth":6}}`)
+	}
+	label := `{"id":"t","type":"label","props":{"text":"-"},"children":[],"binding":{"property":"text","key":"face.1","type":"string"}}`
+	if p := FaceProblem(doc(label, 2)); p != "" {
+		t.Fatalf("a display-only face: %s", p)
+	}
+	button := `{"id":"go","type":"button","props":{},"children":[],"action":{"event":"activate","id":"plugin.increment"}}`
+	title := `{"id":"t","type":"label","props":{"text":"-"},"children":[],"binding":{"property":"text","key":"title","type":"string"}}`
+	big := append(doc(label, 2), bytes.Repeat([]byte(" "), 8200)...)
+	for name, compiled := range map[string][]byte{
+		"action":    doc(button, 2),
+		"title key": doc(title, 2),
+		"nodes":     doc(label, 25),
+		"size":      big,
+	} {
+		if FaceProblem(compiled) == "" {
+			t.Errorf("%s: want a problem", name)
 		}
 	}
 }
