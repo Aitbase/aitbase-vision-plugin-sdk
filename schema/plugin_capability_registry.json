@@ -137,6 +137,21 @@
       "args": {}
     },
     {
+      "cap": "ui", "op": "template", "grant": "ui", "adapter": "ui",
+      "summary": "Opens one of the device's screen templates with the plugin's text (D27): status (title, optional emoji, an OK button), alert (an icon, title, OK) or menu (title and 1 to 4 items). RIGHT on OK gives the action template.ok; RIGHT on item N gives template.itemN. Like open, it replaces the plugin's screen, waits like open with wait_ms, and is preempted by the device.",
+      "args": {
+        "template": {"type": "enum", "values": ["status", "alert", "menu"]},
+        "title": {"type": "string", "max": 48, "charset": "label"},
+        "emoji": {"type": "string", "max": 8, "charset": "label", "optional": true},
+        "icon": {"type": "enum", "values": ["bell", "info", "warning"], "optional": true},
+        "item1": {"type": "string", "max": 24, "charset": "label", "optional": true},
+        "item2": {"type": "string", "max": 24, "charset": "label", "optional": true},
+        "item3": {"type": "string", "max": 24, "charset": "label", "optional": true},
+        "item4": {"type": "string", "max": 24, "charset": "label", "optional": true},
+        "wait_ms": {"type": "int", "min": 0, "max": 30000, "optional": true}
+      }
+    },
+    {
       "cap": "storage", "op": "get", "grant": "storage", "adapter": "storage", "result": true,
       "summary": "Reads a value. The result has found (true or false) and value.",
       "args": {
