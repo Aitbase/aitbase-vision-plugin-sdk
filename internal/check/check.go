@@ -105,8 +105,14 @@ var plannedCapabilities = map[string]bool{
 
 // Limits from the registry that check enforces before a package reaches a device.
 var registryLimits = struct {
-	SoundBytesMax int `json:"audio_sound_bytes_max"`
-	SampleRate    int `json:"audio_sample_rate"`
+	SoundBytesMax      int `json:"audio_sound_bytes_max"`
+	SampleRate         int `json:"audio_sample_rate"`
+	ToolsMax           int `json:"assistant_tools_max"`
+	ToolArgsMax        int `json:"assistant_tool_args_max"`
+	ToolNameMax        int `json:"assistant_tool_name_max"`
+	ToolDescriptionMax int `json:"assistant_tool_description_max"`
+	ToolStringMax      int `json:"assistant_tool_string_max"`
+	ToolEnumValuesMax  int `json:"assistant_tool_enum_values_max"`
 }{}
 
 // registryCapabilities returns what a plugin may request, and the device's capabilities that only
@@ -155,7 +161,7 @@ var (
 	uiErrorPattern = regexp.MustCompile(`^(UI_[A-Z_]+) at (\S+): (.*)$`)
 	knownFields    = map[string]bool{"id": true, "name": true, "version": true, "api_version": true,
 		"description": true, "entry": true, "ui": true, "requested_capabilities": true, "sounds": true, "triggers": true,
-		"idle_face": true}
+		"idle_face": true, "assistant_tools": true}
 )
 
 // Project checks the plugin project rooted at dir. sdkDir is the SDK copy that holds the UI
@@ -312,6 +318,11 @@ func checkManifest(r *Result, dir string, opt Options) *Manifest {
 			r.add(Error, "CAPABILITY_UNKNOWN", p, fmt.Sprintf("capability %q does not exist", c), "remove it; this SDK version supports: "+supported)
 		}
 	}
+	requestsTools := false
+	for _, c := range m.RequestedCapabilities {
+		requestsTools = requestsTools || c == "assistant.tools"
+	}
+	checkAssistantTools(r, file, raw["assistant_tools"], requestsTools)
 	if len(m.Sounds) > 0 && !hasAudio {
 		r.add(Error, "CAPABILITY_AUDIO_MISSING", file+"#requested_capabilities", "the plugin has sounds but does not request \"audio.output\"", `add "audio.output" to requested_capabilities`)
 	}
