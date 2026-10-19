@@ -8,5 +8,21 @@
   </consts>
   <subjects>
     <string name="title" value=""/>
+    <string name="face.1" value=""/>
+    <string name="face.2" value=""/>
+    <string name="face.3" value=""/>
+    <string name="face.4" value=""/>
+    <string name="face.5" value=""/>
+    <string name="face.6" value=""/>
+    <string name="face.7" value=""/>
+    <string name="face.8" value=""/>
+    <string name="face.9" value=""/>
+    <string name="face.10" value=""/>
+    <string name="face.11" value=""/>
+    <string name="face.12" value=""/>
+    <string name="face.13" value=""/>
+    <string name="face.14" value=""/>
+    <string name="face.15" value=""/>
+    <string name="face.16" value=""/>
   </subjects>
 </globals>

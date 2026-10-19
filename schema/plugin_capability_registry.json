@@ -86,6 +86,13 @@
       "rate_per_s": 10,
       "burst": 20,
       "summary": "Publish the module's status for the device and other modules. Firmware feature modules only (D25)."
+    },
+    {
+      "name": "idle.face",
+      "class": "standard",
+      "rate_per_s": 1,
+      "burst": 5,
+      "summary": "Fill in the plugin's idle face (D22), the home screen face the owner may choose on the Device Console."
     }
   ],
   "limits": {
@@ -264,6 +271,14 @@
       "args": {
         "key": {"type": "string", "max": 48, "charset": "key"},
         "value": {"type": "string", "max": 256, "charset": "text"}
+      }
+    },
+    {
+      "cap": "face", "op": "set", "grant": "idle.face", "adapter": "face",
+      "summary": "Sets a value of the plugin's idle face (D22): the labels its face document binds to key. The device keeps the values, so the face shows them after a reboot without the plugin running. Works whether or not the owner has chosen the face.",
+      "args": {
+        "key": {"type": "enum", "values": ["face.1", "face.2", "face.3", "face.4", "face.5", "face.6", "face.7", "face.8", "face.9", "face.10", "face.11", "face.12", "face.13", "face.14", "face.15", "face.16"]},
+        "value": {"type": "string", "max": 64, "charset": "label"}
       }
     }
   ],

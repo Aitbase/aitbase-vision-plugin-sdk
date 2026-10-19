@@ -47,6 +47,7 @@ type Manifest struct {
 	RequestedCapabilities []string  `json:"requested_capabilities"`
 	Sounds                []string  `json:"sounds"`
 	Triggers              []Trigger `json:"triggers"`
+	IdleFace              string    `json:"idle_face"`
 }
 
 // Trigger starts the plugin without the user opening it (D21 in the device app). Devices support
@@ -153,7 +154,8 @@ var (
 	sourceIDRegexp = regexp.MustCompile(`AITBASE_PLUGIN_ID\(\s*"([^"]*)"\s*\)`)
 	uiErrorPattern = regexp.MustCompile(`^(UI_[A-Z_]+) at (\S+): (.*)$`)
 	knownFields    = map[string]bool{"id": true, "name": true, "version": true, "api_version": true,
-		"description": true, "entry": true, "ui": true, "requested_capabilities": true, "sounds": true, "triggers": true}
+		"description": true, "entry": true, "ui": true, "requested_capabilities": true, "sounds": true, "triggers": true,
+		"idle_face": true}
 )
 
 // Project checks the plugin project rooted at dir. sdkDir is the SDK copy that holds the UI
@@ -166,7 +168,7 @@ func Project(dir, sdkDir string, opt Options) *Result {
 		r.Manifest = m
 		checkSourceID(r, dir, m.ID)
 		if !opt.SkipUI && m.UI != nil {
-			compileScreens(r, dir, sdkDir, m.UI.Screens, opt.Python)
+			compileScreens(r, dir, sdkDir, m.UI.Screens, m.IdleFace, opt.Python)
 		}
 	}
 	return r
@@ -239,6 +241,17 @@ func checkManifest(r *Result, dir string, opt Options) *Manifest {
 				}
 			}
 			seen[s] = true
+		}
+	}
+
+	if m.IdleFace != "" {
+		listed := false
+		for _, s := range screensOf(&m) {
+			listed = listed || s == m.IdleFace
+		}
+		if !listed {
+			r.add(Error, "IDLE_FACE_SCREEN", file+"#idle_face", fmt.Sprintf("idle_face %q is not one of ui.screens", m.IdleFace),
+				"name a screen listed in ui.screens, or add it there")
 		}
 	}
 
@@ -429,7 +442,7 @@ func FindPython() string {
 
 // compileScreens runs the SDK UI compiler on each screen and turns its UI_* errors into
 // diagnostics. TODO(D12): port the compiler into the CLI so Python is not needed.
-func compileScreens(r *Result, dir, sdkDir string, screens []string, python string) {
+func compileScreens(r *Result, dir, sdkDir string, screens []string, face, python string) {
 	if len(screens) == 0 {
 		return
 	}
@@ -459,9 +472,17 @@ func compileScreens(r *Result, dir, sdkDir string, screens []string, python stri
 			continue // already reported as SCREEN_MISSING
 		}
 		var stderr bytes.Buffer
-		cmd := exec.Command(python, "-I", compiler, filepath.Join(dir, "ui"), s, filepath.Join(tmp, s+".ui.json"))
+		out := filepath.Join(tmp, s+".ui.json")
+		cmd := exec.Command(python, "-I", compiler, filepath.Join(dir, "ui"), s, out)
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err == nil {
+			if s == face {
+				data, err := os.ReadFile(out)
+				if problem := FaceProblem(data); err == nil && problem != "" {
+					r.add(Error, "IDLE_FACE_BOUNDS", "ui/screens/"+s+".xml", problem,
+						"a face is display only: labels and images, no buttons; bind labels to face.1 to face.16")
+				}
+			}
 			continue
 		}
 		msg := strings.TrimSpace(stderr.String())
@@ -471,6 +492,73 @@ func compileScreens(r *Result, dir, sdkDir string, screens []string, python stri
 			r.add(Error, "UI_COMPILE", "ui/screens/"+s+".xml", msg, "see docs/ui-xml.md for what is accepted")
 		}
 	}
+}
+
+func screensOf(m *Manifest) []string {
+	if m.UI == nil {
+		return nil
+	}
+	return m.UI.Screens
+}
+
+// The idle face bounds (D22) from the UI registry.
+var faceLimits = func() (l struct {
+	Bytes int `json:"max_face_bytes"`
+	Nodes int `json:"max_face_nodes"`
+}) {
+	var reg struct {
+		Limits json.RawMessage `json:"limits"`
+	}
+	if err := json.Unmarshal(aitbasesdk.UIRegistry, &reg); err != nil || json.Unmarshal(reg.Limits, &l) != nil || l.Bytes == 0 {
+		panic("schema/plugin_ui_registry.json: no idle face limits")
+	}
+	return l
+}()
+
+type uiNode struct {
+	ID      string          `json:"id"`
+	Action  json.RawMessage `json:"action"`
+	Binding *struct {
+		Key string `json:"key"`
+	} `json:"binding"`
+	Children []uiNode `json:"children"`
+}
+
+// FaceProblem says why a compiled screen can't be an idle face (D22), or "" when it can: the
+// device refuses a face over the size or node bounds, with an action (a face takes no input), or
+// bound to anything but face.N.
+func FaceProblem(compiled []byte) string {
+	if len(compiled) > faceLimits.Bytes {
+		return fmt.Sprintf("the face compiles to %d bytes; a face may have at most %d", len(compiled), faceLimits.Bytes)
+	}
+	var doc struct {
+		Tree   uiNode `json:"tree"`
+		Limits struct {
+			Nodes int `json:"nodes"`
+		} `json:"limits"`
+	}
+	if err := json.Unmarshal(compiled, &doc); err != nil {
+		return "the compiled face is not valid JSON: " + err.Error()
+	}
+	if doc.Limits.Nodes > faceLimits.Nodes {
+		return fmt.Sprintf("the face has %d widgets; a face may have at most %d", doc.Limits.Nodes, faceLimits.Nodes)
+	}
+	var walk func(n *uiNode) string
+	walk = func(n *uiNode) string {
+		if len(n.Action) > 0 && string(n.Action) != "null" {
+			return fmt.Sprintf("%s has an action; a face takes no input", n.ID)
+		}
+		if n.Binding != nil && !strings.HasPrefix(n.Binding.Key, "face.") {
+			return fmt.Sprintf("%s binds %q; a face binds only face.1 to face.16", n.ID, n.Binding.Key)
+		}
+		for i := range n.Children {
+			if p := walk(&n.Children[i]); p != "" {
+				return p
+			}
+		}
+		return ""
+	}
+	return walk(&doc.Tree)
 }
 
 func lastLine(s string) string {

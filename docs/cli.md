@@ -211,6 +211,8 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `TRIGGER_FORMAT` | `triggers` is not a list of at most 4. |
 | `TRIGGER_UNKNOWN` | A trigger's `event` is not one devices support (`schedule`). |
 | `TRIGGER_SCHEDULE` | A schedule needs `every_min`, a whole number from 15 to 1440, and only one schedule is allowed. |
+| `IDLE_FACE_SCREEN` | `idle_face` doesn't name one of `ui.screens`. |
+| `IDLE_FACE_BOUNDS` | The `idle_face` screen can't be a face: it has a button or action, binds a key other than `face.1` to `face.16`, or has more than 24 widgets or 8 KiB compiled. |
 | `SOUND_NAME` | A sound name is not lowercase letters, digits and `_` (at most 32), or is listed twice. |
 | `SOUND_MISSING` | A listed sound has no `sounds/<name>.wav`. |
 | `SOUND_FORMAT` | The sound is not a 16 kHz, mono, 16-bit PCM WAV of at most 10 seconds. |
