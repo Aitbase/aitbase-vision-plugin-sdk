@@ -170,6 +170,37 @@ int aitbase_storage_keys(aitbase_plugin_t *plugin) {
     return storage_request(plugin, "keys", NULL, NULL);
 }
 
+int aitbase_schedule_set(aitbase_plugin_t *plugin, const char *id, int64_t due_epoch, int rings, const char *label) {
+    if (!plugin || !id || !*id || !label || due_epoch <= 0) return AITBASE_ERR_ARGUMENT;
+    cJSON *args = cJSON_CreateObject();
+    if (!args) return AITBASE_ERR_NO_MEMORY;
+    cJSON_AddStringToObject(args, "id", id);
+    cJSON_AddNumberToObject(args, "due_epoch", (double)due_epoch);
+    cJSON_AddBoolToObject(args, "rings", rings ? 1 : 0);
+    cJSON_AddStringToObject(args, "label", label);
+    return send_tracked(plugin, "schedule", "set", args, 1);
+}
+
+static int schedule_id_request(aitbase_plugin_t *plugin, const char *op, const char *id) {
+    if (!plugin || !id || !*id) return AITBASE_ERR_ARGUMENT;
+    cJSON *args = cJSON_CreateObject();
+    if (args) cJSON_AddStringToObject(args, "id", id);
+    return send_tracked(plugin, "schedule", op, args, 1);
+}
+
+int aitbase_schedule_cancel(aitbase_plugin_t *plugin, const char *id) {
+    return schedule_id_request(plugin, "cancel", id);
+}
+
+int aitbase_schedule_list(aitbase_plugin_t *plugin) {
+    if (!plugin) return AITBASE_ERR_ARGUMENT;
+    return send_tracked(plugin, "schedule", "list", cJSON_CreateObject(), 1);
+}
+
+int aitbase_schedule_ring(aitbase_plugin_t *plugin, const char *id) {
+    return schedule_id_request(plugin, "ring", id);
+}
+
 int aitbase_face_set(aitbase_plugin_t *plugin, const char *key, const char *value) {
     if (!plugin || !key || !value) return AITBASE_ERR_ARGUMENT;
     cJSON *args = cJSON_CreateObject();
@@ -360,6 +391,12 @@ static void fill_result(const cJSON *result, const char *op, aitbase_event_t *ou
             *at = '\0';
             out->text = *keys;
         }
+    } else if (strcmp(op, "schedule.cancel") == 0) {
+        out->code = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(result, "found"));
+    } else if (strcmp(op, "schedule.list") == 0) {
+        const cJSON *entries = cJSON_GetObjectItemCaseSensitive(result, "entries");
+        *keys = cJSON_IsArray(entries) ? cJSON_PrintUnformatted(entries) : NULL;
+        out->text = *keys ? *keys : "[]";
     } else if (strcmp(op, "http.request") == 0) {
         const cJSON *status = cJSON_GetObjectItemCaseSensitive(result, "status");
         out->code = cJSON_IsNumber(status) ? status->valueint : 0;
