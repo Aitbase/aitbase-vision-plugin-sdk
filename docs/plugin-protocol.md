@@ -37,6 +37,7 @@ Each message is one UTF-8 JSON object per line (`\n`). A message from the plugin
 | `storage` | `get`, `set`, `delete`, `keys` | `key`, and `value` for `set` |
 | `http` | `request` | `method`, `url`, `headers`, `body`, `timeout_ms` |
 | `audio` | `tone`, `play`, `stop` | `freq_hz`, `duration_ms`, `volume`; `sound`, `volume` |
+| `tool` | `reply` | `call` (the `tool.call` event's id), `text` (at most 2048 bytes) |
 
 Every operation, its arguments and limits, and the capability it needs are in [capabilities](capabilities.md), generated from the device's capability registry. The device checks each request there before doing anything: unknown arguments, wrong types and values out of range are `bad_request`, and an operation whose capability the plugin didn't request is `no_grant`.
 
@@ -44,7 +45,7 @@ Every operation, its arguments and limits, and the capability it needs are in [c
 
 Under the supervisor, the `plugin` field in `hello` must be the identity the supervisor assigned; otherwise the device answers `identity_mismatch` and stops the plugin. On the development socket it is taken as given.
 
-The `hello` reply's result has `protocol`, `api_version`, the `rx_max` the device will respect, `grants`, the capabilities the plugin holds (for example `"ui, storage, http"`), and `trigger`, why the device started the plugin: `autorun`, `voice`, `shortcut` or `schedule` (absent on older devices).
+The `hello` reply's result has `protocol`, `api_version`, the `rx_max` the device will respect, `grants`, the capabilities the plugin holds (for example `"ui, storage, http"`), and `trigger`, why the device started the plugin: `autorun`, `voice`, `shortcut`, `schedule` or `assistant` (absent on older devices).
 
 ## Replies (device → plugin)
 
@@ -97,7 +98,13 @@ The device never sends a message longer than the plugin's `rx_max`. A result tha
 | `schedule.due` | An entry the plugin set with `schedule.set` is due. Ring it with `schedule.ring`, or the device rings it itself after a short grace period. | `id` |
 | `module.action` | A declared action of the module's screen. | `action`: `snooze` or `stop` |
 
-A message is a reply if it has an `id`, and an event if it has an `event`. Clients must ignore events and fields they don't know, so newer devices can add them. Since SDK 0.10, the C runtime delivers events of capabilities other than `ui` and `audio` as `AITBASE_EVENT_DEVICE`: `op` is `"<cap>.<event>"` and `text` is `data` as JSON.
+`cap` `tool` (assistant tools, D31, since SDK 0.10; plugins that request `assistant.tools`):
+
+| `event` | Meaning | `data` |
+|---|---|---|
+| `call` | The voice assistant calls one of the tools in the manifest's `assistant_tools`. Answer once with `tool.reply` within 5 s; a second reply, a late one or one to another call is `tool_unknown`. The C runtime delivers it as `AITBASE_EVENT_TOOL_CALL`. | `call` (a number), `tool`, `args` (an object, already checked against the declaration) |
+
+A message is a reply if it has an `id`, and an event if it has an `event`. Clients must ignore events and fields they don't know, so newer devices can add them. Since SDK 0.10, the C runtime delivers events of capabilities other than `ui`, `audio` and `tool` as `AITBASE_EVENT_DEVICE`: `op` is `"<cap>.<event>"` and `text` is `data` as JSON.
 
 Since SDK 0.10, `aitbase_call()` sends a request and waits for its reply in the native runtime; messages that arrive meanwhile are delivered afterwards, in order. The WASM runtime returns `AITBASE_ERR_UNSUPPORTED`, because the [WASM host ABI](wasm-abi.md) has no blocking receive.
 

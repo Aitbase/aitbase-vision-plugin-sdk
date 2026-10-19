@@ -304,6 +304,52 @@ void aitbase_plugin_stop(aitbase_plugin_t *plugin) {
     if (plugin) plugin->stop = 1;
 }
 
+int aitbase_tool_reply(aitbase_plugin_t *plugin, uint32_t call, const char *text) {
+    if (!plugin || !text || call == 0) return AITBASE_ERR_ARGUMENT;
+    cJSON *args = cJSON_CreateObject();
+    if (!args) return AITBASE_ERR_NO_MEMORY;
+    cJSON_AddNumberToObject(args, "call", call);
+    cJSON_AddStringToObject(args, "text", text);
+    return send_tracked(plugin, "tool", "reply", args, 1);
+}
+
+/* The argument named name of a TOOL_CALL event, parsed from its text; *root must be freed. */
+static const cJSON *tool_arg(const aitbase_event_t *event, const char *name, cJSON **root) {
+    *root = NULL;
+    if (!event || event->kind != AITBASE_EVENT_TOOL_CALL || !event->text || !name) return NULL;
+    *root = cJSON_Parse(event->text);
+    return cJSON_GetObjectItemCaseSensitive(*root, name);
+}
+
+int aitbase_tool_arg_string(const aitbase_event_t *event, const char *name, char *out, size_t cap) {
+    cJSON *root = NULL;
+    const cJSON *item = tool_arg(event, name, &root);
+    int rc = AITBASE_ERR_ARGUMENT;
+    if (cJSON_IsString(item) && out) {
+        const size_t len = strlen(item->valuestring);
+        if (len < cap) {
+            memcpy(out, item->valuestring, len + 1);
+            rc = (int)len;
+        } else {
+            rc = AITBASE_ERR_NO_MEMORY;
+        }
+    }
+    cJSON_Delete(root);
+    return rc;
+}
+
+int aitbase_tool_arg_int(const aitbase_event_t *event, const char *name, long *out) {
+    cJSON *root = NULL;
+    const cJSON *item = tool_arg(event, name, &root);
+    int rc = AITBASE_ERR_ARGUMENT;
+    if (cJSON_IsNumber(item) && out && item->valuedouble == (double)(long)item->valuedouble) {
+        *out = (long)item->valuedouble;
+        rc = AITBASE_OK;
+    }
+    cJSON_Delete(root);
+    return rc;
+}
+
 const char *aitbase_trigger(aitbase_plugin_t *plugin) {
     return plugin ? plugin->trigger : "";
 }
@@ -502,6 +548,19 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
             snprintf(out.op, sizeof(out.op), "%s", op);
             fill_result(cJSON_GetObjectItemCaseSensitive(msg, "result"), op, &out, &keys);
         }
+    } else if (cJSON_IsString(event) && strcmp(string_or_empty(msg, "cap"), "tool") == 0 &&
+               strcmp(event->valuestring, "call") == 0) {
+        /* The assistant calls one of the plugin's assistant_tools (D31, since 0.10). */
+        const cJSON *data = cJSON_GetObjectItemCaseSensitive(msg, "data");
+        const cJSON *call = cJSON_GetObjectItemCaseSensitive(data, "call");
+        const cJSON *args = cJSON_GetObjectItemCaseSensitive(data, "args");
+        out.kind = AITBASE_EVENT_TOOL_CALL;
+        out.request = cJSON_IsNumber(call) ? (uint32_t)call->valuedouble : 0;
+        copy_field(out.action, sizeof(out.action), data, "tool");
+        device_data = cJSON_IsObject(args) ? cJSON_PrintUnformatted(args) : NULL;
+        out.text = device_data ? device_data : "{}";
+        out.text_len = strlen(out.text);
+        if (out.request == 0) out.kind = AITBASE_EVENT_NONE;
     } else if (cJSON_IsString(event) && !typed_cap(string_or_empty(msg, "cap"))) {
         /* A capability this SDK has no event kinds for: hand it over as JSON (since 0.10). */
         const cJSON *data = cJSON_GetObjectItemCaseSensitive(msg, "data");
@@ -567,6 +626,7 @@ const char *aitbase_event_kind_name(aitbase_event_kind_t kind) {
         case AITBASE_EVENT_KEY: return "key";
         case AITBASE_EVENT_DEVICE: return "device";
         case AITBASE_EVENT_STREAM_STATE: return "stream_state";
+        case AITBASE_EVENT_TOOL_CALL: return "tool_call";
         default: return "none";
     }
 }

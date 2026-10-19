@@ -74,6 +74,20 @@ func TestManifestErrors(t *testing.T) {
 		{"idle face not listed", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","ui":{"screens":["main"]},"idle_face":"face","requested_capabilities":["ui"]}`, goodSource, "IDLE_FACE_SCREEN"},
 		{"idle face without screens", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","idle_face":"main","requested_capabilities":["idle.face"]}`, goodSource, "IDLE_FACE_SCREEN"},
 		{"too many triggers", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"triggers":[{"event":"schedule","every_min":15},{},{},{},{}]}`, goodSource, "TRIGGER_FORMAT"},
+		{"tools not a list", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":{}}`, goodSource, "TOOLS_FORMAT"},
+		{"too many tools", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x"},{"name":"b","description":"x"},{"name":"c","description":"x"},{"name":"d","description":"x"},{"name":"e","description":"x"}]}`, goodSource, "TOOLS_FORMAT"},
+		{"tool extra field", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x","shell":"ls"}]}`, goodSource, "TOOLS_FORMAT"},
+		{"tools without grant", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"assistant_tools":[{"name":"a","description":"x"}]}`, goodSource, "TOOLS_GRANT_MISSING"},
+		{"tool name", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"Today","description":"x"}]}`, goodSource, "TOOL_NAME"},
+		{"tool twice", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x"},{"name":"a","description":"y"}]}`, goodSource, "TOOL_NAME"},
+		{"tool description", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"two\nlines"}]}`, goodSource, "TOOL_DESCRIPTION"},
+		{"tool bidi description", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"a\u202eb"}]}`, goodSource, "TOOL_DESCRIPTION"},
+		{"tool arg type", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x","args":{"q":{"type":"object"}}}]}`, goodSource, "TOOL_ARG"},
+		{"tool string max", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x","args":{"q":{"type":"string","max":121}}}]}`, goodSource, "TOOL_ARG"},
+		{"tool int range", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x","args":{"q":{"type":"int","min":5,"max":1}}}]}`, goodSource, "TOOL_ARG"},
+		{"tool enum empty", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x","args":{"q":{"type":"enum","values":[]}}}]}`, goodSource, "TOOL_ARG"},
+		{"tool arg name", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x","args":{"Q":{"type":"string"}}}]}`, goodSource, "TOOL_ARG"},
+		{"tool too many args", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x","args":{"a":{"type":"string"},"b":{"type":"string"},"c":{"type":"string"},"d":{"type":"string"},"e":{"type":"string"}}}]}`, goodSource, "TOOL_ARG"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -95,6 +109,23 @@ func TestScheduleTrigger(t *testing.T) {
 		if d.Code == "MANIFEST_UNKNOWN_FIELD" {
 			t.Fatal("triggers is a known field")
 		}
+	}
+}
+
+func TestAssistantTools(t *testing.T) {
+	m := `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["assistant.tools"],
+"assistant_tools":[{"name":"today","description":"Today's weather for a city","args":{"city":{"type":"string","max":40},
+"days":{"type":"int","min":1,"max":7},"unit":{"type":"enum","values":["c","f"]}}},{"name":"now","description":"The time"}]}`
+	r := Project(writeProject(t, m, goodSource), "", Options{SkipUI: true})
+	if len(r.Diagnostics) != 0 {
+		t.Fatalf("a valid assistant_tools block: %+v", r.Diagnostics)
+	}
+}
+
+func TestWeatherExample(t *testing.T) {
+	r := Project(filepath.Join("..", "..", "examples", "weather"), "", Options{SkipUI: true})
+	if len(r.Diagnostics) != 0 {
+		t.Fatalf("examples/weather: %+v", r.Diagnostics)
 	}
 }
 

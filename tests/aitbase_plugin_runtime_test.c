@@ -98,6 +98,20 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             snprintf(text, sizeof(text), "device %s %s", ev->op, ev->text);
             say(p, text);
             break;
+        case AITBASE_EVENT_TOOL_CALL: {
+            /* Assistant tools (since 0.10, D31): the arguments through the getters, and their errors. */
+            char city[16], tiny[3], other[8];
+            long days = 0, wrong = 0;
+            const int n = aitbase_tool_arg_string(ev, "city", city, sizeof(city));
+            const int small = aitbase_tool_arg_string(ev, "city", tiny, sizeof(tiny));
+            const int missing = aitbase_tool_arg_string(ev, "nope", other, sizeof(other));
+            const int got_days = aitbase_tool_arg_int(ev, "days", &days);
+            const int not_int = aitbase_tool_arg_int(ev, "city", &wrong);
+            snprintf(text, sizeof(text), "%s %s %d %d %ld %d %d %d", ev->action, n >= 0 ? city : "-", n, got_days, days, small,
+                     missing, not_int);
+            aitbase_tool_reply(p, ev->request, text);
+            break;
+        }
         case AITBASE_EVENT_ERROR:
             snprintf(text, sizeof(text), "error %s %d %s", ev->op, ev->status, ev->detail);
             say(p, text);
@@ -260,6 +274,22 @@ int main(void) {
     cJSON_Delete(req);
     expect_update(dev, "call 0 0 {\"found\":true}");
     expect_update(dev, "device schedule.due {\"id\":\"wake\"}");
+
+    /* Assistant tools (since 0.10, D31): tool.call reaches the plugin as AITBASE_EVENT_TOOL_CALL and
+     * aitbase_tool_reply answers it; a refused reply is an ERROR for tool.reply. */
+    device_send(dev, "{\"cap\":\"tool\",\"event\":\"call\",\"data\":{\"call\":7,\"tool\":\"today\",\"args\":{\"city\":\"Hanoi\",\"days\":3}}}");
+    req = next_request(dev, 2000);
+    {
+        const cJSON *rargs = cJSON_GetObjectItem(req, "args");
+        EXPECT(req && strcmp(str(req, "cap"), "tool") == 0 && strcmp(str(req, "op"), "reply") == 0 && num(rargs, "call") == 7,
+               "aitbase_tool_reply answers the call by its id");
+        EXPECT(strcmp(str(rargs, "text"), "today Hanoi 5 0 3 -5 -1 -1") == 0,
+               "the getters read the string and the int, and report a short buffer, a missing name and a wrong type");
+    }
+    if (req) device_send(dev, "{\"id\":%d,\"status\":-1,\"error\":\"tool_unknown\",\"result\":{}}", num(req, "id"));
+    cJSON_Delete(req);
+    expect_update(dev, "error tool.reply -1 tool_unknown");
+    device_send(dev, "{\"cap\":\"tool\",\"event\":\"call\",\"data\":{\"tool\":\"today\",\"args\":{}}}");
 
     /* aitbase_ui_template: the device's own layout with the plugin's text (since 0.10). */
     device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"template\",\"action\":\"x\",\"detail\":\"\"}}");
