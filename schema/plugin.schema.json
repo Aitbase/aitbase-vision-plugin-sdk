@@ -79,7 +79,7 @@
       "description": "Capabilities the plugin uses. See docs/capabilities.md. During the preview the device grants every capability a plugin requests.",
       "type": "array",
       "uniqueItems": true,
-      "items": {"enum": ["ui", "storage", "http", "audio.output", "schedule", "idle.face"]}
+      "items": {"enum": ["ui", "storage", "http", "audio.output", "schedule", "idle.face", "audio.stream"]}
     }
   }
 }
