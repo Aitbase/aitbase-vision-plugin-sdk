@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.10.0 — unreleased
+## 0.10.0 — 2026-10-20
 
 For plugins that ship in the device firmware (feature modules, D23/D25), plus screen templates (D27), idle faces (D22), alarms (D26), audio streams (D28) and assistant tools (D31) for every plugin.
 
