@@ -198,7 +198,8 @@ int aitbase_schedule_list(aitbase_plugin_t *plugin) {
 }
 
 int aitbase_schedule_ring(aitbase_plugin_t *plugin, const char *id) {
-    return schedule_id_request(plugin, "ring", id);
+    /* The device rings due entries itself (since SDK 0.11): nothing to send. */
+    return plugin && id ? AITBASE_OK : AITBASE_ERR_ARGUMENT;
 }
 
 int aitbase_face_set(aitbase_plugin_t *plugin, const char *key, const char *value) {
@@ -352,20 +353,6 @@ int aitbase_tool_arg_int(const aitbase_event_t *event, const char *name, long *o
 
 const char *aitbase_trigger(aitbase_plugin_t *plugin) {
     return plugin ? plugin->trigger : "";
-}
-
-int aitbase_granted(aitbase_plugin_t *plugin, const char *capability) {
-    if (!plugin || !capability || !*capability) return 0;
-    const size_t len = strlen(capability);
-    /* Whole names only: "http" isn't granted by "http.stream". */
-    for (const char *p = plugin->grants; *p;) {
-        while (*p == ',' || *p == ' ') ++p;
-        const char *end = p;
-        while (*end && *end != ',' && *end != ' ') ++end;
-        if ((size_t)(end - p) == len && strncmp(p, capability, len) == 0) return 1;
-        p = end;
-    }
-    return 0;
 }
 
 void aitbase_log(aitbase_plugin_t *plugin, aitbase_log_level_t level, const char *fmt, ...) {
@@ -532,7 +519,6 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
             if (code == 0) {
                 plugin->ready = 1;
                 copy_field(plugin->trigger, sizeof(plugin->trigger), cJSON_GetObjectItemCaseSensitive(msg, "result"), "trigger");
-                copy_field(plugin->grants, sizeof(plugin->grants), cJSON_GetObjectItemCaseSensitive(msg, "result"), "grants");
             } else {
                 aitbase_log(plugin, AITBASE_LOG_ERROR, "device refused the plugin: %s", string_or_empty(msg, "error"));
                 rc = AITBASE_ERR_PROTOCOL;

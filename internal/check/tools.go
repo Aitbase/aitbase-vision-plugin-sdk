@@ -109,7 +109,7 @@ func toolArgProblem(data []byte) string {
 }
 
 // checkAssistantTools validates the assistant_tools block (raw is nil when it is absent).
-func checkAssistantTools(r *Result, file string, raw json.RawMessage, requested bool) {
+func checkAssistantTools(r *Result, file string, raw json.RawMessage) {
 	if raw == nil {
 		return
 	}
@@ -119,10 +119,6 @@ func checkAssistantTools(r *Result, file string, raw json.RawMessage, requested 
 		r.add(Error, "TOOLS_FORMAT", p, fmt.Sprintf("assistant_tools must be a list of at most %d tools", registryLimits.ToolsMax),
 			`for example [{"name": "today", "description": "Today's weather for a city", "args": {"city": {"type": "string", "max": 40}}}]`)
 		return
-	}
-	if len(items) > 0 && !requested {
-		r.add(Error, "TOOLS_GRANT_MISSING", file+"#requested_capabilities", "the plugin declares assistant_tools but does not request \"assistant.tools\"",
-			`add "assistant.tools" to requested_capabilities`)
 	}
 	seen := map[string]bool{}
 	for _, item := range items {

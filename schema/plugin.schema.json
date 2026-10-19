@@ -5,7 +5,7 @@
   "description": "aitbase-plugin check enforces these rules and more (source id match, file names, screens). Keep both in sync.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "name", "version", "api_version", "entry", "requested_capabilities"],
+  "required": ["id", "name", "version", "api_version", "entry"],
   "properties": {
     "id": {
       "description": "Stable plugin id: two or more dot-separated lowercase parts. aitbase.* is reserved for official plugins. Must match AITBASE_PLUGIN_ID(...) in the source.",
@@ -50,13 +50,13 @@
       }
     },
     "idle_face": {
-      "description": "One of ui.screens, offered as the device's home screen face (since SDK 0.10). The owner chooses it on the Device Console; the device shows it display only (no buttons or actions, at most 24 widgets and 8 KiB compiled) under its own badge. Its labels bind to face.1 to face.16, set with aitbase_face_set (needs idle.face).",
+      "description": "One of ui.screens, offered as the device's home screen face (since SDK 0.10). The owner chooses it on the Device Console; the device shows it display only (no buttons or actions, at most 24 widgets and 8 KiB compiled) under its own badge. Its labels bind to face.1 to face.16, set with aitbase_face_set.",
       "type": "string",
       "maxLength": 32,
       "pattern": "^[a-z][a-z0-9_]*$"
     },
     "sounds": {
-      "description": "Sounds in sounds/<name>.wav (16 kHz, mono, 16-bit PCM, at most 10 s), played with aitbase_audio_play(p, \"<name>\", ...). Needs audio.output.",
+      "description": "Sounds in sounds/<name>.wav (16 kHz, mono, 16-bit PCM, at most 10 s), played with aitbase_audio_play(p, \"<name>\", ...), only while the plugin's screen is visible.",
       "type": "array",
       "uniqueItems": true,
       "items": {"type": "string", "maxLength": 32, "pattern": "^[a-z][a-z0-9_]*$"}
@@ -76,7 +76,7 @@
       }
     },
     "assistant_tools": {
-      "description": "Tools the device's voice assistant may call (since SDK 0.10, D31): the plugin gets AITBASE_EVENT_TOOL_CALL and answers with aitbase_tool_reply within 5 s. Needs assistant.tools. The device starts a plugin that isn't running, without a screen. Every declared argument is required. An invalid block offers no tools; the plugin still runs.",
+      "description": "Tools the device's voice assistant may call (since SDK 0.10, D31): the plugin gets AITBASE_EVENT_TOOL_CALL and answers with aitbase_tool_reply within 5 s. The device starts a plugin that isn't running, without a screen. Every declared argument is required. An invalid block offers no tools; the plugin still runs.",
       "type": "array",
       "maxItems": 4,
       "items": {
@@ -114,7 +114,7 @@
       }
     },
     "requested_capabilities": {
-      "description": "Capabilities the plugin uses. See docs/capabilities.md. During the preview the device grants every capability a plugin requests.",
+      "description": "Ignored since SDK 0.11 (device decision D32): every plugin may use every capability. Devices before 2026-10-20 still need it. check warns CAPABILITIES_IGNORED.",
       "type": "array",
       "uniqueItems": true,
       "items": {"enum": ["ui", "storage", "http", "audio.output", "schedule", "idle.face", "audio.stream", "assistant.tools"]}

@@ -39,13 +39,13 @@ Each message is one UTF-8 JSON object per line (`\n`). A message from the plugin
 | `audio` | `tone`, `play`, `stop` | `freq_hz`, `duration_ms`, `volume`; `sound`, `volume` |
 | `tool` | `reply` | `call` (the `tool.call` event's id), `text` (at most 2048 bytes) |
 
-Every operation, its arguments and limits, and the capability it needs are in [capabilities](capabilities.md), generated from the device's capability registry. The device checks each request there before doing anything: unknown arguments, wrong types and values out of range are `bad_request`, and an operation whose capability the plugin didn't request is `no_grant`.
+Every operation, its arguments and limits, and the capability it needs are in [capabilities](capabilities.md), generated from the device's capability registry. The device checks each request there before doing anything: unknown arguments, wrong types and values out of range are `bad_request`, and an operation only firmware feature modules may use is `module_only` (`no_screen` for a module's `ui`). Since device decision D32 nothing is requested: devices before it answered `no_grant` for an operation whose capability wasn't in `requested_capabilities`.
 
 **`hello` must be the first request.** The device answers any other request sent before `hello` with `hello_required`. If the device doesn't support the protocol version, it answers `protocol_unsupported`.
 
 Under the supervisor, the `plugin` field in `hello` must be the identity the supervisor assigned; otherwise the device answers `identity_mismatch` and stops the plugin. On the development socket it is taken as given.
 
-The `hello` reply's result has `protocol`, `api_version`, the `rx_max` the device will respect, `grants`, the capabilities the plugin holds (for example `"ui, storage, http"`), and `trigger`, why the device started the plugin: `autorun`, `voice`, `shortcut`, `schedule` or `assistant` (absent on older devices).
+The `hello` reply's result has `protocol`, `api_version`, the `rx_max` the device will respect, `grants` (what the session can use; SDK 0.11 ignores it, and devices may stop sending it), and `trigger`, why the device started the plugin: `autorun`, `voice`, `shortcut`, `schedule` or `assistant` (absent on older devices).
 
 ## Replies (device → plugin)
 
@@ -61,7 +61,7 @@ Every request gets exactly one reply with the same `id`. Most replies come at on
 | -2 | Stale: no screen is open, or the screen is no longer current. | `not_open` |
 | -3 | Busy: the update mailbox is full, or a request of the same kind is running. | `in_flight` |
 | -4 | Out of memory. | |
-| -5 | Denied. | `no_grant`, `destination_blocked` |
+| -5 | Denied. | `module_only`, `destination_blocked` |
 | -6 | Unavailable now or on this device. | `not_foreground`, `no_storage` |
 | -7 | A rate, size or storage limit. | `rate_limited`, `quota_exceeded`, `too_large` |
 | -8 | The device tried and failed. | `timeout`, `network_error`, `tls_error` |
