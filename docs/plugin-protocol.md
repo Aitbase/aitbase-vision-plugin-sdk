@@ -88,6 +88,7 @@ The device never sends a message longer than the plugin's `rx_max`. A result tha
 | `event` | Meaning | `data` |
 |---|---|---|
 | `sound_done` | The sound started by request `request` ended. | `request`, `detail`: `finished`, `stopped` or `failed` |
+| `stream_state` | The audio stream changed (D28, since SDK 0.10). | `state`: `paused`, `resumed` or `stopped`; for `stopped`, `reason`: `closed`, `preempted`, `replaced`, `idle_timeout`, `bad_stream` or `failed` |
 
 `cap` `schedule` and `module` (firmware feature modules only; community plugins never receive them):
 
@@ -99,3 +100,14 @@ The device never sends a message longer than the plugin's `rx_max`. A result tha
 A message is a reply if it has an `id`, and an event if it has an `event`. Clients must ignore events and fields they don't know, so newer devices can add them. Since SDK 0.10, the C runtime delivers events of capabilities other than `ui` and `audio` as `AITBASE_EVENT_DEVICE`: `op` is `"<cap>.<event>"` and `text` is `data` as JSON.
 
 Since SDK 0.10, `aitbase_call()` sends a request and waits for its reply in the native runtime; messages that arrive meanwhile are delivered afterwards, in order. The WASM runtime returns `AITBASE_ERR_UNSUPPORTED`, because the [WASM host ABI](wasm-abi.md) has no blocking receive.
+
+## Audio channel (D28)
+
+Audio samples don't travel in the messages above. A plugin whose `plugin.json` requests `audio.stream` gets a second socket from the device's plugin supervisor, on **descriptor 4** (`AITBASE_LIMIT_AUDIO_STREAM_FD`), next to the message channel. After `audio.stream_open {rate}` succeeds, the plugin sends frames on it:
+
+- 4 bytes: the payload length, little-endian;
+- the payload: 16-bit little-endian mono PCM at the stream's rate, 2 to 8192 bytes, an even count.
+
+The device reads only as fast as the speaker plays, so a plugin that sends faster finds the socket full (`EAGAIN`, or `aitbase_audio_stream_write` returning 0). While the stream is `paused` nothing is read. A malformed frame, or a frame while no stream is open, ends the stream with `bad_stream` and closes the channel for the rest of the run. Frames already in flight when the device stops a stream (`preempted`, `replaced`, `idle_timeout`) are dropped. `audio.stream_close` plays out the frames already sent, then reports `stopped` with `closed`.
+
+WASM plugins don't see the descriptor: the runner's `audio_write` import ([WASM ABI](wasm-abi.md)) writes the frames. A plugin without the capability has no descriptor 4.

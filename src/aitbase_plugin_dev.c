@@ -13,6 +13,7 @@
 #include "cJSON.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -32,6 +33,9 @@
 #define AITBASE_UI_DIR_ENV "AITBASE_PLUGIN_UI_DIR"
 /* Set by the device's plugin supervisor: the inherited connection descriptor. */
 #define AITBASE_CHANNEL_FD_ENV "AITBASE_PLUGIN_FD"
+/* The device's audio channel (D28): open on this descriptor only for a plugin that holds
+ * "audio.stream" under the supervisor. */
+#define AITBASE_AUDIO_FD ((int)AITBASE_LIMIT_AUDIO_STREAM_FD)
 #define AITBASE_HELLO_TIMEOUT_MS 3000
 #define AITBASE_IDLE_POLL_MS 200
 
@@ -57,6 +61,44 @@ static int send_all(aitbase_plugin_t *plugin, const char *data, size_t len) {
         len -= (size_t)n;
     }
     return AITBASE_OK;
+}
+
+/* The audio channel: non-blocking, with at most one frame waiting to finish sending. */
+static int g_audio_fd = -1;
+static int g_audio_broken;
+static unsigned char g_audio_frame[4 + AITBASE_LIMIT_AUDIO_STREAM_FRAME_MAX];
+static size_t g_audio_sent, g_audio_len;
+
+/* 1 when the waiting frame is all sent, 0 while the socket is full, -1 once it is gone. */
+static int audio_flush(void) {
+    while (g_audio_sent < g_audio_len) {
+        const ssize_t n = send(g_audio_fd, g_audio_frame + g_audio_sent, g_audio_len - g_audio_sent, MSG_NOSIGNAL);
+        if (n < 0 && errno == EINTR) continue;
+        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return 0;
+        if (n <= 0) {
+            g_audio_broken = 1;
+            return -1;
+        }
+        g_audio_sent += (size_t)n;
+    }
+    g_audio_sent = g_audio_len = 0;
+    return 1;
+}
+
+int aitbase_transport_audio_write(aitbase_plugin_t *plugin, const void *pcm, size_t len) {
+    (void)plugin;
+    if (g_audio_fd < 0) return AITBASE_ERR_UNSUPPORTED;
+    if (g_audio_broken) return AITBASE_ERR_IO;
+    const int sent = audio_flush();
+    if (sent <= 0) return sent < 0 ? AITBASE_ERR_IO : 0;
+    g_audio_frame[0] = (unsigned char)(len & 0xff);
+    g_audio_frame[1] = (unsigned char)(len >> 8 & 0xff);
+    g_audio_frame[2] = (unsigned char)(len >> 16 & 0xff);
+    g_audio_frame[3] = (unsigned char)(len >> 24 & 0xff);
+    memcpy(g_audio_frame + 4, pcm, len);
+    g_audio_sent = 0;
+    g_audio_len = 4 + len;
+    return audio_flush() < 0 ? AITBASE_ERR_IO : (int)len;
 }
 
 int aitbase_transport_send(aitbase_plugin_t *plugin, const char *message, size_t len) {
@@ -208,7 +250,12 @@ int aitbase_plugin_run(int argc, char **argv) {
         return 1;
     }
     if (inherited >= 0) {
+        struct stat st;
         plugin->fd = inherited;
+        if (inherited != AITBASE_AUDIO_FD && fstat(AITBASE_AUDIO_FD, &st) == 0 && S_ISSOCK(st.st_mode)) {
+            g_audio_fd = AITBASE_AUDIO_FD;
+            fcntl(g_audio_fd, F_SETFL, fcntl(g_audio_fd, F_GETFL) | O_NONBLOCK);
+        }
     } else {
         const char *endpoint = getenv(AITBASE_ENDPOINT_ENV);
         plugin->fd = connect_endpoint(endpoint && *endpoint ? endpoint : AITBASE_DEFAULT_ENDPOINT);
@@ -230,6 +277,8 @@ int aitbase_plugin_run(int argc, char **argv) {
             continue;
         }
         int wait = AITBASE_IDLE_POLL_MS;
+        /* A frame left half sent goes out first, so the device never waits on it. */
+        if (g_audio_len && audio_flush() == 0) wait = 10;
         const long long now = now_ms();
         if (!plugin->ready) {
             if (now >= hello_deadline) {

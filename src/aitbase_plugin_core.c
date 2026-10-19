@@ -271,6 +271,24 @@ int aitbase_audio_stop(aitbase_plugin_t *plugin) {
     return send_tracked(plugin, "audio", "stop", cJSON_CreateObject(), 1);
 }
 
+int aitbase_audio_stream_open(aitbase_plugin_t *plugin, uint32_t rate) {
+    if (!plugin) return AITBASE_ERR_ARGUMENT;
+    cJSON *args = cJSON_CreateObject();
+    if (args) cJSON_AddNumberToObject(args, "rate", rate);
+    return send_tracked(plugin, "audio", "stream_open", args, 1);
+}
+
+int aitbase_audio_stream_write(aitbase_plugin_t *plugin, const int16_t *pcm, size_t samples) {
+    if (!plugin || !pcm || samples == 0 || samples > AITBASE_AUDIO_STREAM_FRAME_SAMPLES) return AITBASE_ERR_ARGUMENT;
+    const int rc = aitbase_transport_audio_write(plugin, pcm, samples * 2);
+    return rc > 0 ? (int)samples : rc;
+}
+
+int aitbase_audio_stream_close(aitbase_plugin_t *plugin) {
+    if (!plugin) return AITBASE_ERR_ARGUMENT;
+    return send_tracked(plugin, "audio", "stream_close", cJSON_CreateObject(), 1);
+}
+
 void aitbase_plugin_stop(aitbase_plugin_t *plugin) {
     if (plugin) plugin->stop = 1;
 }
@@ -298,6 +316,7 @@ static aitbase_event_kind_t kind_from_name(const char *name) {
         {"closed", AITBASE_EVENT_CLOSED},     {"preempted", AITBASE_EVENT_PREEMPTED},
         {"action", AITBASE_EVENT_ACTION},     {"update_rejected", AITBASE_EVENT_UPDATE_REJECTED},
         {"sound_done", AITBASE_EVENT_SOUND_DONE}, {"key", AITBASE_EVENT_KEY},
+        {"stream_state", AITBASE_EVENT_STREAM_STATE},
     };
     for (size_t i = 0; i < sizeof(kinds) / sizeof(kinds[0]); ++i) {
         if (strcmp(name, kinds[i].name) == 0) return kinds[i].kind;
@@ -474,6 +493,10 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
             copy_field(out.action, sizeof(out.action), data, "action");
             copy_field(out.detail, sizeof(out.detail), data, "detail");
             out.request = cJSON_IsNumber(request) ? (uint32_t)request->valuedouble : 0;
+            if (out.kind == AITBASE_EVENT_STREAM_STATE) {
+                copy_field(out.detail, sizeof(out.detail), data, "state");
+                copy_field(out.reason, sizeof(out.reason), data, "reason");
+            }
             if (out.kind == AITBASE_EVENT_KEY) {
                 const char *key = string_or_empty(data, "key");
                 const char *gesture = string_or_empty(data, "gesture");
@@ -516,6 +539,8 @@ const char *aitbase_event_kind_name(aitbase_event_kind_t kind) {
         case AITBASE_EVENT_RESULT: return "result";
         case AITBASE_EVENT_SOUND_DONE: return "sound_done";
         case AITBASE_EVENT_KEY: return "key";
+        case AITBASE_EVENT_DEVICE: return "device";
+        case AITBASE_EVENT_STREAM_STATE: return "stream_state";
         default: return "none";
     }
 }

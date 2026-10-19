@@ -21,6 +21,7 @@ grants a plugin everything it requests; owner approval of sensitive ones comes l
 | `settings` | official | 10/s, bursts of 20 | Keep the module's settings on internal flash. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `status` | official | 10/s, bursts of 20 | Publish the module's status for the device and other modules. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `idle.face` | standard | 1/s, bursts of 5 | Fill in the plugin's idle face (D22), the home screen face the owner may choose on the Device Console. |
+| `audio.stream` | sensitive | 5/s, bursts of 10 | Stream continuous audio to the speaker, such as a radio or a podcast, only while the plugin's screen is visible (D28). Alarms, calls and the voice assistant pause it. |
 
 ## Operations
 
@@ -129,6 +130,18 @@ Needs `audio.output`. Plays sounds/<sound>.wav from the package (16 kHz, mono, 1
 
 Needs `audio.output`. Stops the sound playing, if any.
 
+### `audio.stream_open`
+
+Needs `audio.stream`. Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `rate` | int | 8000 to 48000 |
+
+### `audio.stream_close`
+
+Needs `audio.stream`. Plays out the frames already sent, then closes the stream. A stream_state event with state stopped and reason closed follows.
+
 ### `schedule.set`
 
 Needs `schedule`. Adds or replaces the plugin's entry with this id. A ringing entry makes the device ring at due_epoch with its label, even if the plugin isn't running then (D23).
@@ -212,6 +225,7 @@ or zero-width characters.
 | `ui` | `key` | A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press (a long press comes after a press of the same button). data.key is left or right, data.gesture is press or long_press. LEFT long press is never delivered: it leaves the plugin. |
 | `ui` | `update_rejected` | An update was refused when the device applied it. data.node and data.detail. |
 | `audio` | `sound_done` | The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed. |
+| `audio` | `stream_state` | The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). |
 | `schedule` | `due` | An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings. |
 | `module` | `action` | A declared action of the module's screen. data.action is snooze or stop. |
 
@@ -240,12 +254,16 @@ or zero-width characters.
 | `bad_header` | -1 | An HTTP header is malformed, or one the device sets itself (Host, Content-Length, Connection, Transfer-Encoding, Proxy-*). |
 | `sound_not_found` | -1 | The package has no sounds/<name>.wav. |
 | `bad_sound` | -1 | The sound isn't a 16 kHz, mono, 16-bit PCM WAV file within the size limit. |
+| `bad_rate` | -1 | The stream rate isn't one the speaker plays: 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100 or 48000 Hz. |
 | `not_open` | -2 | No screen is open. |
 | `in_flight` | -3 | An HTTP request is already running; wait for its result. |
+| `speaker_busy` | -3 | An alarm, a call or the voice assistant holds the speaker, or another plugin is streaming (D28). |
+| `streaming` | -3 | The plugin's audio stream is open; sounds wait until it closes. |
 | `no_memory` | -4 | The device ran out of memory. |
 | `no_grant` | -5 | plugin.json doesn't list the capability this operation needs in requested_capabilities. |
 | `destination_blocked` | -5 | The URL isn't http or https, or its host resolves to a loopback, private, link-local or other non-public address. |
 | `not_foreground` | -6 | Sound plays only while the plugin's screen is visible. |
+| `no_channel` | -6 | The plugin has no working audio channel: it doesn't hold audio.stream, or an earlier malformed frame ended the channel for this run (D28). |
 | `no_storage` | -6 | Plugin storage isn't available: no SD card, or it can't be written. |
 | `rate_limited` | -7 | Too many requests of this kind; slow down. |
 | `quota_exceeded` | -7 | Plugin storage is full. |
@@ -278,6 +296,10 @@ or zero-width characters.
 | `http_timeout_ms_max` | 15000 |
 | `audio_sound_bytes_max` | 327680 |
 | `audio_sample_rate` | 16000 |
+| `audio_stream_frame_max` | 8192 |
+| `audio_stream_queue_ms` | 200 |
+| `audio_stream_idle_s` | 10 |
+| `audio_stream_fd` | 4 |
 | `schedule_entries_max` | 8 |
 | `schedule_ahead_s_max` | 31622400 |
 | `schedule_late_s_max` | 300 |

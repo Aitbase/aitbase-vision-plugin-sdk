@@ -34,6 +34,7 @@ AITBASE_IMPORT("log") void aitbase_host_log(int32_t level, const char *text, uin
 AITBASE_IMPORT("timer_set") int32_t aitbase_host_timer_set(uint32_t interval_ms);
 AITBASE_IMPORT("package_read")
 int32_t aitbase_host_package_read(const char *name, uint32_t name_len, char *buf, uint32_t cap);
+AITBASE_IMPORT("audio_write") int32_t aitbase_host_audio_write(const void *pcm, uint32_t len);
 
 /* --- Transport -------------------------------------------------------------------------------- */
 
@@ -70,6 +71,15 @@ int aitbase_transport_read_screen(aitbase_plugin_t *plugin, const char *screen, 
     if (rc < 0) return rc == AITBASE_ERR_NOT_FOUND ? AITBASE_ERR_NOT_FOUND : AITBASE_ERR_ARGUMENT;
     *len = (size_t)rc;
     return AITBASE_OK;
+}
+
+/* The runner frames it and finishes a partly sent frame itself (docs/wasm-abi.md). */
+int aitbase_transport_audio_write(aitbase_plugin_t *plugin, const void *pcm, size_t len) {
+    (void)plugin;
+    const int32_t rc = aitbase_host_audio_write(pcm, (uint32_t)len);
+    if (rc >= 0) return (int)rc;
+    if (rc == AITBASE_ERR_UNSUPPORTED || rc == AITBASE_ERR_ARGUMENT) return (int)rc;
+    return AITBASE_ERR_IO;
 }
 
 int aitbase_timer_set(aitbase_plugin_t *plugin, uint32_t interval_ms) {

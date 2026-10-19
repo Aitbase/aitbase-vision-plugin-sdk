@@ -53,6 +53,7 @@ Module `aitbase`:
 | `log` | `(level, ptr, len)` | Writes one line to the plugin log. Levels are `aitbase_log_level_t`. Lines are cut at 255 bytes, control characters are replaced, and the device allows 20 lines a second with bursts of 50. |
 | `timer_set` | `(interval_ms) -> i32` | Calls `aitbase_timer` every `interval_ms`; `0` stops. Intervals under 10 ms become 10 ms. Returns `0`, or `-1` over 24 hours. |
 | `package_read` | `(name_ptr, name_len, buf_ptr, cap) -> i32` | Copies a compiled screen, `<screen>.ui.json`, from the plugin's package. Returns its size, `-6` if there is no such file, or `-1` if it is larger than `cap`. Screens are at most 16 KiB. |
+| `audio_write` | `(ptr, len) -> i32` | Since SDK 0.10 (D28). Sends `len` bytes of 16-bit mono PCM as one frame of the plugin's audio stream. Returns `len` when the device took the frame, `0` while its buffer is full (try again later), `-1` for an empty, odd or longer than 8192-byte frame, `-3` once the audio channel is closed, or `-8` when the plugin doesn't hold `audio.stream`. Never blocks: the runner finishes a partly sent frame itself before it delivers the next message. Use `aitbase_audio_stream_write`. |
 
 Module `wasi_snapshot_preview1`: wasi-libc links these into any program that uses stdio, so the device provides them. It provides nothing else from WASI.
 
