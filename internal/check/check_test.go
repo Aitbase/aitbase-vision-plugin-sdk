@@ -57,7 +57,6 @@ func TestManifestErrors(t *testing.T) {
 		{"version", `{"id":"alice.counter","name":"C","version":"1.0","api_version":1,"entry":"c","requested_capabilities":["ui"]}`, goodSource, "VERSION_FORMAT"},
 		{"api", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":2,"entry":"c","requested_capabilities":["ui"]}`, goodSource, "API_VERSION_UNSUPPORTED"},
 		{"firmware only", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","settings"]}`, goodSource, "CAPABILITY_FIRMWARE_ONLY"},
-		{"schedule not yet", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","schedule"]}`, goodSource, "CAPABILITY_FIRMWARE_ONLY"},
 		{"planned capability", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","camera.capture"]}`, goodSource, "CAPABILITY_UNAVAILABLE"},
 		{"sounds without audio", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","sounds":["beep"],"requested_capabilities":["ui"]}`, goodSource, "CAPABILITY_AUDIO_MISSING"},
 		{"missing sound", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","sounds":["beep"],"requested_capabilities":["ui","audio.output"]}`, goodSource, "SOUND_MISSING"},
@@ -221,5 +220,13 @@ func TestFaceProblem(t *testing.T) {
 		if FaceProblem(compiled) == "" {
 			t.Errorf("%s: want a problem", name)
 		}
+	}
+}
+
+func TestScheduleIsCommunity(t *testing.T) {
+	m := `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","schedule"]}`
+	r := Project(writeProject(t, m, goodSource), "", Options{SkipUI: true})
+	if r.HasErrors() {
+		t.Fatalf("schedule is open to community plugins with the owner's approval (D26): %+v", r.Diagnostics)
 	}
 }

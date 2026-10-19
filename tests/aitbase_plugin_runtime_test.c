@@ -56,6 +56,11 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
                 aitbase_ui_template(p, &tpl, 45000);
                 break;
             }
+            if (strcmp(ev->node, "alarm") == 0) {
+                aitbase_schedule_set(p, "wake", 1900000000, 1, "Wake");
+                aitbase_schedule_list(p);
+                break;
+            }
             if (strcmp(ev->node, "face") == 0) {
                 aitbase_face_set(p, "face.1", "21 C");
                 break;
@@ -75,6 +80,12 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             }
             snprintf(text, sizeof(text), "action %s %s", ev->node, ev->action);
             say(p, text);
+            break;
+        case AITBASE_EVENT_RESULT:
+            if (strcmp(ev->op, "schedule.list") == 0) {
+                snprintf(text, sizeof(text), "list %s", ev->text);
+                say(p, text);
+            }
             break;
         case AITBASE_EVENT_DEVICE:
             snprintf(text, sizeof(text), "device %s %s", ev->op, ev->text);
@@ -256,6 +267,27 @@ int main(void) {
     }
     if (req) reply_ok(dev, req);
     cJSON_Delete(req);
+
+    /* aitbase_schedule_*: community alarms (since 0.10, D26), tracked like storage. */
+    device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"alarm\",\"action\":\"x\",\"detail\":\"\"}}");
+    req = next_request(dev, 2000);
+    {
+        const cJSON *sargs = cJSON_GetObjectItem(req, "args");
+        EXPECT(req && strcmp(str(req, "cap"), "schedule") == 0 && strcmp(str(req, "op"), "set") == 0 &&
+                   strcmp(str(sargs, "id"), "wake") == 0 && num(sargs, "due_epoch") == 1900000000 &&
+                   cJSON_IsTrue(cJSON_GetObjectItem(sargs, "rings")) && strcmp(str(sargs, "label"), "Wake") == 0,
+               "aitbase_schedule_set sends schedule.set");
+    }
+    if (req) reply_ok(dev, req);
+    cJSON_Delete(req);
+    req = next_request(dev, 2000);
+    EXPECT(req && strcmp(str(req, "op"), "list") == 0, "aitbase_schedule_list sends schedule.list");
+    if (req) {
+        device_send(dev, "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"entries\":[{\"id\":\"wake\",\"due_epoch\":1900000000,\"rings\":true,\"label\":\"Wake\"}]}}",
+                    num(req, "id"));
+    }
+    cJSON_Delete(req);
+    expect_update(dev, "list [{\"id\":\"wake\",\"due_epoch\":1900000000,\"rings\":true,\"label\":\"Wake\"}]");
 
     /* aitbase_face_set: the plugin's idle face values (since 0.10). */
     device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"face\",\"action\":\"x\",\"detail\":\"\"}}");
