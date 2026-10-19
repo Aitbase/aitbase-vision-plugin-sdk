@@ -57,6 +57,12 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
                 aitbase_ui_template(p, &tpl, 45000);
                 break;
             }
+            if (strcmp(ev->node, "http") == 0) {
+                unsigned char frame[AITBASE_LIMIT_HTTP_STREAM_FRAME_MAX];
+                snprintf(text, sizeof(text), "http-read %d", aitbase_http_stream_read(p, frame, sizeof(frame), 2000));
+                say(p, text);
+                break;
+            }
             if (strcmp(ev->node, "stream") == 0) {
                 static const int16_t pcm[4] = {1, -2, 3, -4};
                 snprintf(text, sizeof(text), "stream-write %d", aitbase_audio_stream_write(p, pcm, 4));
@@ -422,6 +428,54 @@ int main(void) {
                    "the frame has its 4-byte little-endian length and the samples");
             close(av[0]);
         }
+        device_send(sv[0], "{\"cap\":\"ui\",\"event\":\"preempted\",\"data\":{}}");
+        req = next_request(sv[0], 2000);
+        cJSON_Delete(req);
+        waitpid(child, &status, 0);
+        close(sv[0]);
+    }
+
+    /* D29: with the HTTP stream channel on fd 5, a frame is read whole; without it, reads are
+     * unsupported. */
+    for (int with_http = 0; with_http < 2; ++with_http) {
+        int hv[2] = {-1, -1};
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) return 2;
+        if (with_http && socketpair(AF_UNIX, SOCK_STREAM, 0, hv) != 0) return 2;
+        child = fork();
+        if (child == 0) {
+            close(sv[0]);
+            if (hv[0] >= 0) close(hv[0]);
+            const int channel = fcntl(sv[1], F_DUPFD, 6);
+            if (with_http) dup2(hv[1], 5);
+            else close(5);
+            char fd_text[16];
+            snprintf(fd_text, sizeof(fd_text), "%d", channel);
+            unsetenv("AITBASE_PLUGIN_ENDPOINT");
+            setenv("AITBASE_PLUGIN_FD", fd_text, 1);
+            setenv("AITBASE_PLUGIN_UI_DIR", dir, 1);
+            char *args[] = {"plugin", NULL};
+            _exit(aitbase_plugin_run(1, args));
+        }
+        close(sv[1]);
+        if (hv[1] >= 0) close(hv[1]);
+        g_used = 0;
+        req = next_request(sv[0], 2000);
+        if (req) device_send(sv[0], "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"protocol\":1}}", num(req, "id"));
+        cJSON_Delete(req);
+        req = next_request(sv[0], 2000);
+        if (req) reply_ok(sv[0], req);
+        cJSON_Delete(req);
+        device_send(sv[0], "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"http\",\"action\":\"x\"}}");
+        if (with_http) {
+            const unsigned char frame[] = {4, 0, 0, 0, 'a', 'b', 'c', 'd'};
+            EXPECT(send(hv[0], frame, sizeof(frame), MSG_NOSIGNAL) == (ssize_t)sizeof(frame), "the test sends one frame");
+        }
+        req = next_request(sv[0], 2000);
+        const char *want = with_http ? "http-read 4" : "http-read -8";
+        EXPECT(req && strcmp(str(cJSON_GetObjectItem(req, "args"), "value"), want) == 0,
+               with_http ? "a supervised plugin with fd 5 reads a whole frame" : "without fd 5, reads are AITBASE_ERR_UNSUPPORTED");
+        cJSON_Delete(req);
+        if (with_http) close(hv[0]);
         device_send(sv[0], "{\"cap\":\"ui\",\"event\":\"preempted\",\"data\":{}}");
         req = next_request(sv[0], 2000);
         cJSON_Delete(req);
