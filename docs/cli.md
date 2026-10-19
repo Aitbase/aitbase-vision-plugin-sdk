@@ -188,6 +188,8 @@ Exit codes:
 
 ## Diagnostic codes
 
+Retired in SDK 0.11, when devices stopped needing `requested_capabilities`: `CAPABILITY_UNAVAILABLE`, `CAPABILITY_FIRMWARE_ONLY`, `CAPABILITY_UNKNOWN`, `CAPABILITY_UI_MISSING`, `CAPABILITY_AUDIO_MISSING` and `TOOLS_GRANT_MISSING`. Codes are never reused.
+
 Codes are stable: a code keeps its meaning once released. `path` is relative to the project. `plugin.json#field` points at a manifest field.
 
 | Code | Meaning |
@@ -203,17 +205,12 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `ENTRY_FORMAT` | `entry` is not a valid build target name. |
 | `SCREEN_NAME` | A screen name is invalid or listed twice. |
 | `SCREEN_MISSING` | A listed screen has no `ui/screens/<name>.xml`. |
-| `CAPABILITY_UNAVAILABLE` | The capability is planned but no device supports it yet. |
-| `CAPABILITY_FIRMWARE_ONLY` | The capability exists on the device but only plugins that ship in its firmware may hold it (`schedule`, `settings`, `status`). |
-| `CAPABILITY_UNKNOWN` | The capability does not exist. |
-| `CAPABILITY_UI_MISSING` | The plugin has screens but does not request `ui`. |
-| `CAPABILITY_AUDIO_MISSING` | The plugin lists sounds but does not request `audio.output`. |
+| `CAPABILITIES_IGNORED` | Warning: `plugin.json` has `requested_capabilities`, which devices no longer need (SDK 0.11, device decision D32). Remove it. |
 | `TRIGGER_FORMAT` | `triggers` is not a list of at most 4. |
 | `TRIGGER_UNKNOWN` | A trigger's `event` is not one devices support (`schedule`). |
 | `TRIGGER_SCHEDULE` | A schedule needs `every_min`, a whole number from 15 to 1440, and only one schedule is allowed. |
 | `IDLE_FACE_SCREEN` | `idle_face` doesn't name one of `ui.screens`. |
 | `TOOLS_FORMAT` | `assistant_tools` isn't a list of at most 4 tools, or a tool has fields other than `name`, `description` and `args`. |
-| `TOOLS_GRANT_MISSING` | The plugin declares `assistant_tools` but doesn't request `assistant.tools`. |
 | `TOOL_NAME` | A tool's name isn't lowercase letters, digits and `_` starting with a letter (at most 24), or is declared twice. |
 | `TOOL_DESCRIPTION` | A tool has no description, or it isn't one line of at most 120 bytes without control or invisible characters. |
 | `TOOL_ARG` | A tool has more than 4 arguments, or an argument isn't a `string` (`max` 1 to 120), an `int` (`min` and `max`) or an `enum` (1 to 8 values). |

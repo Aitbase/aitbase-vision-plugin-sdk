@@ -20,8 +20,9 @@
  * AITBASE_EVENT_SOUND_DONE carrying the same id in event->request, and failures as
  * AITBASE_EVENT_ERROR with that id too.
  *
- * Storage, HTTP and sound need the capability in plugin.json's requested_capabilities ("storage",
- * "http", "audio.output"); without it the request fails with detail "no_grant". The device's
+ * Every plugin may use every capability: there is nothing to request in plugin.json (since SDK
+ * 0.11; devices before 2026-10-20 still need requested_capabilities). What the device enforces is
+ * in each call's rules, for example sound only while the plugin's screen shows. The device's
  * limits and every error code are in docs/capabilities.md and aitbase_capabilities.h.
  *
  * Minimal plugin:
@@ -204,16 +205,16 @@ int aitbase_storage_keys(aitbase_plugin_t *plugin);
 
 /* Entries the device keeps and rings itself, on its own alarm screen titled "<plugin name>:
  * <label>", with its built-in alarm sound, whether or not the plugin runs (device decisions D23,
- * D26). The owner must turn on "Allow alarms" for the plugin on the Device Console first; until
- * then set fails with detail "not_allowed", and turning it off cancels the entries. At most 4
- * entries, at least 5 minutes apart ("too_many", "too_close"); a ring stops after 60 s. Ids: 1 to
+ * D26). Any plugin may set them (since SDK 0.11; older devices asked the owner to "Allow alarms"
+ * first). At most 4 entries, at least 5 minutes apart ("too_many", "too_close"); a ring stops after
+ * 60 s, and the next alarm shows on the device's home screen. Ids: 1 to
  * 14 of a-z, 0-9 and '_'. Labels: one line of at most 48 bytes, no control or invisible
  * characters. due_epoch: Unix seconds, at most 366 days ahead.
  *
- * When an entry is due while the plugin runs, it receives AITBASE_EVENT_DEVICE with op
- * "schedule.due" and text {"id":"<id>"}; it may then call aitbase_schedule_ring, or let the device
- * ring it 2 s later. A silent entry (rings = 0) only delivers schedule.due, and only if the plugin
- * runs then. */
+ * When a ringing entry is due, the device rings it at once, once; an entry whose time passed while
+ * the device was off never rings. If the plugin runs then, it receives AITBASE_EVENT_DEVICE with op
+ * "schedule.due" and text {"id":"<id>"} afterwards. A silent entry (rings = 0) only delivers
+ * schedule.due, and only if the plugin runs then. */
 
 /* Adds or moves the entry. Silent on success. */
 int aitbase_schedule_set(aitbase_plugin_t *plugin, const char *id, int64_t due_epoch, int rings, const char *label);
@@ -221,7 +222,7 @@ int aitbase_schedule_set(aitbase_plugin_t *plugin, const char *id, int64_t due_e
 int aitbase_schedule_cancel(aitbase_plugin_t *plugin, const char *id);
 /* RESULT: text = the plugin's entries as JSON: [{"id","due_epoch","rings","label"}, ...]. */
 int aitbase_schedule_list(aitbase_plugin_t *plugin);
-/* Rings the entry that just became due, now. Silent on success; "not_due" otherwise. */
+/* Does nothing: the device rings due entries itself (since SDK 0.11). Kept so 0.10 code builds. */
 int aitbase_schedule_ring(aitbase_plugin_t *plugin, const char *id);
 
 /* --- Idle face ("idle.face"): the plugin's face for the home screen (since SDK 0.10) ----------- */
@@ -379,11 +380,6 @@ void aitbase_plugin_stop(aitbase_plugin_t *plugin);
  *   ""         an older device, which doesn't say. */
 const char *aitbase_trigger(aitbase_plugin_t *plugin);
 
-/* 1 when the device granted capability (a plugin.json name such as "net" or "audio.stream") to this
- * run, 0 otherwise: not requested, refused (for example "net" on a target without its kernel gate,
- * D30), or an older device that doesn't say. Valid from aitbase_on_start. A feature module checks the
- * grants it can't be stopped from using, such as "net", before it acts on them. Since SDK 0.10. */
-int aitbase_granted(aitbase_plugin_t *plugin, const char *capability);
 /* Writes a line to the plugin log on the device. */
 void aitbase_log(aitbase_plugin_t *plugin, aitbase_log_level_t level, const char *fmt, ...)
 #if defined(__GNUC__)

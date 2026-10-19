@@ -29,7 +29,7 @@ func writeProject(t *testing.T, manifest, source string) string {
 }
 
 const goodManifest = `{"id":"alice.counter","name":"Counter","version":"1.0.0","api_version":1,
-"entry":"counter","ui":{"screens":["main"]},"requested_capabilities":["ui"]}`
+"entry":"counter","ui":{"screens":["main"]}}`
 const goodSource = `AITBASE_PLUGIN_ID("alice.counter");`
 
 func codes(r *Result) map[string]bool {
@@ -38,6 +38,15 @@ func codes(r *Result) map[string]bool {
 		m[d.Code] = true
 	}
 	return m
+}
+
+// D32: requested_capabilities is no longer needed; an old list is a warning, not an error.
+func TestRequestedCapabilitiesIgnored(t *testing.T) {
+	m := `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","settings","shell"]}`
+	r := Project(writeProject(t, m, goodSource), "", Options{SkipUI: true})
+	if r.HasErrors() || !codes(r)["CAPABILITIES_IGNORED"] {
+		t.Fatalf("want only the CAPABILITIES_IGNORED warning: %+v", r.Diagnostics)
+	}
 }
 
 func TestValidProject(t *testing.T) {
@@ -56,13 +65,8 @@ func TestManifestErrors(t *testing.T) {
 		{"reserved id", `{"id":"aitbase.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"]}`, `AITBASE_PLUGIN_ID("aitbase.counter");`, "ID_RESERVED"},
 		{"version", `{"id":"alice.counter","name":"C","version":"1.0","api_version":1,"entry":"c","requested_capabilities":["ui"]}`, goodSource, "VERSION_FORMAT"},
 		{"api", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":2,"entry":"c","requested_capabilities":["ui"]}`, goodSource, "API_VERSION_UNSUPPORTED"},
-		{"firmware only", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","settings"]}`, goodSource, "CAPABILITY_FIRMWARE_ONLY"},
-		{"planned capability", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","camera.capture"]}`, goodSource, "CAPABILITY_UNAVAILABLE"},
-		{"sounds without audio", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","sounds":["beep"],"requested_capabilities":["ui"]}`, goodSource, "CAPABILITY_AUDIO_MISSING"},
 		{"missing sound", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","sounds":["beep"],"requested_capabilities":["ui","audio.output"]}`, goodSource, "SOUND_MISSING"},
 		{"bad sound name", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","sounds":["../x"],"requested_capabilities":["ui","audio.output"]}`, goodSource, "SOUND_NAME"},
-		{"unknown capability", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","shell"]}`, goodSource, "CAPABILITY_UNKNOWN"},
-		{"no ui capability", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","ui":{"screens":["main"]},"requested_capabilities":[]}`, goodSource, "CAPABILITY_UI_MISSING"},
 		{"missing screen", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","ui":{"screens":["other"]},"requested_capabilities":["ui"]}`, goodSource, "SCREEN_MISSING"},
 		{"source id", goodManifest, `AITBASE_PLUGIN_ID("alice.other");`, "SOURCE_ID_MISMATCH"},
 		{"no source id", goodManifest, `int x;`, "SOURCE_ID_MISSING"},
@@ -77,7 +81,6 @@ func TestManifestErrors(t *testing.T) {
 		{"tools not a list", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":{}}`, goodSource, "TOOLS_FORMAT"},
 		{"too many tools", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x"},{"name":"b","description":"x"},{"name":"c","description":"x"},{"name":"d","description":"x"},{"name":"e","description":"x"}]}`, goodSource, "TOOLS_FORMAT"},
 		{"tool extra field", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x","shell":"ls"}]}`, goodSource, "TOOLS_FORMAT"},
-		{"tools without grant", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui"],"assistant_tools":[{"name":"a","description":"x"}]}`, goodSource, "TOOLS_GRANT_MISSING"},
 		{"tool name", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"Today","description":"x"}]}`, goodSource, "TOOL_NAME"},
 		{"tool twice", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"x"},{"name":"a","description":"y"}]}`, goodSource, "TOOL_NAME"},
 		{"tool description", `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","assistant.tools"],"assistant_tools":[{"name":"a","description":"two\nlines"}]}`, goodSource, "TOOL_DESCRIPTION"},
@@ -113,8 +116,7 @@ func TestScheduleTrigger(t *testing.T) {
 }
 
 func TestAssistantTools(t *testing.T) {
-	m := `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["assistant.tools"],
-"assistant_tools":[{"name":"today","description":"Today's weather for a city","args":{"city":{"type":"string","max":40},
+	m := `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","assistant_tools":[{"name":"today","description":"Today's weather for a city","args":{"city":{"type":"string","max":40},
 "days":{"type":"int","min":1,"max":7},"unit":{"type":"enum","values":["c","f"]}}},{"name":"now","description":"The time"}]}`
 	r := Project(writeProject(t, m, goodSource), "", Options{SkipUI: true})
 	if len(r.Diagnostics) != 0 {
@@ -171,14 +173,6 @@ func TestCaseCollision(t *testing.T) {
 	}
 	if r := Project(dir, "", Options{SkipUI: true}); !codes(r)["PATH_CASE_COLLISION"] {
 		t.Fatalf("want PATH_CASE_COLLISION, got %+v", r.Diagnostics)
-	}
-}
-
-func TestBrokerCapabilitiesAreAvailable(t *testing.T) {
-	dir := writeProject(t, `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","storage","http","audio.output"]}`, goodSource)
-	r := Project(dir, "", Options{SkipUI: true})
-	for _, d := range r.Diagnostics {
-		t.Errorf("unexpected %s: %s", d.Code, d.Message)
 	}
 }
 

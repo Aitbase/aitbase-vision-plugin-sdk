@@ -15,7 +15,7 @@
 #define AITBASE_DEVICE_LIMIT (-7) /* A rate, size or storage limit was reached. */
 #define AITBASE_DEVICE_FAILED (-8) /* The device tried and failed: network error, timeout, TLS error. */
 
-/* Capabilities a plugin can request in plugin.json (requested_capabilities). */
+/* Capability names: groups of operations for rate limits and docs. Nothing to request (D32). */
 #define AITBASE_CAP_UI "ui"
 #define AITBASE_CAP_STORAGE "storage"
 #define AITBASE_CAP_HTTP "http"
