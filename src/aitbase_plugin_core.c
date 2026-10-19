@@ -300,23 +300,6 @@ int aitbase_audio_stream_open_background(aitbase_plugin_t *plugin, uint32_t rate
     return send_tracked(plugin, "audio", "stream_open", args, 1);
 }
 
-int aitbase_http_stream_open(aitbase_plugin_t *plugin, const char *url) {
-    if (!plugin || !url || !*url) return AITBASE_ERR_ARGUMENT;
-    cJSON *args = cJSON_CreateObject();
-    if (args) cJSON_AddStringToObject(args, "url", url);
-    return send_tracked(plugin, "http", "stream_open", args, 1);
-}
-
-int aitbase_http_stream_read(aitbase_plugin_t *plugin, void *buf, size_t cap, int timeout_ms) {
-    if (!plugin || !buf || cap < AITBASE_LIMIT_HTTP_STREAM_FRAME_MAX || timeout_ms < 0) return AITBASE_ERR_ARGUMENT;
-    return aitbase_transport_http_stream_read(buf, cap, timeout_ms);
-}
-
-int aitbase_http_stream_close(aitbase_plugin_t *plugin) {
-    if (!plugin) return AITBASE_ERR_ARGUMENT;
-    return send_tracked(plugin, "http", "stream_close", cJSON_CreateObject(), 1);
-}
-
 void aitbase_plugin_stop(aitbase_plugin_t *plugin) {
     if (plugin) plugin->stop = 1;
 }
@@ -359,7 +342,6 @@ static aitbase_event_kind_t kind_from_name(const char *name) {
         {"action", AITBASE_EVENT_ACTION},     {"update_rejected", AITBASE_EVENT_UPDATE_REJECTED},
         {"sound_done", AITBASE_EVENT_SOUND_DONE}, {"key", AITBASE_EVENT_KEY},
         {"stream_state", AITBASE_EVENT_STREAM_STATE},
-        {"stream_closed", AITBASE_EVENT_HTTP_STREAM_CLOSED},
     };
     for (size_t i = 0; i < sizeof(kinds) / sizeof(kinds[0]); ++i) {
         if (strcmp(name, kinds[i].name) == 0) return kinds[i].kind;
@@ -374,7 +356,7 @@ static const char *string_or_empty(const cJSON *obj, const char *name) {
 
 /* Capabilities whose events have their own kinds. Others arrive as AITBASE_EVENT_DEVICE. */
 static int typed_cap(const char *cap) {
-    return cap[0] == '\0' || strcmp(cap, "ui") == 0 || strcmp(cap, "audio") == 0 || strcmp(cap, "http") == 0;
+    return cap[0] == '\0' || strcmp(cap, "ui") == 0 || strcmp(cap, "audio") == 0;
 }
 
 static int valid_call_name(const char *name, size_t max) {
@@ -541,14 +523,6 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
                 copy_field(out.detail, sizeof(out.detail), data, "state");
                 copy_field(out.reason, sizeof(out.reason), data, "reason");
             }
-            if (out.kind == AITBASE_EVENT_HTTP_STREAM_CLOSED) {
-                /* Only the http capability's stream_closed is this kind. */
-                if (strcmp(string_or_empty(msg, "cap"), "http") == 0) {
-                    copy_field(out.reason, sizeof(out.reason), data, "reason");
-                } else {
-                    out.kind = AITBASE_EVENT_NONE;
-                }
-            }
             if (out.kind == AITBASE_EVENT_KEY) {
                 const char *key = string_or_empty(data, "key");
                 const char *gesture = string_or_empty(data, "gesture");
@@ -593,7 +567,6 @@ const char *aitbase_event_kind_name(aitbase_event_kind_t kind) {
         case AITBASE_EVENT_KEY: return "key";
         case AITBASE_EVENT_DEVICE: return "device";
         case AITBASE_EVENT_STREAM_STATE: return "stream_state";
-        case AITBASE_EVENT_HTTP_STREAM_CLOSED: return "http_stream_closed";
         default: return "none";
     }
 }
