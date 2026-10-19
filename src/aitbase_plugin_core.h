@@ -30,7 +30,7 @@ struct aitbase_plugin {
     uint32_t next_id;
     struct {
         uint32_t id;
-        char op[16];
+        char op[24];
         int tracked; /* the plugin holds the id: RESULT, SOUND_DONE and ERROR carry it */
     } pending[AITBASE_PENDING];
     /* Native transport only. */
@@ -58,6 +58,10 @@ int aitbase_transport_can_wait(void);
 /* Copies the compiled screen <screen>.ui.json into buf. Sets *len; returns a status. */
 int aitbase_transport_read_screen(aitbase_plugin_t *plugin, const char *screen, char *buf, size_t cap,
                                   size_t *len);
+
+/* Sends one audio stream frame of len bytes (D28): returns len when it is taken, 0 while the
+ * device's buffer is full, or a negative status. Never blocks. */
+int aitbase_transport_audio_write(aitbase_plugin_t *plugin, const void *pcm, size_t len);
 
 /* --- Provided by the core -------------------------------------------------------------------- */
 
