@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Docs:** `net` is granted to every firmware feature module, on every target (device decision D34). There is no kernel gate precondition any more.
+
 ## 0.11.0 — 2026-10-20
 
 An open plugin model (device decision D32): fewer rules for plugin authors. Needs device firmware with D32; older devices still need `requested_capabilities`.
