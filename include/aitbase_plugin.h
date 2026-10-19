@@ -191,6 +191,30 @@ int aitbase_storage_delete(aitbase_plugin_t *plugin, const char *key);
 /* RESULT: text = the keys, separated by newlines. */
 int aitbase_storage_keys(aitbase_plugin_t *plugin);
 
+/* --- Alarms ("schedule"): the device rings at set times (since SDK 0.10) ------------------------ */
+
+/* Entries the device keeps and rings itself, on its own alarm screen titled "<plugin name>:
+ * <label>", with its built-in alarm sound, whether or not the plugin runs (device decisions D23,
+ * D26). The owner must turn on "Allow alarms" for the plugin on the Device Console first; until
+ * then set fails with detail "not_allowed", and turning it off cancels the entries. At most 4
+ * entries, at least 5 minutes apart ("too_many", "too_close"); a ring stops after 60 s. Ids: 1 to
+ * 14 of a-z, 0-9 and '_'. Labels: one line of at most 48 bytes, no control or invisible
+ * characters. due_epoch: Unix seconds, at most 366 days ahead.
+ *
+ * When an entry is due while the plugin runs, it receives AITBASE_EVENT_DEVICE with op
+ * "schedule.due" and text {"id":"<id>"}; it may then call aitbase_schedule_ring, or let the device
+ * ring it 2 s later. A silent entry (rings = 0) only delivers schedule.due, and only if the plugin
+ * runs then. */
+
+/* Adds or moves the entry. Silent on success. */
+int aitbase_schedule_set(aitbase_plugin_t *plugin, const char *id, int64_t due_epoch, int rings, const char *label);
+/* RESULT: code 1 when the entry existed, 0 when not. */
+int aitbase_schedule_cancel(aitbase_plugin_t *plugin, const char *id);
+/* RESULT: text = the plugin's entries as JSON: [{"id","due_epoch","rings","label"}, ...]. */
+int aitbase_schedule_list(aitbase_plugin_t *plugin);
+/* Rings the entry that just became due, now. Silent on success; "not_due" otherwise. */
+int aitbase_schedule_ring(aitbase_plugin_t *plugin, const char *id);
+
 /* --- Idle face ("idle.face"): the plugin's face for the home screen (since SDK 0.10) ----------- */
 
 /* A plugin may offer one of its screens as the device's home screen face, in place of the clock:
