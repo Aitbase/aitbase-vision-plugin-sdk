@@ -36,6 +36,9 @@
 /* The device's audio channel (D28): open on this descriptor only for a plugin that holds
  * "audio.stream" under the supervisor. */
 #define AITBASE_AUDIO_FD ((int)AITBASE_LIMIT_AUDIO_STREAM_FD)
+/* The device's HTTP stream channel (D29): frames from ControlCenter, read only, for a feature module
+ * that holds http.stream. */
+#define AITBASE_HTTP_STREAM_FD ((int)AITBASE_LIMIT_HTTP_STREAM_FD)
 #define AITBASE_HELLO_TIMEOUT_MS 3000
 #define AITBASE_IDLE_POLL_MS 200
 
@@ -83,6 +86,49 @@ static int audio_flush(void) {
     }
     g_audio_sent = g_audio_len = 0;
     return 1;
+}
+
+/* The HTTP stream channel is blocking: a frame is read whole, after poll says data is waiting. */
+static int g_http_fd = -1;
+
+/* 1 when len bytes arrived, 0 when the channel ended or failed. */
+static int read_whole(int fd, unsigned char *buf, size_t len) {
+    while (len > 0) {
+        const ssize_t n = recv(fd, buf, len, 0);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) return 0;
+        buf += n;
+        len -= (size_t)n;
+    }
+    return 1;
+}
+
+int aitbase_transport_http_stream_read(void *buf, size_t cap, int timeout_ms) {
+    if (g_http_fd < 0) return AITBASE_ERR_UNSUPPORTED;
+    struct pollfd pfd = {g_http_fd, POLLIN, 0};
+    int ready;
+    do {
+        ready = poll(&pfd, 1, timeout_ms);
+    } while (ready < 0 && errno == EINTR);
+    if (ready < 0) return AITBASE_ERR_IO;
+    if (ready == 0) return 0;
+    unsigned char header[4];
+    if (!read_whole(g_http_fd, header, sizeof(header))) {
+        g_http_fd = -1;  /* ended: nothing more is read */
+        return AITBASE_ERR_IO;
+    }
+    const uint32_t len = (uint32_t)header[0] | (uint32_t)header[1] << 8 | (uint32_t)header[2] << 16 |
+                         (uint32_t)header[3] << 24;
+    if (len == 0 || len > AITBASE_LIMIT_HTTP_STREAM_FRAME_MAX) {
+        g_http_fd = -1;  /* a broken frame: the framing is lost */
+        return AITBASE_ERR_PROTOCOL;
+    }
+    if (len > cap) return AITBASE_ERR_ARGUMENT;
+    if (!read_whole(g_http_fd, (unsigned char *)buf, len)) {
+        g_http_fd = -1;
+        return AITBASE_ERR_IO;
+    }
+    return (int)len;
 }
 
 int aitbase_transport_audio_write(aitbase_plugin_t *plugin, const void *pcm, size_t len) {
@@ -255,6 +301,9 @@ int aitbase_plugin_run(int argc, char **argv) {
         if (inherited != AITBASE_AUDIO_FD && fstat(AITBASE_AUDIO_FD, &st) == 0 && S_ISSOCK(st.st_mode)) {
             g_audio_fd = AITBASE_AUDIO_FD;
             fcntl(g_audio_fd, F_SETFL, fcntl(g_audio_fd, F_GETFL) | O_NONBLOCK);
+        }
+        if (inherited != AITBASE_HTTP_STREAM_FD && fstat(AITBASE_HTTP_STREAM_FD, &st) == 0 && S_ISSOCK(st.st_mode)) {
+            g_http_fd = AITBASE_HTTP_STREAM_FD;
         }
     } else {
         const char *endpoint = getenv(AITBASE_ENDPOINT_ENV);

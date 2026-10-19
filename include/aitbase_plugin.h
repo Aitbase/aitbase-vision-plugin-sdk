@@ -80,6 +80,9 @@ typedef enum aitbase_event_kind {
                                           Since SDK 0.10 */
     AITBASE_EVENT_STREAM_STATE = 13,   /* the audio stream changed: detail is "paused", "resumed" or
                                           "stopped", and reason says why it stopped. Since SDK 0.10 */
+    AITBASE_EVENT_HTTP_STREAM_CLOSED = 14, /* the HTTP stream ended; reason says why: "finished",
+                                          "closed", "idle_timeout", "destination_blocked" or "failed".
+                                          Since SDK 0.10 */
 } aitbase_event_kind_t;
 
 /* The device's buttons, in AITBASE_EVENT_KEY. */
@@ -121,8 +124,9 @@ typedef struct aitbase_event {
     aitbase_key_t key;         /* KEY: which button */
     aitbase_gesture_t gesture; /* KEY: press or long press */
     /* Since SDK 0.10. */
-    char reason[17];   /* STREAM_STATE "stopped": "closed", "preempted", "replaced", "idle_timeout",
-                          "bad_stream" or "failed"; "" otherwise */
+    char reason[24];   /* STREAM_STATE "stopped": "closed", "preempted", "replaced", "idle_timeout",
+                          "bad_stream", "user" or "failed"; HTTP_STREAM_CLOSED: see above; "" otherwise.
+                          (Grew from 17 in SDK 0.11, before the 0.10 release.) */
 } aitbase_event_t;
 
 typedef enum aitbase_log_level {
@@ -291,6 +295,35 @@ int aitbase_audio_stream_write(aitbase_plugin_t *plugin, const int16_t *pcm, siz
 /* Plays out the samples already sent, then closes the stream: AITBASE_EVENT_STREAM_STATE
  * "stopped" with reason "closed". Returns a request id. */
 int aitbase_audio_stream_close(aitbase_plugin_t *plugin);
+
+/* --- Background audio and HTTP streams (D29, D30). Feature modules only: firmware packages that
+ * request audio.background or http.stream, native, with the device's module host. Since SDK 0.10. */
+
+/* Opens the stream as a background stream, which keeps playing after the screen closes. The device
+ * shows it on its own screen, titled "<plugin name>: <title>" (title NULL or "" for the name alone;
+ * at most 48 characters). Refusals are AITBASE_EVENT_ERROR with the request id: "module_only" (not a
+ * feature module, or no audio.background), "speaker_busy", "bad_rate" or "no_channel". Otherwise as
+ * aitbase_audio_stream_open(). Returns a request id. */
+int aitbase_audio_stream_open_background(aitbase_plugin_t *plugin, uint32_t rate, const char *title);
+
+/* Starts an HTTP or HTTPS GET of url (feature modules with http.stream). The body arrives on the
+ * device's HTTP channel as frames, read with aitbase_http_stream_read(). Redirects are not
+ * followed; a non-2xx response ends the stream as "failed" with no body. One stream at a time:
+ * wait for AITBASE_EVENT_HTTP_STREAM_CLOSED before opening another. A refusal is AITBASE_EVENT_ERROR
+ * with the request id: "stream_limit", "no_channel", "destination_blocked" (not http or https) or
+ * "module_only". Returns a request id. */
+int aitbase_http_stream_open(aitbase_plugin_t *plugin, const char *url);
+
+/* Reads the next body frame into buf, waiting up to timeout_ms. cap must hold a whole frame
+ * (AITBASE_LIMIT_HTTP_STREAM_FRAME_MAX bytes), or the call is AITBASE_ERR_ARGUMENT. Returns the
+ * frame's byte count, 0 when no frame came in time, AITBASE_ERR_PROTOCOL for a malformed frame
+ * (the channel is then closed), AITBASE_ERR_IO once the channel has ended, or AITBASE_ERR_UNSUPPORTED
+ * in WASM and without the http.stream grant. */
+int aitbase_http_stream_read(aitbase_plugin_t *plugin, void *buf, size_t cap, int timeout_ms);
+
+/* Stops the stream now. It ends with AITBASE_EVENT_HTTP_STREAM_CLOSED, reason "closed". Returns a
+ * request id. */
+int aitbase_http_stream_close(aitbase_plugin_t *plugin);
 
 /* --- Plugin ------------------------------------------------------------------------------------ */
 

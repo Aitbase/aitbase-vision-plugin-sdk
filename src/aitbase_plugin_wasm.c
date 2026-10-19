@@ -74,6 +74,14 @@ int aitbase_transport_read_screen(aitbase_plugin_t *plugin, const char *screen, 
 }
 
 /* The runner frames it and finishes a partly sent frame itself (docs/wasm-abi.md). */
+/* WASM guests get no HTTP stream channel (feature modules are native). */
+int aitbase_transport_http_stream_read(void *buf, size_t cap, int timeout_ms) {
+    (void)buf;
+    (void)cap;
+    (void)timeout_ms;
+    return AITBASE_ERR_UNSUPPORTED;
+}
+
 int aitbase_transport_audio_write(aitbase_plugin_t *plugin, const void *pcm, size_t len) {
     (void)plugin;
     const int32_t rc = aitbase_host_audio_write(pcm, (uint32_t)len);
