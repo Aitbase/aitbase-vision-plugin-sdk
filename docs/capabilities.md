@@ -24,7 +24,7 @@ only, sizes and rate limits.
 | `idle.face` | community | 1/s, bursts of 5 | Fill in the plugin's idle face (D22), the home screen face the owner may choose on the Device Console. |
 | `audio.stream` | community | 5/s, bursts of 10 | Stream continuous audio to the speaker, such as a radio or a podcast, only while the plugin's screen is visible (D28). Alarms, calls and the voice assistant pause it. |
 | `audio.background` | module | 10/s, bursts of 20 | Keep an audio stream playing after the plugin's screen closes (D29). Firmware feature modules only; the owner stops it with LEFT long press. Firmware feature modules only. |
-| `net` | module | 1/s, bursts of 1 | Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, and only where the target's kernel gate is installed. Firmware feature modules only. |
+| `net` | module | 1/s, bursts of 1 | Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, on every target (D34). Firmware feature modules only. |
 | `assistant.tools` | community | 5/s, bursts of 10 | Answer the voice assistant through the tools the plugin declares in assistant_tools (D31). The assistant reads the reply, labelled as the plugin's output; the device may start the plugin without a screen to answer. |
 
 ## Operations
