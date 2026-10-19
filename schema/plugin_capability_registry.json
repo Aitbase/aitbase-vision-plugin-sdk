@@ -41,7 +41,8 @@
     {"code": "too_many", "status": "limit", "summary": "The plugin already holds the most scheduler entries it may: 8 for a firmware module, 4 for a community plugin."},
     {"code": "too_close", "status": "limit", "summary": "Another entry of this plugin is due within 5 minutes of this one (community plugins, D26)."},
     {"code": "not_allowed", "status": "denied", "summary": "The owner hasn't turned on \"Allow alarms\" for this plugin on the Device Console (D26)."},
-    {"code": "not_due", "status": "stale", "summary": "No entry of this plugin is due to ring now."}
+    {"code": "not_due", "status": "stale", "summary": "No entry of this plugin is due to ring now."},
+    {"code": "stream_limit", "status": "limit", "summary": "Another http stream is running, or this plugin's stream is already open (D29)."}
   ],
   "grants": [
     {
@@ -105,6 +106,20 @@
       "rate_per_s": 5,
       "burst": 10,
       "summary": "Stream continuous audio to the speaker, such as a radio or a podcast, only while the plugin's screen is visible (D28). Alarms, calls and the voice assistant pause it."
+    },
+    {
+      "name": "audio.background",
+      "class": "official",
+      "rate_per_s": 10,
+      "burst": 20,
+      "summary": "Keep an audio stream playing after the plugin's screen closes (D29). Firmware feature modules only; the owner stops it with LEFT long press."
+    },
+    {
+      "name": "http.stream",
+      "class": "official",
+      "rate_per_s": 1,
+      "burst": 10,
+      "summary": "Stream an HTTP(S) response body to the plugin in frames on its http channel (D29). Firmware feature modules only; one stream at a time."
     }
   ],
   "limits": {
@@ -127,6 +142,9 @@
     "audio_stream_queue_ms": 200,
     "audio_stream_idle_s": 10,
     "audio_stream_fd": 4,
+    "http_stream_fd": 5,
+    "http_stream_frame_max": 8192,
+    "http_stream_idle_s": 10,
     "schedule_entries_max": 8,
     "schedule_ahead_s_max": 31622400,
     "schedule_late_s_max": 300,
@@ -239,14 +257,27 @@
     },
     {
       "cap": "audio", "op": "stream_open", "grant": "audio.stream", "adapter": "audio",
-      "summary": "Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow.",
+      "summary": "Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow. background (D29, audio.background) keeps it playing after the screen closes; it needs no screen.",
       "args": {
-        "rate": {"type": "int", "min": 8000, "max": 48000}
+        "rate": {"type": "int", "min": 8000, "max": 48000},
+        "background": {"type": "bool", "optional": true}
       }
     },
     {
       "cap": "audio", "op": "stream_close", "grant": "audio.stream", "adapter": "audio",
       "summary": "Plays out the frames already sent, then closes the stream. A stream_state event with state stopped and reason closed follows.",
+      "args": {}
+    },
+    {
+      "cap": "http", "op": "stream_open", "grant": "http.stream", "adapter": "http",
+      "summary": "Opens a GET of an http or https URL and streams its body to the plugin's http channel in frames (D29): a 4-byte little-endian length, then at most http_stream_frame_max bytes. Redirects are not followed. A stream_closed event follows when it ends.",
+      "args": {
+        "url": {"type": "string", "max": 1024, "charset": "url"}
+      }
+    },
+    {
+      "cap": "http", "op": "stream_close", "grant": "http.stream", "adapter": "http",
+      "summary": "Stops the stream now. The stream_closed event follows with reason closed.",
       "args": {}
     },
     {
@@ -322,7 +353,8 @@
     {"cap": "ui", "event": "key", "summary": "A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press (a long press comes after a press of the same button). data.key is left or right, data.gesture is press or long_press. LEFT long press is never delivered: it leaves the plugin."},
     {"cap": "ui", "event": "update_rejected", "summary": "An update was refused when the device applied it. data.node and data.detail."},
     {"cap": "audio", "event": "sound_done", "summary": "The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed."},
-    {"cap": "audio", "event": "stream_state", "summary": "The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed)."},
+    {"cap": "audio", "event": "stream_state", "summary": "The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). user means LEFT long press ended a background stream (D29)."},
+    {"cap": "http", "event": "stream_closed", "summary": "The http stream ended (D29). data.reason is finished (the body ended), closed (the plugin asked, or closed its channel), idle_timeout (the plugin read no frame for 10 s), destination_blocked (a connection went to a non-public address) or failed (the network failed). A close takes effect between frames; a frame cut short ends the channel for the run."},
     {"cap": "schedule", "event": "due", "summary": "An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings."},
     {"cap": "module", "event": "action", "summary": "A declared action of the module's screen. data.action is snooze or stop."}
   ]
