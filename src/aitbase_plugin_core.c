@@ -105,6 +105,23 @@ int aitbase_ui_open(aitbase_plugin_t *plugin, const char *screen, uint32_t wait_
     return send_request(plugin, "ui", "open", args);
 }
 
+int aitbase_ui_template(aitbase_plugin_t *plugin, const aitbase_template_t *tpl, uint32_t wait_ms) {
+    if (!plugin || !tpl || !tpl->kind || !tpl->title) return AITBASE_ERR_ARGUMENT;
+    cJSON *args = cJSON_CreateObject();
+    if (!args) return AITBASE_ERR_NO_MEMORY;
+    cJSON_AddStringToObject(args, "template", tpl->kind);
+    cJSON_AddStringToObject(args, "title", tpl->title);
+    if (tpl->emoji) cJSON_AddStringToObject(args, "emoji", tpl->emoji);
+    if (tpl->icon) cJSON_AddStringToObject(args, "icon", tpl->icon);
+    for (int i = 0; i < 4 && tpl->items[i]; ++i) {
+        char name[8];
+        snprintf(name, sizeof(name), "item%d", i + 1);
+        cJSON_AddStringToObject(args, name, tpl->items[i]);
+    }
+    cJSON_AddNumberToObject(args, "wait_ms", wait_ms > AITBASE_UI_MAX_WAIT_MS ? AITBASE_UI_MAX_WAIT_MS : wait_ms);
+    return send_request(plugin, "ui", "template", args);
+}
+
 int aitbase_ui_update(aitbase_plugin_t *plugin, const char *node, const char *key,
                       const char *type, const char *value) {
     if (!plugin || !node || !key || !type || !value) return AITBASE_ERR_ARGUMENT;
