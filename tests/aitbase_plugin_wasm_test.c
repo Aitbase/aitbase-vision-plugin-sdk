@@ -25,9 +25,13 @@ static void say(aitbase_plugin_t *p, const char *text) {
 }
 
 static char g_trigger[16];
+static int g_call_rc = 1;
 
 int aitbase_on_start(aitbase_plugin_t *p) {
     snprintf(g_trigger, sizeof(g_trigger), "%s", aitbase_trigger(p));
+    aitbase_reply_t reply;
+    memset(&reply, 0, sizeof(reply));
+    g_call_rc = aitbase_call(p, "settings", "get", NULL, 10, &reply);
     return aitbase_ui_open(p, "demo", 99999) == AITBASE_OK ? 0 : 1;
 }
 
@@ -192,12 +196,14 @@ int main(void) {
     EXPECT(strcmp(str(cJSON_GetObjectItem(req, "args"), "plugin"), "test.plugin") == 0, "hello carries the plugin id");
     EXPECT(num(cJSON_GetObjectItem(req, "args"), "rx_max") == (int)AITBASE_LIMIT_RX_MAX, "hello declares the receive buffer");
     EXPECT(g_sent_count == 1, "nothing before the handshake reply");
+    EXPECT(g_call_rc == 1, "aitbase_call is not tried before the handshake");
     snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"protocol\":1,\"trigger\":\"schedule\"}}", num(req, "id"));
     cJSON_Delete(req);
 
     /* The reply runs aitbase_on_start, which opens the screen read through package_read. */
     EXPECT(deliver(line) == 0, "hello reply continues");
     EXPECT(strcmp(g_trigger, "schedule") == 0, "aitbase_trigger() tells on_start why the device started the plugin");
+    EXPECT(g_call_rc == AITBASE_ERR_UNSUPPORTED, "aitbase_call is native only: WASM gets AITBASE_ERR_UNSUPPORTED and sends nothing");
     req = take(&next);
     EXPECT(req && strcmp(str(req, "op"), "open") == 0, "open after the handshake");
     EXPECT(strcmp(str(cJSON_GetObjectItem(cJSON_GetObjectItem(req, "args"), "document"), "format"), "aitbase.plugin-ui") == 0,

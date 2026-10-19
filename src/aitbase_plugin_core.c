@@ -253,6 +253,60 @@ static const char *string_or_empty(const cJSON *obj, const char *name) {
     return cJSON_IsString(item) ? item->valuestring : "";
 }
 
+/* Capabilities whose events have their own kinds. Others arrive as AITBASE_EVENT_DEVICE. */
+static int typed_cap(const char *cap) {
+    return cap[0] == '\0' || strcmp(cap, "ui") == 0 || strcmp(cap, "audio") == 0;
+}
+
+static int valid_call_name(const char *name, size_t max) {
+    if (!name || !*name || strlen(name) > max) return 0;
+    for (const char *c = name; *c; ++c) {
+        if (!((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '_' || *c == '.')) return 0;
+    }
+    return 1;
+}
+
+int aitbase_call(aitbase_plugin_t *plugin, const char *cap, const char *op, const char *args_json,
+                 uint32_t timeout_ms, aitbase_reply_t *reply) {
+    if (!aitbase_transport_can_wait()) return AITBASE_ERR_UNSUPPORTED;
+    if (!plugin || !reply || !valid_call_name(cap, 15) || !valid_call_name(op, 15) || !plugin->ready) {
+        return AITBASE_ERR_ARGUMENT;
+    }
+    cJSON *args = args_json ? cJSON_Parse(args_json) : cJSON_CreateObject();
+    if (!cJSON_IsObject(args)) {
+        cJSON_Delete(args);
+        return args_json ? AITBASE_ERR_ARGUMENT : AITBASE_ERR_NO_MEMORY;
+    }
+    reply->status = 0;
+    reply->error[0] = '\0';
+    reply->result_len = 0;
+    if (reply->result && reply->result_cap) reply->result[0] = '\0';
+    const int id = send_tracked(plugin, cap, op, args, 0);
+    if (id < 0) return id;
+    cJSON *msg = NULL;
+    const int rc = aitbase_transport_take_reply(plugin, (uint32_t)id, timeout_ms, &msg);
+    if (rc != AITBASE_OK) return rc;
+    /* Answered here: the core never sees this reply. */
+    plugin->pending[(uint32_t)id % AITBASE_PENDING].id = 0;
+    const cJSON *status = cJSON_GetObjectItemCaseSensitive(msg, "status");
+    reply->status = cJSON_IsNumber(status) ? status->valueint : AITBASE_ERR_PROTOCOL;
+    copy_field(reply->error, sizeof(reply->error), msg, "error");
+    int out = AITBASE_OK;
+    const cJSON *result = cJSON_GetObjectItemCaseSensitive(msg, "result");
+    char *text = cJSON_IsObject(result) ? cJSON_PrintUnformatted(result) : NULL;
+    if (text) {
+        reply->result_len = strlen(text);
+        if (reply->result && reply->result_cap > reply->result_len) {
+            memcpy(reply->result, text, reply->result_len + 1);
+        } else if (reply->result) {
+            out = AITBASE_ERR_NO_MEMORY;
+        }
+        cJSON_free(text);
+    }
+    cJSON_Delete(msg);
+    return out;
+}
+
 /* Fills a RESULT from a successful tracked reply. *keys receives an allocated newline-separated
  * list for storage.keys; the caller frees it after dispatch. */
 static void fill_result(const cJSON *result, const char *op, aitbase_event_t *out, char **keys) {
@@ -309,6 +363,7 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
     const int was_ready = plugin->ready;
     aitbase_event_t out;
     char *keys = NULL;
+    char *device_data = NULL;
     int rc = AITBASE_OK;
     memset(&out, 0, sizeof(out));
     const cJSON *id = cJSON_GetObjectItemCaseSensitive(msg, "id");
@@ -339,6 +394,14 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
             snprintf(out.op, sizeof(out.op), "%s", op);
             fill_result(cJSON_GetObjectItemCaseSensitive(msg, "result"), op, &out, &keys);
         }
+    } else if (cJSON_IsString(event) && !typed_cap(string_or_empty(msg, "cap"))) {
+        /* A capability this SDK has no event kinds for: hand it over as JSON (since 0.10). */
+        const cJSON *data = cJSON_GetObjectItemCaseSensitive(msg, "data");
+        out.kind = AITBASE_EVENT_DEVICE;
+        snprintf(out.op, sizeof(out.op), "%s.%s", string_or_empty(msg, "cap"), event->valuestring);
+        device_data = cJSON_IsObject(data) ? cJSON_PrintUnformatted(data) : NULL;
+        out.text = device_data ? device_data : "{}";
+        out.text_len = strlen(out.text);
     } else if (cJSON_IsString(event)) {
         const cJSON *data = cJSON_GetObjectItemCaseSensitive(msg, "data");
         out.kind = kind_from_name(event->valuestring);
@@ -363,6 +426,7 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
     /* Strings in the event point into msg, which lives until the callback returns. */
     if (rc == AITBASE_OK && out.kind != AITBASE_EVENT_NONE && was_ready) aitbase_core_dispatch(plugin, &out);
     free(keys);
+    cJSON_free(device_data);
     cJSON_Delete(msg);
     if (rc != AITBASE_OK) return rc;
     if (!was_ready && plugin->ready && aitbase_on_start(plugin) != 0) plugin->stop = 1;

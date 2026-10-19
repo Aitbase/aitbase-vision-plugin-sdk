@@ -34,7 +34,7 @@ int aitbase_on_start(aitbase_plugin_t *p) {
 }
 
 void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
-    char text[96];
+    char text[256];
     switch (ev->kind) {
         case AITBASE_EVENT_OPENED:
             say(p, "opened");
@@ -46,7 +46,24 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             if (g_ticks == 2) aitbase_timer_set(p, 0);
             break;
         case AITBASE_EVENT_ACTION:
+            if (strcmp(ev->node, "call") == 0 || strcmp(ev->node, "call_timeout") == 0) {
+                /* A synchronous call (since 0.10): the result comes back here, before any event. */
+                char result[128];
+                aitbase_reply_t reply;
+                memset(&reply, 0, sizeof(reply));
+                reply.result = result;
+                reply.result_cap = sizeof(result);
+                const uint32_t timeout = strcmp(ev->node, "call") == 0 ? 2000 : 50;
+                const int rc = aitbase_call(p, "settings", "get", NULL, timeout, &reply);
+                snprintf(text, sizeof(text), "call %d %d %s", rc, reply.status, rc == AITBASE_OK ? result : "-");
+                say(p, text);
+                break;
+            }
             snprintf(text, sizeof(text), "action %s %s", ev->node, ev->action);
+            say(p, text);
+            break;
+        case AITBASE_EVENT_DEVICE:
+            snprintf(text, sizeof(text), "device %s %s", ev->op, ev->text);
             say(p, text);
             break;
         case AITBASE_EVENT_ERROR:
@@ -200,6 +217,28 @@ int main(void) {
 
     device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"increment\",\"action\":\"plugin.increment\",\"detail\":\"\"}}");
     expect_update(dev, "action increment plugin.increment");
+
+    /* aitbase_call: the plugin waits for its reply; an event that arrives first is delivered after
+     * the call returns, as AITBASE_EVENT_DEVICE for a capability without typed events. */
+    device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"call\",\"action\":\"x\",\"detail\":\"\"}}");
+    req = next_request(dev, 2000);
+    EXPECT(req && strcmp(str(req, "cap"), "settings") == 0 && strcmp(str(req, "op"), "get") == 0, "aitbase_call sends its request");
+    device_send(dev, "{\"cap\":\"schedule\",\"event\":\"due\",\"data\":{\"id\":\"wake\"}}");
+    if (req) device_send(dev, "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"found\":true}}", num(req, "id"));
+    cJSON_Delete(req);
+    expect_update(dev, "call 0 0 {\"found\":true}");
+    expect_update(dev, "device schedule.due {\"id\":\"wake\"}");
+
+    /* No reply in time: AITBASE_ERR_TIMEOUT; the late reply is ignored. */
+    device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"call_timeout\",\"action\":\"x\",\"detail\":\"\"}}");
+    req = next_request(dev, 2000);
+    EXPECT(req && strcmp(str(req, "cap"), "settings") == 0, "a second call");
+    expect_update(dev, "call -7 0 -");
+    if (req) device_send(dev, "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{}}", num(req, "id"));
+    cJSON_Delete(req);
+    /* A device event of a known capability keeps its own kind: a module action is not a UI action. */
+    device_send(dev, "{\"cap\":\"module\",\"event\":\"action\",\"data\":{\"action\":\"snooze\"}}");
+    expect_update(dev, "device module.action {\"action\":\"snooze\"}");
 
     /* A failed reply becomes an ERROR event naming the request's op. */
     device_send(dev, "{\"id\":%d,\"status\":-1,\"error\":\"bad_request\",\"result\":{}}", last);

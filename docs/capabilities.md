@@ -17,6 +17,9 @@ grants a plugin everything it requests; owner approval of sensitive ones comes l
 | `storage` | standard | 20/s, bursts of 40 | Keep small text values across runs, in a store only this plugin can reach. Needs an SD card. |
 | `http` | sensitive | 1/s, bursts of 5 | Make HTTP and HTTPS requests to public internet hosts. Local network, loopback and reserved addresses are refused. |
 | `audio.output` | sensitive | 5/s, bursts of 10 | Play tones and the package's own sounds on the speaker, only while the plugin's screen is visible. |
+| `schedule` | sensitive | 1/s, bursts of 5 | Ring the device at set times, with the entry's label and a built-in sound; the device shows its own alarm screen. Firmware feature modules only for now (D23). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
+| `settings` | official | 10/s, bursts of 20 | Keep the module's settings on internal flash. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
+| `status` | official | 10/s, bursts of 20 | Publish the module's status for the device and other modules. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 
 ## Operations
 
@@ -109,9 +112,67 @@ Needs `audio.output`. Plays sounds/<sound>.wav from the package (16 kHz, mono, 1
 
 Needs `audio.output`. Stops the sound playing, if any.
 
+### `schedule.set`
+
+Needs `schedule`. Adds or replaces the plugin's entry with this id. A ringing entry makes the device ring at due_epoch with its label, even if the plugin isn't running then (D23).
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `id` | string | at most 14 bytes; charset `name` |
+| `due_epoch` | int | 1 to 2147483647 |
+| `rings` | bool |  |
+| `label` | string | at most 48 bytes; charset `label` |
+| `sound` | enum | `alarm`; optional |
+
+### `schedule.cancel`
+
+Needs `schedule`. Removes the plugin's entry with this id. The result has found.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `id` | string | at most 14 bytes; charset `name` |
+
+### `schedule.list`
+
+Needs `schedule`. The plugin's own entries: entries is a list of {id, due_epoch, rings, label}.
+
+### `schedule.ring`
+
+Needs `schedule`. Rings the entry that schedule.due just announced, with its label. Without it the device rings anyway after a short grace period (C14).
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `id` | string | at most 14 bytes; charset `name` |
+
+### `settings.get`
+
+Needs `settings`. The module's settings: found, and values, an object of string values.
+
+### `settings.set`
+
+Needs `settings`. Replaces the module's settings: at most 64 keys of [a-z0-9_] up to 32 bytes, string values up to 512 bytes.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `values` | object |  |
+
+### `settings.erase`
+
+Needs `settings`. Removes the module's settings.
+
+### `status.publish`
+
+Needs `status`. Publishes a status value under the module's own prefix: key is <module>.<name>.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `key` | string | at most 48 bytes; charset `key` |
+| `value` | string | at most 256 bytes; charset `text` |
+
 Charsets: `name` is `[a-z][a-z0-9_]*`; `key` is letters, digits, `.`, `_` and `-`; `text` is
 UTF-8 without control characters other than tab, newline and carriage return; `url` is printable
-ASCII without spaces.
+ASCII without spaces; `label` is one line of UTF-8 text without control, bidirectional-override
+or zero-width characters.
 
 ## Events
 
@@ -125,6 +186,8 @@ ASCII without spaces.
 | `ui` | `key` | A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press (a long press comes after a press of the same button). data.key is left or right, data.gesture is press or long_press. LEFT long press is never delivered: it leaves the plugin. |
 | `ui` | `update_rejected` | An update was refused when the device applied it. data.node and data.detail. |
 | `audio` | `sound_done` | The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed. |
+| `schedule` | `due` | An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings. |
+| `module` | `action` | A declared action of the module's screen. data.action is snooze or stop. |
 
 ## Status codes
 
@@ -164,6 +227,9 @@ ASCII without spaces.
 | `timeout` | -8 | The HTTP request didn't finish in time. |
 | `network_error` | -8 | DNS, connection or transfer failure. |
 | `tls_error` | -8 | The server's TLS certificate couldn't be verified. |
+| `module_only` | -5 | Only a firmware feature module (D25) may use this operation. |
+| `too_many` | -7 | The plugin already holds the most scheduler entries it may (8). |
+| `not_due` | -2 | No entry of this plugin is due to ring now. |
 
 ## Limits
 
@@ -184,3 +250,9 @@ ASCII without spaces.
 | `http_timeout_ms_max` | 15000 |
 | `audio_sound_bytes_max` | 327680 |
 | `audio_sample_rate` | 16000 |
+| `schedule_entries_max` | 8 |
+| `schedule_ahead_s_max` | 31622400 |
+| `schedule_late_s_max` | 300 |
+| `settings_keys_max` | 64 |
+| `settings_key_max` | 32 |
+| `settings_value_max` | 512 |
