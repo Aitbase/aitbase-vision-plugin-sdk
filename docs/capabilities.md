@@ -24,6 +24,7 @@ grants a plugin everything it requests; owner approval of sensitive ones comes l
 | `audio.stream` | sensitive | 5/s, bursts of 10 | Stream continuous audio to the speaker, such as a radio or a podcast, only while the plugin's screen is visible (D28). Alarms, calls and the voice assistant pause it. |
 | `audio.background` | official | 10/s, bursts of 20 | Keep an audio stream playing after the plugin's screen closes (D29). Firmware feature modules only; the owner stops it with LEFT long press. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `http.stream` | official | 1/s, bursts of 10 | Stream an HTTP(S) response body to the plugin in frames on its http channel (D29). Firmware feature modules only; one stream at a time. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
+| `net` | official | 1/s, bursts of 1 | Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, and only where the target's kernel gate is installed. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 
 ## Operations
 
