@@ -26,8 +26,10 @@ static void say(aitbase_plugin_t *p, const char *text) {
 
 static char g_trigger[16];
 static int g_call_rc = 1;
+static aitbase_plugin_t *g_p;
 
 int aitbase_on_start(aitbase_plugin_t *p) {
+    g_p = p;
     snprintf(g_trigger, sizeof(g_trigger), "%s", aitbase_trigger(p));
     aitbase_reply_t reply;
     memset(&reply, 0, sizeof(reply));
@@ -36,7 +38,7 @@ int aitbase_on_start(aitbase_plugin_t *p) {
 }
 
 void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
-    char text[96];
+    char text[160];
     switch (ev->kind) {
         case AITBASE_EVENT_OPENED:
             say(p, "opened");
@@ -75,6 +77,10 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             break;
         case AITBASE_EVENT_SOUND_DONE:
             snprintf(text, sizeof(text), "sound %u %s", (unsigned)ev->request, ev->detail);
+            say(p, text);
+            break;
+        case AITBASE_EVENT_STREAM_STATE:
+            snprintf(text, sizeof(text), "stream %s %s", ev->detail, ev->reason);
             say(p, text);
             break;
         case AITBASE_EVENT_PREEMPTED:
@@ -136,6 +142,18 @@ void aitbase_host_log(int32_t level, const char *text, uint32_t len) {
 int32_t aitbase_host_timer_set(uint32_t interval_ms) {
     g_timer_ms = interval_ms;
     return 0;
+}
+
+/* The audio channel (D28): the last frame and what the next call returns. */
+static unsigned char g_audio[8192];
+static uint32_t g_audio_len;
+static int32_t g_audio_result = 0; /* 0: take the frame */
+
+int32_t aitbase_host_audio_write(const void *pcm, uint32_t len) {
+    if (g_audio_result != 0) return g_audio_result;
+    memcpy(g_audio, pcm, len);
+    g_audio_len = len;
+    return (int32_t)len;
 }
 
 int32_t aitbase_host_package_read(const char *name, uint32_t name_len, char *buf, uint32_t cap) {
@@ -281,6 +299,44 @@ int main(void) {
     EXPECT(deliver(line) == 0, "broker error");
     expect_update(&next, "error http.request -5 no_grant");
     EXPECT(g_error_request == (uint32_t)g_ids[1], "errors carry the request id");
+
+    /* Audio streams (D28): open and close are requests; samples go through audio_write. */
+    {
+        const int16_t pcm[4] = {1, -2, 3, -4};
+        static int16_t big[AITBASE_AUDIO_STREAM_FRAME_SAMPLES + 1];
+        const int open_id = aitbase_audio_stream_open(g_p, 22050);
+        EXPECT(open_id > 0, "stream_open returns a request id");
+        req = take(&next);
+        EXPECT(req && strcmp(str(req, "cap"), "audio") == 0 && strcmp(str(req, "op"), "stream_open") == 0 &&
+               num(cJSON_GetObjectItem(req, "args"), "rate") == 22050, "audio.stream_open with the rate");
+        cJSON_Delete(req);
+        EXPECT(aitbase_audio_stream_write(g_p, pcm, 4) == 4 && g_audio_len == 8 && memcmp(g_audio, pcm, 8) == 0,
+               "samples go to audio_write as bytes");
+        g_audio_result = 0;
+        EXPECT(aitbase_audio_stream_write(g_p, pcm, 0) == AITBASE_ERR_ARGUMENT &&
+               aitbase_audio_stream_write(g_p, big, AITBASE_AUDIO_STREAM_FRAME_SAMPLES + 1) == AITBASE_ERR_ARGUMENT &&
+               aitbase_audio_stream_write(g_p, NULL, 4) == AITBASE_ERR_ARGUMENT,
+               "no samples, too many or none at all are refused before the host");
+        EXPECT(aitbase_audio_stream_write(g_p, big, AITBASE_AUDIO_STREAM_FRAME_SAMPLES) == (int)AITBASE_AUDIO_STREAM_FRAME_SAMPLES,
+               "a full frame is taken");
+        g_audio_result = -3;
+        EXPECT(aitbase_audio_stream_write(g_p, pcm, 4) == AITBASE_ERR_IO, "a closed channel is AITBASE_ERR_IO");
+        g_audio_result = -8;
+        EXPECT(aitbase_audio_stream_write(g_p, pcm, 4) == AITBASE_ERR_UNSUPPORTED, "no grant is AITBASE_ERR_UNSUPPORTED");
+        g_audio_result = 0;
+        snprintf(line, sizeof(line), "{\"id\":%d,\"status\":-3,\"error\":\"speaker_busy\",\"result\":{}}", open_id);
+        EXPECT(deliver(line) == 0, "stream_open refused");
+        expect_update(&next, "error audio.stream_open -3 speaker_busy");
+        EXPECT(deliver("{\"cap\":\"audio\",\"event\":\"stream_state\",\"data\":{\"state\":\"paused\"}}") == 0, "paused");
+        expect_update(&next, "stream paused ");
+        EXPECT(deliver("{\"cap\":\"audio\",\"event\":\"stream_state\",\"data\":{\"state\":\"stopped\",\"reason\":\"idle_timeout\"}}") == 0,
+               "stopped");
+        expect_update(&next, "stream stopped idle_timeout");
+        EXPECT(aitbase_audio_stream_close(g_p) > 0, "stream_close returns a request id");
+        req = take(&next);
+        EXPECT(req && strcmp(str(req, "op"), "stream_close") == 0, "audio.stream_close");
+        cJSON_Delete(req);
+    }
 
     EXPECT(deliver("not json") == -1, "a malformed device message is a failure");
     EXPECT(aitbase_wasm_message(AITBASE_LIMIT_RX_MAX + 1) == -1, "a length past the receive buffer is a failure");

@@ -78,6 +78,8 @@ typedef enum aitbase_event_kind {
     AITBASE_EVENT_DEVICE = 12,         /* an event this SDK has no kind for: op is "<cap>.<event>",
                                           e.g. "schedule.due"; text is its data as a JSON object.
                                           Since SDK 0.10 */
+    AITBASE_EVENT_STREAM_STATE = 13,   /* the audio stream changed: detail is "paused", "resumed" or
+                                          "stopped", and reason says why it stopped. Since SDK 0.10 */
 } aitbase_event_kind_t;
 
 /* The device's buttons, in AITBASE_EVENT_KEY. */
@@ -100,8 +102,8 @@ typedef struct aitbase_event {
     aitbase_event_kind_t kind;
     char node[33];
     char action[33];
-    char op[16];       /* ERROR, RESULT: the request's operation: "open", "update", "close",
-                          "storage.get", "http.request", "audio.play"... */
+    char op[24];       /* ERROR, RESULT: the request's operation: "open", "update", "close",
+                          "storage.get", "http.request", "audio.play"... (24 bytes since SDK 0.10) */
     int status;        /* ERROR: a device status, AITBASE_DEVICE_* */
     char detail[65];   /* ERROR: a stable error code; SOUND_DONE: how the sound ended */
     /* Since SDK 0.5. */
@@ -118,6 +120,9 @@ typedef struct aitbase_event {
     /* Since SDK 0.8. */
     aitbase_key_t key;         /* KEY: which button */
     aitbase_gesture_t gesture; /* KEY: press or long press */
+    /* Since SDK 0.10. */
+    char reason[17];   /* STREAM_STATE "stopped": "closed", "preempted", "replaced", "idle_timeout",
+                          "bad_stream" or "failed"; "" otherwise */
 } aitbase_event_t;
 
 typedef enum aitbase_log_level {
@@ -260,6 +265,32 @@ int aitbase_audio_tone(aitbase_plugin_t *plugin, uint32_t freq_hz, uint32_t dura
  * plugin.json under "sounds". */
 int aitbase_audio_play(aitbase_plugin_t *plugin, const char *sound, uint32_t volume);
 int aitbase_audio_stop(aitbase_plugin_t *plugin);
+
+/* --- Audio stream ("audio.stream", D28): continuous sound while the plugin's screen is visible -- */
+
+/* Samples one aitbase_audio_stream_write() takes at most: AITBASE_LIMIT_AUDIO_STREAM_FRAME_MAX
+ * bytes of 16-bit samples. */
+#define AITBASE_AUDIO_STREAM_FRAME_SAMPLES (AITBASE_LIMIT_AUDIO_STREAM_FRAME_MAX / 2u)
+
+/* Opens the plugin's stream of 16-bit mono PCM at rate Hz: 8000, 11025, 12000, 16000, 22050,
+ * 24000, 32000, 44100 or 48000. Stops any sound playing; sounds are refused ("streaming") until
+ * the stream closes. Returns a request id. A refusal arrives as AITBASE_EVENT_ERROR with that id:
+ * "speaker_busy" (an alarm, a call or the voice assistant holds the speaker, or another plugin
+ * streams), "not_foreground", "bad_rate" or "no_channel". Afterwards the stream reports
+ * AITBASE_EVENT_STREAM_STATE: "paused" while the device's own audio plays (keep your samples;
+ * writes return 0 then), "resumed", and "stopped" with a reason. The stream stops when the device
+ * takes the screen back, and after 10 s without samples. At most 5 opens and closes a second. */
+int aitbase_audio_stream_open(aitbase_plugin_t *plugin, uint32_t rate);
+/* Sends up to AITBASE_AUDIO_STREAM_FRAME_SAMPLES samples. Never blocks: returns samples when the
+ * device took them, 0 while its buffer is full (send the same samples again later, for example on
+ * the next timer), or a negative status: AITBASE_ERR_ARGUMENT for none or too many,
+ * AITBASE_ERR_IO once the audio channel is closed (after a "bad_stream", it stays closed for the
+ * run), AITBASE_ERR_UNSUPPORTED when plugin.json doesn't request "audio.stream". Samples sent
+ * while no stream is open end the channel ("bad_stream"). */
+int aitbase_audio_stream_write(aitbase_plugin_t *plugin, const int16_t *pcm, size_t samples);
+/* Plays out the samples already sent, then closes the stream: AITBASE_EVENT_STREAM_STATE
+ * "stopped" with reason "closed". Returns a request id. */
+int aitbase_audio_stream_close(aitbase_plugin_t *plugin);
 
 /* --- Plugin ------------------------------------------------------------------------------------ */
 

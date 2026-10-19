@@ -3,6 +3,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <fcntl.h>
 #include <poll.h>
 #include <stdarg.h>
 #include <signal.h>
@@ -54,6 +55,12 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
                 tpl.items[0] = "Tea";
                 tpl.items[1] = "Coffee";
                 aitbase_ui_template(p, &tpl, 45000);
+                break;
+            }
+            if (strcmp(ev->node, "stream") == 0) {
+                static const int16_t pcm[4] = {1, -2, 3, -4};
+                snprintf(text, sizeof(text), "stream-write %d", aitbase_audio_stream_write(p, pcm, 4));
+                say(p, text);
                 break;
             }
             if (strcmp(ev->node, "alarm") == 0) {
@@ -369,6 +376,58 @@ int main(void) {
     waitpid(child, &status, 0);
     EXPECT(WIFEXITED(status) && WEXITSTATUS(status) == 0, "supervised plugin exits 0");
     close(sv[0]);
+
+    /* D28: with the audio channel on fd 4, samples go there as length-prefixed frames; without
+     * it, writes are unsupported. */
+    for (int with_audio = 0; with_audio < 2; ++with_audio) {
+        int av[2] = {-1, -1};
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) return 2;
+        if (with_audio && socketpair(AF_UNIX, SOCK_STREAM, 0, av) != 0) return 2;
+        child = fork();
+        if (child == 0) {
+            close(sv[0]);
+            if (av[0] >= 0) close(av[0]);
+            /* The channel above fd 4, and fd 4 the audio channel or nothing. */
+            const int channel = fcntl(sv[1], F_DUPFD, 5);
+            if (with_audio) dup2(av[1], 4);
+            else close(4);
+            char fd_text[16];
+            snprintf(fd_text, sizeof(fd_text), "%d", channel);
+            unsetenv("AITBASE_PLUGIN_ENDPOINT");
+            setenv("AITBASE_PLUGIN_FD", fd_text, 1);
+            setenv("AITBASE_PLUGIN_UI_DIR", dir, 1);
+            char *args[] = {"plugin", NULL};
+            _exit(aitbase_plugin_run(1, args));
+        }
+        close(sv[1]);
+        if (av[1] >= 0) close(av[1]);
+        g_used = 0;
+        req = next_request(sv[0], 2000);
+        if (req) device_send(sv[0], "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"protocol\":1}}", num(req, "id"));
+        cJSON_Delete(req);
+        req = next_request(sv[0], 2000);
+        if (req) reply_ok(sv[0], req);
+        cJSON_Delete(req);
+        device_send(sv[0], "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"stream\",\"action\":\"x\"}}");
+        req = next_request(sv[0], 2000);
+        const char *want = with_audio ? "stream-write 4" : "stream-write -8";
+        EXPECT(req && strcmp(str(cJSON_GetObjectItem(req, "args"), "value"), want) == 0,
+               with_audio ? "a supervised plugin with fd 4 writes samples" : "without fd 4, writes are AITBASE_ERR_UNSUPPORTED");
+        cJSON_Delete(req);
+        if (with_audio) {
+            unsigned char frame[16];
+            struct pollfd pfd = {av[0], POLLIN, 0};
+            EXPECT(poll(&pfd, 1, 2000) == 1 && recv(av[0], frame, sizeof(frame), 0) == 12 &&
+                   memcmp(frame, "\x08\x00\x00\x00", 4) == 0 && frame[4] == 1 && frame[6] == 0xfe,
+                   "the frame has its 4-byte little-endian length and the samples");
+            close(av[0]);
+        }
+        device_send(sv[0], "{\"cap\":\"ui\",\"event\":\"preempted\",\"data\":{}}");
+        req = next_request(sv[0], 2000);
+        cJSON_Delete(req);
+        waitpid(child, &status, 0);
+        close(sv[0]);
+    }
 
     /* A descriptor that isn't a socket is refused; the plugin doesn't fall back to the path. */
     child = fork();
