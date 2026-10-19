@@ -46,6 +46,16 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             if (g_ticks == 2) aitbase_timer_set(p, 0);
             break;
         case AITBASE_EVENT_ACTION:
+            if (strcmp(ev->node, "template") == 0) {
+                aitbase_template_t tpl;
+                memset(&tpl, 0, sizeof(tpl));
+                tpl.kind = "menu";
+                tpl.title = "Pick";
+                tpl.items[0] = "Tea";
+                tpl.items[1] = "Coffee";
+                aitbase_ui_template(p, &tpl, 45000);
+                break;
+            }
             if (strcmp(ev->node, "call") == 0 || strcmp(ev->node, "call_timeout") == 0) {
                 /* A synchronous call (since 0.10): the result comes back here, before any event. */
                 char result[128];
@@ -228,6 +238,20 @@ int main(void) {
     cJSON_Delete(req);
     expect_update(dev, "call 0 0 {\"found\":true}");
     expect_update(dev, "device schedule.due {\"id\":\"wake\"}");
+
+    /* aitbase_ui_template: the device's own layout with the plugin's text (since 0.10). */
+    device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"template\",\"action\":\"x\",\"detail\":\"\"}}");
+    req = next_request(dev, 2000);
+    {
+        const cJSON *targs = cJSON_GetObjectItem(req, "args");
+        EXPECT(req && strcmp(str(req, "cap"), "ui") == 0 && strcmp(str(req, "op"), "template") == 0 &&
+                   strcmp(str(targs, "template"), "menu") == 0 && strcmp(str(targs, "title"), "Pick") == 0 &&
+                   strcmp(str(targs, "item1"), "Tea") == 0 && strcmp(str(targs, "item2"), "Coffee") == 0 &&
+                   cJSON_GetObjectItem(targs, "item3") == NULL && num(targs, "wait_ms") == 30000,
+               "aitbase_ui_template sends ui.template with the items in order and the wait capped");
+    }
+    if (req) reply_ok(dev, req);
+    cJSON_Delete(req);
 
     /* No reply in time: AITBASE_ERR_TIMEOUT; the late reply is ignored. */
     device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"call_timeout\",\"action\":\"x\",\"detail\":\"\"}}");

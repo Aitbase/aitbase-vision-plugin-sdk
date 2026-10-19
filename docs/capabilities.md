@@ -48,6 +48,22 @@ Needs `ui`. Sets a bound value on the open screen.
 
 Needs `ui`. Closes the open screen.
 
+### `ui.template`
+
+Needs `ui`. Opens one of the device's screen templates with the plugin's text (D27): status (title, optional emoji, an OK button), alert (an icon, title, OK) or menu (title and 1 to 4 items). RIGHT on OK gives the action template.ok; RIGHT on item N gives template.itemN. Like open, it replaces the plugin's screen, waits like open with wait_ms, and is preempted by the device.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `template` | enum | `status`, `alert`, `menu` |
+| `title` | string | at most 48 bytes; charset `label` |
+| `emoji` | string | at most 8 bytes; charset `label`; optional |
+| `icon` | enum | `bell`, `info`, `warning`; optional |
+| `item1` | string | at most 24 bytes; charset `label`; optional |
+| `item2` | string | at most 24 bytes; charset `label`; optional |
+| `item3` | string | at most 24 bytes; charset `label`; optional |
+| `item4` | string | at most 24 bytes; charset `label`; optional |
+| `wait_ms` | int | 0 to 30000; optional |
+
 ### `storage.get`
 
 Needs `storage`. Reads a value. The result has found (true or false) and value.

@@ -158,6 +158,24 @@ int aitbase_ui_set_text(aitbase_plugin_t *plugin, const char *node, const char *
                         const char *text);
 int aitbase_ui_close(aitbase_plugin_t *plugin);
 
+/* One of the device's own screen layouts, filled with your text (since SDK 0.10; device decision
+ * D27). Use it instead of a compiled screen when the layout fits:
+ *   "status": title, optional emoji line, an OK button: RIGHT gives the action "template.ok";
+ *   "alert":  an icon ("bell", "info" or "warning"; NULL for bell), title, an OK button;
+ *   "menu":   title and 1 to 4 items, without gaps; LEFT moves between them, RIGHT on item N gives
+ *             the action "template.itemN".
+ * Text: one line each, no control or invisible characters; title at most 48 bytes, emoji 8,
+ * items 24. Like aitbase_ui_open it replaces your screen and waits up to wait_ms if the device is
+ * busy; OPENED, REJECTED and PREEMPTED follow as for any screen. Call it again to change the text. */
+typedef struct aitbase_template {
+    const char *kind;      /* "status", "alert" or "menu" */
+    const char *title;
+    const char *emoji;     /* status only; NULL for none */
+    const char *icon;      /* alert only; NULL for "bell" */
+    const char *items[4];  /* menu only; NULL ends the list */
+} aitbase_template_t;
+int aitbase_ui_template(aitbase_plugin_t *plugin, const aitbase_template_t *tpl, uint32_t wait_ms);
+
 /* --- Storage ("storage"): small text values kept across runs, private to this plugin ----------- */
 
 /* Keys: 1 to 64 letters, digits, '.', '_' or '-'. Values: up to 4096 bytes of UTF-8 text; tabs and
