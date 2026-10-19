@@ -364,6 +364,12 @@ void aitbase_plugin_stop(aitbase_plugin_t *plugin);
  *              screen is ended after 30 s;
  *   ""         an older device, which doesn't say. */
 const char *aitbase_trigger(aitbase_plugin_t *plugin);
+
+/* 1 when the device granted capability (a plugin.json name such as "net" or "audio.stream") to this
+ * run, 0 otherwise: not requested, refused (for example "net" on a target without its kernel gate,
+ * D30), or an older device that doesn't say. Valid from aitbase_on_start. A feature module checks the
+ * grants it can't be stopped from using, such as "net", before it acts on them. Since SDK 0.10. */
+int aitbase_granted(aitbase_plugin_t *plugin, const char *capability);
 /* Writes a line to the plugin log on the device. */
 void aitbase_log(aitbase_plugin_t *plugin, aitbase_log_level_t level, const char *fmt, ...)
 #if defined(__GNUC__)
