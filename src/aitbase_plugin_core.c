@@ -325,6 +325,20 @@ const char *aitbase_trigger(aitbase_plugin_t *plugin) {
     return plugin ? plugin->trigger : "";
 }
 
+int aitbase_granted(aitbase_plugin_t *plugin, const char *capability) {
+    if (!plugin || !capability || !*capability) return 0;
+    const size_t len = strlen(capability);
+    /* Whole names only: "http" isn't granted by "http.stream". */
+    for (const char *p = plugin->grants; *p;) {
+        while (*p == ',' || *p == ' ') ++p;
+        const char *end = p;
+        while (*end && *end != ',' && *end != ' ') ++end;
+        if ((size_t)(end - p) == len && strncmp(p, capability, len) == 0) return 1;
+        p = end;
+    }
+    return 0;
+}
+
 void aitbase_log(aitbase_plugin_t *plugin, aitbase_log_level_t level, const char *fmt, ...) {
     char line[256];
     va_list ap;
@@ -490,6 +504,7 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
             if (code == 0) {
                 plugin->ready = 1;
                 copy_field(plugin->trigger, sizeof(plugin->trigger), cJSON_GetObjectItemCaseSensitive(msg, "result"), "trigger");
+                copy_field(plugin->grants, sizeof(plugin->grants), cJSON_GetObjectItemCaseSensitive(msg, "result"), "grants");
             } else {
                 aitbase_log(plugin, AITBASE_LOG_ERROR, "device refused the plugin: %s", string_or_empty(msg, "error"));
                 rc = AITBASE_ERR_PROTOCOL;
