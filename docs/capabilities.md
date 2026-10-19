@@ -22,6 +22,8 @@ grants a plugin everything it requests; owner approval of sensitive ones comes l
 | `status` | official | 10/s, bursts of 20 | Publish the module's status for the device and other modules. Firmware feature modules only (D25). Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 | `idle.face` | standard | 1/s, bursts of 5 | Fill in the plugin's idle face (D22), the home screen face the owner may choose on the Device Console. |
 | `audio.stream` | sensitive | 5/s, bursts of 10 | Stream continuous audio to the speaker, such as a radio or a podcast, only while the plugin's screen is visible (D28). Alarms, calls and the voice assistant pause it. |
+| `audio.background` | official | 10/s, bursts of 20 | Keep an audio stream playing after the plugin's screen closes (D29). Firmware feature modules only; the owner stops it with LEFT long press. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
+| `http.stream` | official | 1/s, bursts of 10 | Stream an HTTP(S) response body to the plugin in frames on its http channel (D29). Firmware feature modules only; one stream at a time. Not available to community plugins: `check` reports `CAPABILITY_FIRMWARE_ONLY`. |
 
 ## Operations
 
@@ -132,15 +134,28 @@ Needs `audio.output`. Stops the sound playing, if any.
 
 ### `audio.stream_open`
 
-Needs `audio.stream`. Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow.
+Needs `audio.stream`. Opens the plugin's audio stream at rate Hz (D28): 16-bit mono PCM frames then go on the audio channel (aitbase_audio_stream_write). Stops any sound playing. stream_state events follow. background (D29, audio.background) keeps it playing after the screen closes; it needs no screen.
 
 | Argument | Type | Bounds |
 |---|---|---|
 | `rate` | int | 8000 to 48000 |
+| `background` | bool | optional |
 
 ### `audio.stream_close`
 
 Needs `audio.stream`. Plays out the frames already sent, then closes the stream. A stream_state event with state stopped and reason closed follows.
+
+### `http.stream_open`
+
+Needs `http.stream`. Opens a GET of an http or https URL and streams its body to the plugin's http channel in frames (D29): a 4-byte little-endian length, then at most http_stream_frame_max bytes. Redirects are not followed. A stream_closed event follows when it ends.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `url` | string | at most 1024 bytes; charset `url` |
+
+### `http.stream_close`
+
+Needs `http.stream`. Stops the stream now. The stream_closed event follows with reason closed.
 
 ### `schedule.set`
 
@@ -225,7 +240,8 @@ or zero-width characters.
 | `ui` | `key` | A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press (a long press comes after a press of the same button). data.key is left or right, data.gesture is press or long_press. LEFT long press is never delivered: it leaves the plugin. |
 | `ui` | `update_rejected` | An update was refused when the device applied it. data.node and data.detail. |
 | `audio` | `sound_done` | The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed. |
-| `audio` | `stream_state` | The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). |
+| `audio` | `stream_state` | The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). user means LEFT long press ended a background stream (D29). |
+| `http` | `stream_closed` | The http stream ended (D29). data.reason is finished (the body ended), closed (the plugin asked, or closed its channel), idle_timeout (the plugin read no frame for 10 s), destination_blocked (a connection went to a non-public address) or failed (the network failed). A close takes effect between frames; a frame cut short ends the channel for the run. |
 | `schedule` | `due` | An entry of this plugin is due. data.id names it; ring it with schedule.ring if it rings. |
 | `module` | `action` | A declared action of the module's screen. data.action is snooze or stop. |
 
@@ -276,6 +292,7 @@ or zero-width characters.
 | `too_close` | -7 | Another entry of this plugin is due within 5 minutes of this one (community plugins, D26). |
 | `not_allowed` | -5 | The owner hasn't turned on "Allow alarms" for this plugin on the Device Console (D26). |
 | `not_due` | -2 | No entry of this plugin is due to ring now. |
+| `stream_limit` | -7 | Another http stream is running, or this plugin's stream is already open (D29). |
 
 ## Limits
 
@@ -300,6 +317,9 @@ or zero-width characters.
 | `audio_stream_queue_ms` | 200 |
 | `audio_stream_idle_s` | 10 |
 | `audio_stream_fd` | 4 |
+| `http_stream_fd` | 5 |
+| `http_stream_frame_max` | 8192 |
+| `http_stream_idle_s` | 10 |
 | `schedule_entries_max` | 8 |
 | `schedule_ahead_s_max` | 31622400 |
 | `schedule_late_s_max` | 300 |
