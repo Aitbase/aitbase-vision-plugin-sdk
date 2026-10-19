@@ -121,7 +121,7 @@
       "class": "module",
       "rate_per_s": 1,
       "burst": 1,
-      "summary": "Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, and only where the target's kernel gate is installed."
+      "summary": "Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, on every target (D34)."
     },
     {
       "name": "assistant.tools",
