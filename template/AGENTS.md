@@ -19,7 +19,7 @@ Only what is listed here exists. Do not invent functions, widgets, colors, actio
 - **Capabilities:** a plugin may use all of these without listing them anywhere (there is no `requested_capabilities` since SDK 0.11):
   - screens (`aitbase_ui_*`);
   - storage: small text values kept across runs (needs an SD card in the device);
-  - HTTP(S) requests to public internet hosts, never local network addresses;
+  - HTTP(S) requests to internet hosts and to other hosts on the local network (a Home Assistant, a NAS), never to the device itself;
   - sound: tones and the package's own sounds (`sounds/<name>.wav`, listed under `"sounds"`), only while its screen is visible;
   - audio streams: continuous 16-bit mono PCM (a radio, white noise), only while its screen is visible; the device's alarms, calls and voice assistant pause it;
   - alarms the device rings with the plugin's name (at most 4, 5 minutes apart);
