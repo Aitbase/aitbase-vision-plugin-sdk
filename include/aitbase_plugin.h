@@ -198,6 +198,11 @@ int aitbase_ui_template(aitbase_plugin_t *plugin, const aitbase_template_t *tpl,
  * newlines are fine, other control characters are not. At most 128 keys and 64 KiB per plugin.
  * Needs an SD card in the device; without one requests fail with "no_storage". */
 
+/* Settings (since SDK 0.12, device decision D38): the values the owner fills in on the Device
+ * Console for the fields in plugin.json's "settings" are in storage as "settings.<key>", for
+ * example aitbase_storage_get(p, "settings.ha_token"). A running plugin gets AITBASE_EVENT_DEVICE
+ * with op "plugin.settings_changed" when the owner saves; read them again then. */
+
 /* RESULT: code 1 and text = the value, or code 0 when the key is missing. */
 int aitbase_storage_get(aitbase_plugin_t *plugin, const char *key);
 /* Silent on success. */

@@ -242,6 +242,7 @@ or zero-width characters.
 | `ui` | `changed` | The user changed an input widget (D36): data.node, and data.value: 0 or 1 for a checkbox or switch, the value of a slider, the option's index of a roller or dropdown. At most 10 a second per screen; between them the latest value per widget waits. Setting the widget's binding sends none. |
 | `audio` | `sound_done` | The sound started by data.request finished, was replaced or stopped. data.detail is finished, stopped or failed. |
 | `audio` | `stream_state` | The audio stream changed (D28). data.state is paused (an alarm, a call or the assistant took the speaker; frames wait), resumed, or stopped, with data.reason: closed, preempted (the screen closed), replaced (music or another stream started), idle_timeout (no frame for 10 s), bad_stream (a malformed frame, or a frame while no stream is open; the channel stays closed for this run) or failed (the speaker failed). user means LEFT long press ended a background stream (D29). |
+| `plugin` | `settings_changed` | The owner saved the plugin's settings on the Device Console (D38). Read them again from storage (settings.<key>). Only a running plugin gets it; the SDK delivers it as AITBASE_EVENT_DEVICE with op plugin.settings_changed. |
 | `schedule` | `due` | An entry of this plugin was due. data.id names it; if it rings, the device has already rung it. |
 | `tool` | `call` | The assistant calls one of the plugin's assistant_tools (D31): data.call (a number), data.tool and data.args, already checked against the manifest. Answer with tool.reply within assistant_tool_timeout_ms. |
 | `module` | `action` | A declared action of the module's screen (data.action snooze or stop), or a request from the core: the music module's play, with data.url and data.title, and stop (D29). |
@@ -338,3 +339,7 @@ or zero-width characters.
 | `assistant_tool_enum_values_max` | 8 |
 | `assistant_tool_timeout_ms` | 5000 |
 | `assistant_tool_reply_max` | 2048 |
+| `plugin_settings_max` | 8 |
+| `plugin_setting_key_max` | 32 |
+| `plugin_setting_label_max` | 48 |
+| `plugin_setting_value_max` | 1024 |
