@@ -36,6 +36,14 @@ More LVGL for plugin UI (device decision D36): display widgets, input widgets, s
 - `aitbase_http_request` may reach the local network on devices with D37: `10/8`, `172.16/12`, `192.168/16` and `fc00::/7`, `http://` included, for example a Home Assistant at `http://192.168.1.10:8123`.
 - The device's own addresses, loopback and link-local stay refused (`destination_blocked`). Older firmware refuses every local address.
 
+### Plugin settings
+
+- **New manifest field `settings`** (devices with D38): up to 8 fields (`key`, `label`, `type`: `text`, `url` or `secret`, and an optional `placeholder`). The Device Console shows them as a form.
+- **Reading values:** the values are in the plugin's storage on the SD card as `settings.<key>`; read them with `aitbase_storage_get`.
+- **Secrets** are write-only on the console. Saving one needs the owner's password.
+- **Change notice:** a running plugin gets `AITBASE_EVENT_DEVICE` with op `plugin.settings_changed` when the owner saves.
+- **`check`** reports `SETTINGS_FORMAT` and `SETTING_FIELD`.
+
 ### Upgrading from 0.11
 
 - **Existing plugins build and run unchanged.** No API was removed, `aitbase_event_t` keeps its layout, and screens that use only the 0.11 widgets keep working on every firmware.
