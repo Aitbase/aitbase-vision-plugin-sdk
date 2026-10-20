@@ -113,6 +113,22 @@
         }
       }
     },
+    "settings": {
+      "description": "Values the owner fills in on the Device Console (since SDK 0.12, device decision D38), such as a server address and a token. They are saved in the plugin's storage on the SD card: read them with aitbase_storage_get(p, \"settings.<key>\"). A secret is never shown again on the console. A running plugin gets AITBASE_EVENT_DEVICE with op \"plugin.settings_changed\" when the owner saves. An invalid block offers no settings; the plugin still runs.",
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "key": {"type": "string", "maxLength": 32, "pattern": "^[a-z][a-z0-9_]*$"},
+          "label": {"type": "string", "minLength": 1, "maxLength": 48},
+          "type": {"enum": ["text", "url", "secret"]},
+          "placeholder": {"type": "string", "maxLength": 48}
+        }
+      }
+    },
     "requested_capabilities": {
       "description": "Ignored since SDK 0.11 (device decision D32): every plugin may use every capability. Devices before 2026-10-20 still need it. check warns CAPABILITIES_IGNORED.",
       "type": "array",

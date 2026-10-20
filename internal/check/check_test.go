@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -121,6 +122,43 @@ func TestAssistantTools(t *testing.T) {
 	r := Project(writeProject(t, m, goodSource), "", Options{SkipUI: true})
 	if len(r.Diagnostics) != 0 {
 		t.Fatalf("a valid assistant_tools block: %+v", r.Diagnostics)
+	}
+}
+
+// D38: settings the owner fills in on the Device Console.
+func TestSettings(t *testing.T) {
+	head := `{"id":"alice.counter","name":"H","version":"1.0.0","api_version":1,"entry":"c","settings":`
+	good := head + `[{"key":"ha_url","label":"Address","type":"url","placeholder":"http://192.168.1.10:8123"},{"key":"ha_token","label":"Token","type":"secret"}]}`
+	if r := Project(writeProject(t, good, goodSource), "", Options{SkipUI: true}); len(r.Diagnostics) != 0 {
+		t.Fatalf("a valid settings block: %+v", r.Diagnostics)
+	}
+	nine := "["
+	for i := 0; i < 9; i++ {
+		if i > 0 {
+			nine += ","
+		}
+		nine += `{"key":"k` + strconv.Itoa(i) + `","label":"L","type":"text"}`
+	}
+	nine += "]"
+	cases := map[string]string{
+		`{}`: "SETTINGS_FORMAT",
+		nine: "SETTINGS_FORMAT",
+		`[{"key":"a","label":"L","type":"text","default":"x"}]`:                        "SETTINGS_FORMAT",
+		`[{"key":"Bad","label":"L","type":"text"}]`:                                    "SETTING_FIELD",
+		`[{"key":"a","label":"L","type":"text"},{"key":"a","label":"M","type":"url"}]`: "SETTING_FIELD",
+		`[{"key":"a","label":"","type":"text"}]`:                                       "SETTING_FIELD",
+		`[{"key":"a","label":"L","type":"password"}]`:                                  "SETTING_FIELD",
+		`[{"key":"a","label":"` + strings.Repeat("x", 49) + `","type":"text"}]`:        "SETTING_FIELD",
+	}
+	for block, want := range cases {
+		r := Project(writeProject(t, head+block+"}", goodSource), "", Options{SkipUI: true})
+		found := false
+		for _, d := range r.Diagnostics {
+			found = found || d.Code == want
+		}
+		if !found {
+			t.Errorf("%s: want %s, got %+v", block, want, r.Diagnostics)
+		}
 	}
 }
 

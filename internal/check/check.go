@@ -105,6 +105,9 @@ var registryLimits = struct {
 	ToolDescriptionMax int `json:"assistant_tool_description_max"`
 	ToolStringMax      int `json:"assistant_tool_string_max"`
 	ToolEnumValuesMax  int `json:"assistant_tool_enum_values_max"`
+	SettingsMax        int `json:"plugin_settings_max"`
+	SettingKeyMax      int `json:"plugin_setting_key_max"`
+	SettingLabelMax    int `json:"plugin_setting_label_max"`
 }{}
 
 // The registry's limits, read once.
@@ -128,7 +131,7 @@ var (
 	uiErrorPattern = regexp.MustCompile(`^(UI_[A-Z_]+) at (\S+): (.*)$`)
 	knownFields    = map[string]bool{"id": true, "name": true, "version": true, "api_version": true,
 		"description": true, "entry": true, "ui": true, "requested_capabilities": true, "sounds": true, "triggers": true,
-		"idle_face": true, "assistant_tools": true}
+		"idle_face": true, "assistant_tools": true, "settings": true}
 )
 
 // Project checks the plugin project rooted at dir. sdkDir is the SDK copy that holds the UI
@@ -277,6 +280,7 @@ func checkManifest(r *Result, dir string, opt Options) *Manifest {
 			"remove requested_capabilities from plugin.json")
 	}
 	checkAssistantTools(r, file, raw["assistant_tools"])
+	checkSettings(r, file, raw["settings"])
 	return &m
 }
 
