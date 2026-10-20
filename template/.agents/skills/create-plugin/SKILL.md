@@ -25,4 +25,4 @@ description: Turn a user's idea into a working AITBASE VISION plugin in this pro
 - Using an action other than `plugin.increment`. It is the only registered action in this version. Tell buttons apart with `event->node`, the button's `name`.
 - Blocking in a callback (`sleep`, loops waiting for something). Use `aitbase_timer_set` instead, and wait for results as events.
 - Using `event->text` after the callback returns. Copy it into your own buffer first.
-- Requesting a local address such as `http://192.168.1.10/`. The device refuses it (`destination_blocked`); only public internet hosts work.
+- Requesting the device itself (`http://127.0.0.1/`, its own LAN address). The device refuses it (`destination_blocked`). Internet hosts and other hosts on the local network, such as `http://192.168.1.10:8123/`, work on firmware with D37.

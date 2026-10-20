@@ -27,7 +27,7 @@
     {"code": "streaming", "status": "busy", "summary": "The plugin's audio stream is open; sounds wait until it closes."},
     {"code": "no_memory", "status": "no_memory", "summary": "The device ran out of memory."},
     {"code": "no_grant", "status": "denied", "summary": "No longer returned (D32): every plugin may use every community capability. Devices before D32 returned it when plugin.json didn't list the capability in requested_capabilities."},
-    {"code": "destination_blocked", "status": "denied", "summary": "The URL isn't http or https, or its host resolves to a loopback, private, link-local or other non-public address."},
+    {"code": "destination_blocked", "status": "denied", "summary": "The URL isn't http or https, or its host resolves to the device's own address, loopback, link-local, multicast or another reserved address. Public and LAN addresses are allowed (D37)."},
     {"code": "not_foreground", "status": "unavailable", "summary": "Sound plays only while the plugin's screen is visible."},
     {"code": "no_channel", "status": "unavailable", "summary": "The plugin has no working audio channel: it doesn't hold audio.stream, or an earlier malformed frame ended the channel for this run (D28)."},
     {"code": "no_storage", "status": "unavailable", "summary": "Plugin storage isn't available: no SD card, or it can't be written."},
@@ -65,7 +65,7 @@
       "class": "community",
       "rate_per_s": 1,
       "burst": 5,
-      "summary": "Make HTTP and HTTPS requests to public internet hosts. Local network, loopback and reserved addresses are refused."
+      "summary": "Make HTTP and HTTPS requests to internet hosts and to the local network (10/8, 172.16/12, 192.168/16, fc00::/7; D37), for example a Home Assistant at http://192.168.1.10:8123. The device's own addresses, loopback, link-local and reserved addresses are refused."
     },
     {
       "name": "audio.output",

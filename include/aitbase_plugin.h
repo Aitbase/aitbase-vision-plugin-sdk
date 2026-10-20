@@ -246,10 +246,12 @@ int aitbase_schedule_ring(aitbase_plugin_t *plugin, const char *id);
  * At most 1 a second with bursts of 5. Silent on success. */
 int aitbase_face_set(aitbase_plugin_t *plugin, const char *key, const char *value);
 
-/* --- HTTP ("http"): requests to public internet hosts ------------------------------------------- */
+/* --- HTTP ("http"): requests to internet and local network hosts --------------------------------- */
 
-/* The device makes the request. http:// and https:// only; hosts that resolve to local,
- * private or reserved addresses are refused ("destination_blocked"). Redirects are not followed:
+/* The device makes the request. http:// and https:// only. Internet hosts and, on devices with D37
+ * (since SDK 0.12), the local network (10/8, 172.16/12, 192.168/16, fc00::/7) are allowed, for
+ * example a Home Assistant at http://192.168.1.10:8123. The device's own addresses, loopback,
+ * link-local and reserved addresses are refused ("destination_blocked"). Redirects are not followed:
  * a 3xx RESULT has the target in event->location, and the plugin decides whether to request it.
  * One request at a time ("in_flight"); at most 1 a second with bursts of 5. The response body is
  * text, cut to fit the plugin's receive buffer (event->truncated). */
