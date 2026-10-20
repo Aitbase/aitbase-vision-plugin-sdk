@@ -39,7 +39,7 @@ Each message is one UTF-8 JSON object per line (`\n`). A message from the plugin
 | `audio` | `tone`, `play`, `stop` | `freq_hz`, `duration_ms`, `volume`; `sound`, `volume` |
 | `tool` | `reply` | `call` (the `tool.call` event's id), `text` (at most 2048 bytes) |
 
-Every operation, its arguments and limits, and the capability it needs are in [capabilities](capabilities.md), generated from the device's capability registry. The device checks each request there before doing anything: unknown arguments, wrong types and values out of range are `bad_request`, and an operation only firmware feature modules may use is `module_only` (`no_screen` for a module's `ui`). Since device decision D32 nothing is requested: devices before it answered `no_grant` for an operation whose capability wasn't in `requested_capabilities`.
+Every operation, its arguments and limits, and the capability it needs are in [capabilities](capabilities.md), generated from the device's capability registry. The device checks each request there before doing anything: unknown arguments, wrong types and values out of range are `bad_request`, and an operation only firmware feature modules may use is `module_only`. Every plugin, firmware feature modules too, may open screens; devices from before 2026-10-20 answered `no_screen` for a module's `ui`. Since device decision D32 nothing is requested: devices before it answered `no_grant` for an operation whose capability wasn't in `requested_capabilities`.
 
 **`hello` must be the first request.** The device answers any other request sent before `hello` with `hello_required`. If the device doesn't support the protocol version, it answers `protocol_unsupported`.
 
