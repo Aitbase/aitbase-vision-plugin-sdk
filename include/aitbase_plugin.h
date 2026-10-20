@@ -303,8 +303,10 @@ int aitbase_audio_stream_open(aitbase_plugin_t *plugin, uint32_t rate);
  * device took them, 0 while its buffer is full (send the same samples again later, for example on
  * the next timer), or a negative status: AITBASE_ERR_ARGUMENT for none or too many,
  * AITBASE_ERR_IO once the audio channel is closed (after a "bad_stream", it stays closed for the
- * run), AITBASE_ERR_UNSUPPORTED when plugin.json doesn't request "audio.stream". Samples sent
- * while no stream is open end the channel ("bad_stream"). */
+ * run), AITBASE_ERR_UNSUPPORTED when plugin.json doesn't request "audio.stream". Since SDK 0.12,
+ * write right after aitbase_audio_stream_open: it returns 0 until the device has opened the stream,
+ * and AITBASE_ERR_IO if the device refused it (the refusal also arrives as AITBASE_EVENT_ERROR).
+ * Samples sent while no stream is open end the channel ("bad_stream"). */
 int aitbase_audio_stream_write(aitbase_plugin_t *plugin, const int16_t *pcm, size_t samples);
 /* Plays out the samples already sent, then closes the stream: AITBASE_EVENT_STREAM_STATE
  * "stopped" with reason "closed". Returns a request id. */

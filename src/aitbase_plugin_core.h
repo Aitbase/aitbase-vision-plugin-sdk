@@ -33,6 +33,11 @@ struct aitbase_plugin {
         char op[24];
         int tracked; /* the plugin holds the id: RESULT, SOUND_DONE and ERROR carry it */
     } pending[AITBASE_PENDING];
+    /* Audio stream (D28): the stream_open the device hasn't answered yet (0 for none), and whether
+     * it refused the last one. Samples wait for the answer: sent before the device opened the
+     * stream, they would end the channel (bad_stream). */
+    uint32_t stream_open_id;
+    int stream_refused;
     /* Native transport only. */
     int fd;
     uint32_t timer_ms;

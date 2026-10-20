@@ -272,15 +272,26 @@ int aitbase_audio_stop(aitbase_plugin_t *plugin) {
     return send_tracked(plugin, "audio", "stop", cJSON_CreateObject(), 1);
 }
 
+/* A stream_open was sent: samples wait for its answer (see aitbase_plugin_core.h). */
+static int stream_opening(aitbase_plugin_t *plugin, int id) {
+    if (id > 0) {
+        plugin->stream_open_id = (uint32_t)id;
+        plugin->stream_refused = 0;
+    }
+    return id;
+}
+
 int aitbase_audio_stream_open(aitbase_plugin_t *plugin, uint32_t rate) {
     if (!plugin) return AITBASE_ERR_ARGUMENT;
     cJSON *args = cJSON_CreateObject();
     if (args) cJSON_AddNumberToObject(args, "rate", rate);
-    return send_tracked(plugin, "audio", "stream_open", args, 1);
+    return stream_opening(plugin, send_tracked(plugin, "audio", "stream_open", args, 1));
 }
 
 int aitbase_audio_stream_write(aitbase_plugin_t *plugin, const int16_t *pcm, size_t samples) {
     if (!plugin || !pcm || samples == 0 || samples > AITBASE_AUDIO_STREAM_FRAME_SAMPLES) return AITBASE_ERR_ARGUMENT;
+    if (plugin->stream_open_id) return 0;                /* the device hasn't opened it yet: try again later */
+    if (plugin->stream_refused) return AITBASE_ERR_IO;  /* the device refused the open (see its ERROR) */
     const int rc = aitbase_transport_audio_write(plugin, pcm, samples * 2);
     return rc > 0 ? (int)samples : rc;
 }
@@ -298,7 +309,7 @@ int aitbase_audio_stream_open_background(aitbase_plugin_t *plugin, uint32_t rate
         cJSON_AddBoolToObject(args, "background", 1);
         if (title && *title) cJSON_AddStringToObject(args, "title", title);
     }
-    return send_tracked(plugin, "audio", "stream_open", args, 1);
+    return stream_opening(plugin, send_tracked(plugin, "audio", "stream_open", args, 1));
 }
 
 void aitbase_plugin_stop(aitbase_plugin_t *plugin) {
@@ -515,6 +526,10 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
         const int known = plugin->pending[reply_id % AITBASE_PENDING].id == reply_id;
         const char *op = known ? plugin->pending[reply_id % AITBASE_PENDING].op : "";
         const int tracked = known && plugin->pending[reply_id % AITBASE_PENDING].tracked;
+        if (plugin->stream_open_id && reply_id == plugin->stream_open_id) {
+            plugin->stream_open_id = 0;  /* answered: samples may go, or the open was refused */
+            plugin->stream_refused = code != 0;
+        }
         if (strcmp(op, "hello") == 0) {
             if (code == 0) {
                 plugin->ready = 1;
