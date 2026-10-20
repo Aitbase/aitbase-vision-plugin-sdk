@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+More LVGL for plugin UI (device decision D36). Needs device firmware with D36; older devices refuse the new widgets and styles.
+
+- **Display widgets:** `lv_bar`, `lv_arc`, `lv_led`, `lv_spinner` (at most 2), `lv_line` (up to 16 points), `lv_scale`, `lv_chart` (2 series of up to 32 points, `<lv_chart-series>`) and `lv_table` (8 × 4, `<lv_table-cell>`, `<lv_table-row>`). Gauges and leds bind with `bind_value` and take the leading integer of the bound text. Chart series and table rows bind too. They work on idle faces.
+- **Styles:** any `#rrggbb` or `0xRRGGBB` color, `style_border_*`, `style_radius`, `style_bg_opa`, `style_opa`, `style_pad_*`, `style_text_font` (14, 16, 20, 24, 28), `style_text_align`, and flex layout on `lv_obj` (`flex_flow`, `style_flex_*_place`). Indicator colors are `style_*_color-indicator`.
+- **Limits:** 64 widgets and 24 KiB per screen; an idle face may have 40 widgets and 12 KiB. Screens bind `value.1` to `value.16` as well as `title`.
+- **The registry format:** typed `widget_props` and `shared_props`, `bindable` and `binding_keys` replace the list of `bindings`. Tools that read `schema/plugin_ui_registry.json` need updating.
+
 ## 0.11.1 — 2026-10-20
 
 Documentation only; no API or behavior change.

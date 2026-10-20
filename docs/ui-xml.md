@@ -6,7 +6,7 @@ Plugin screens are written in XML that follows **LVGL 9.4 XML conventions**:
 - `style_*` attributes and `#constants`;
 - `bind_text` and `<event_cb>`.
 
-Only a small, safe subset is accepted. The compiler turns a screen into the `aitbase.plugin-ui` document that the device validates again and renders itself. The device never runs plugin XML through LVGL's XML loader.
+A bounded subset is accepted (device decision D36). The compiler turns a screen into the `aitbase.plugin-ui` document that the device validates again and renders itself. The device never runs plugin XML through LVGL's XML loader.
 
 > AITBASE VISION is not affiliated with LVGL. This format follows LVGL's conventions so they feel familiar, but it is a restricted subset, and the SDK doesn't claim compatibility with LVGL's tools.
 
@@ -67,30 +67,55 @@ The source of truth is `schema/plugin_ui_registry.json`.
 | `<component>` | An optional `<api>` with `<prop name type [default]/>` (`type` is `string`, `int` or `color`), and one `<view [extends="lv_obj\|lv_button\|lv_label\|lv_image"]>`. `<previews>` is ignored. |
 | Component instance `<card name="…" …/>` | Attributes are `name`, the component's props and `x`/`y`/`width`/`height`. No children. Recursion is rejected. |
 | `$prop` | A whole attribute value can be `$prop`. The prop's type must match the attribute. |
-| Widgets | `lv_obj`, `lv_label`, `lv_button` and `lv_image`. |
+| Widgets | `lv_obj`, `lv_label`, `lv_button`, `lv_image`, and the display widgets below. Input widgets (checkbox, switch, slider, roller, dropdown) come with a later SDK. |
 | `name` | Required on every widget: lowercase letters, digits and `_`. It must be unique after component prefixing. |
 | `x`, `y`, `width`, `height` | Integer pixels (`240` or `240px`). `%` and `content` are not accepted yet. |
-| `style_pad_all` | Integer pixels. |
-| `style_bg_color`, `style_text_color` | Platform color tokens only: `#surface`, `#on_surface`, `#accent`, `#control`, or their exact `0xRRGGBB` values. |
-| `lv_label` | `text` (at most 80 bytes); `bind_text` (a platform subject: `title`, or `face.1` to `face.16` for an idle face). |
+| Colors (`style_bg_color`, `style_text_color`, `style_border_color`, `style_line_color`) | Any `#rrggbb` or `0xRRGGBB`, or a platform token: `#surface`, `#on_surface`, `#accent`, `#control`. |
+| `style_pad_all` | Integer pixels, 0–320. |
+| `style_pad_top`, `_bottom`, `_left`, `_right`, `_row`, `_column` | 0–64. |
+| `style_radius` | 0–40. |
+| `style_border_width` | 0–8. |
+| `style_bg_opa`, `style_opa` | 0–255. |
+| `style_text_font` | The device's font sizes: `14`, `16`, `20`, `24` or `28` (Latin and Vietnamese). |
+| `style_text_align` | `left`, `center` or `right`. |
+| `lv_obj` layout | `flex_flow` (`row`, `column`, `row_wrap`, `column_wrap`); `style_flex_main_place` and `style_flex_track_place` (`start`, `center`, `end`, `space_between`, `space_around`, `space_evenly`); `style_flex_cross_place` (`start`, `center`, `end`). |
+| `lv_label` | `text` (at most 80 bytes); `bind_text` (a platform subject: `title` or `value.1` to `value.16` on a screen, `face.1` to `face.16` on an idle face). |
 | `lv_image` | `src` is the name of an image declared in `globals.xml`: `<images><file name="logo" src_path="assets/logo.rgb565"/></images>`. |
 | `lv_button` | Must contain exactly one `<event_cb trigger="clicked" callback="aitbase_action" user_data="<action>"/>`, where `<action>` is a registered action (`plugin.increment`). |
 
-The platform constants and subjects are listed in `schema/aitbase_globals.xml`. Plugins can't define their own colors, fonts or subjects.
+### Display widgets
 
-**Idle faces.** A screen named in `plugin.json`'s `idle_face` may be shown on the device's home screen instead of the clock, when the owner chooses it. It must be display only: no `lv_button` and no `<event_cb>`, labels bound only to `face.1` to `face.16` (set with `aitbase_face_set`), at most 24 widgets and 8 KiB compiled. The device draws its "Plugin" badge in the top right corner, over the face. `aitbase-plugin check` reports `IDLE_FACE_BOUNDS` otherwise.
+They show values; they never take focus or input. Bound values are text, set with `aitbase_ui_set_text` on a screen or `aitbase_face_set` on a face. A gauge or a led takes the leading integer of the text (`"45%"` is 45, `"N/A"` is 0), so one value can feed a label and a gauge.
+
+| Widget | Attributes | Binding | Bounds |
+|---|---|---|---|
+| `lv_bar` | `value`, `min_value`, `max_value`, `style_bg_color-indicator` | `bind_value` | -1000..1000; min below max |
+| `lv_arc` | `value`, `min_value`, `max_value`, `rotation`, `bg_start_angle`, `bg_end_angle`, `style_arc_width`, `style_arc_color-indicator` | `bind_value` | angles 0–360; width 2–16; no knob |
+| `lv_led` | `brightness`, `color` | `bind_value` (the brightness) | 0–255 |
+| `lv_spinner` | `anim_duration`, `arc_length`, `style_arc_color-indicator` | — | 500–5000 ms; at most 2 per screen |
+| `lv_line` | `points="x,y x,y …"`, `style_line_color` | — | 2 to 16 points, each within ±320 |
+| `lv_scale` | `mode` (`horizontal_top`, `horizontal_bottom`, `vertical_left`, `vertical_right`, `round_inner`, `round_outer`), `min_value`, `max_value`, `total_tick_count`, `major_tick_every`, `style_line_color-indicator` | — | ≤ 41 ticks |
+| `lv_chart` | `type` (`line`, `bar`), `point_count`, `min_value`, `max_value`, `style_line_color-indicator`; up to two `<lv_chart-series [values="1 2 3"] [bind_values="value.N"]/>` children | `bind_values` per series: comma-separated integers | ≤ 32 points |
+| `lv_table` | `row_count`, `column_count`; `<lv_table-cell row column value/>` and `<lv_table-row row bind_value/>` children | a row: its cells separated by `\|` | ≤ 8 rows × 4 columns; cells ≤ 32 bytes |
+
+Indicator colors use LVGL's part names with a hyphen (`style_bg_color-indicator`), because XML can't take `:` in an attribute name.
+
+The platform constants and subjects are listed in `schema/aitbase_globals.xml`. Plugins can't define their own fonts or subjects.
+
+**Idle faces.** A screen named in `plugin.json`'s `idle_face` may be shown on the device's home screen instead of the clock, when the owner chooses it. It must be display only: no `lv_button` and no `<event_cb>`, widgets bound only to `face.1` to `face.16` (set with `aitbase_face_set`), at most 40 widgets and 12 KiB compiled. Display widgets are fine on a face. The device draws its "Plugin" badge in the top right corner, over the face. `aitbase-plugin check` reports `IDLE_FACE_BOUNDS` otherwise.
 
 Images are RGB565: `uint16 width`, `uint16 height`, then pixels. They must be at most 32×32 and 8 KB.
 
-The registry's `limits` cap nodes, nesting depth, text length and total size.
+The registry's `limits` cap nodes (64 per screen), nesting depth, text length and total size (24 KiB compiled). Devices older than D36 refuse the new widgets and styles; `check` can't tell which firmware a device runs.
 
 ## What is rejected
 
 Everything not listed above is rejected with a stable error code (`UI_WIDGET`, `UI_PROPERTY`, `UI_STYLE`, `UI_EVENT`, `UI_ACTION`, `UI_BINDING`…). Nothing is silently ignored. In particular:
-- other widgets;
+- other widgets: `lv_canvas`, `lv_textarea`, `lv_keyboard`, message boxes, tab views, windows, menus, calendars and span groups among them;
 - flags and states (`hidden`, `clickable`, `focused`…);
-- `align`, `flex_*` and `grid_*`;
-- other `style_*` properties;
+- `align`, `grid_*`, and flex properties other than those above;
+- other `style_*` properties, and styles on parts other than the indicators above;
+- fonts other than the device's sizes, and images over 32×32;
 - `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<gradients>`, `<animations>` and `<translations>`;
 - `screen_load_event` and the `subject_*_event` elements;
 - `bind_text-fmt`;

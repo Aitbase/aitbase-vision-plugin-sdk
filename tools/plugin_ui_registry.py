@@ -17,19 +17,32 @@ ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "schema" / "plugin_ui_registry.json"
 
 
+PROP_TYPES = {"int", "int_set", "enum", "int_list", "text", "text_list", "asset"}
+
+
 def load_registry(path: Path = REGISTRY_PATH) -> dict:
     registry = json.loads(path.read_text(encoding="utf-8"))
     widgets = registry["widgets"]
-    for binding in registry["bindings"]:
-        if binding["widget"] not in widgets:
-            raise ValueError(f"binding references unknown widget {binding['widget']}")
+    widget_props = registry["widget_props"]
+    for spec in list(registry["shared_props"].values()) + list(widget_props.values()):
+        if spec["type"] not in PROP_TYPES:
+            raise ValueError(f"unknown property type {spec['type']}")
     names = registry.get("color_token_names", {})
     if set(names.values()) != set(registry["color_tokens"]) or len(names) != len(registry["color_tokens"]):
         raise ValueError("color_token_names must name every color token exactly once")
-    shared = set(registry["int_props"]) | set(registry["color_props"])
+    shared = set(registry["int_props"]) | set(registry["color_props"]) | set(registry["shared_props"])
     for name, spec in widgets.items():
         if shared & set(spec["props"]):
             raise ValueError(f"widget {name} redeclares a shared property")
+        for prop in spec["props"]:
+            if prop not in widget_props:
+                raise ValueError(f"widget {name} uses undeclared property {prop}")
+    for widget, props in registry["bindable"].items():
+        if widget not in widgets:
+            raise ValueError(f"bindable references unknown widget {widget}")
+        for prop in props:
+            if prop in widget_props and prop not in widgets[widget]["props"]:
+                raise ValueError(f"{widget} binds {prop}, which it doesn't have")
     return registry
 
 
@@ -57,6 +70,8 @@ def render_header(registry: dict) -> str:
     ]
     for key, value in limits.items():
         lines.append(f"constexpr size_t k{_c_ident(key)} = {value};")
+    lines.append(f"constexpr bool kColorAnyHex = {str(bool(registry.get('color_any_hex'))).lower()};")
+    lines.append(f"constexpr const char *kBindingType = {_c_string(registry['binding_type'])};")
     lines += [
         "",
         "struct IntProp {",
@@ -65,19 +80,37 @@ def render_header(registry: dict) -> str:
         "    int max;",
         "};",
         "",
+        "enum class PropKind { kInt, kIntSet, kEnum, kIntList, kText, kTextList, kAsset };",
+        "",
+        "// A typed property: int (min..max), int_set (ints), enum (values), int_list (at most max_items",
+        "// ints in min..max), text (the text rules), text_list (at most max_items texts of at most",
+        "// max_bytes), asset (an image).",
+        "struct PropSpec {",
+        "    const char *name;",
+        "    PropKind kind;",
+        "    int min;",
+        "    int max;",
+        "    size_t max_items;",
+        "    size_t max_bytes;",
+        "    const char *const *values;",
+        "    size_t value_count;",
+        "    const int *ints;",
+        "    size_t int_count;",
+        "};",
+        "",
         "struct WidgetSpec {",
         "    const char *name;",
         "    const char *const *props;",
         "    size_t prop_count;",
         "    bool children;",
         "    bool requires_action;",
+        "    size_t max_per_document;  // 0: no limit",
         "};",
         "",
-        "struct BindingSpec {",
+        "// A widget property a document may bind to a binding key.",
+        "struct Bindable {",
         "    const char *widget;",
         "    const char *property;",
-        "    const char *key;",
-        "    const char *type;",
         "};",
         "",
         "static const IntProp kIntProps[] = {",
@@ -91,10 +124,31 @@ def render_header(registry: dict) -> str:
         lines.extend(f"    {_c_string(value)}," for value in values)
         lines.append("};")
 
+    kinds = {"int": "kInt", "int_set": "kIntSet", "enum": "kEnum", "int_list": "kIntList", "text": "kText",
+             "text_list": "kTextList", "asset": "kAsset"}
+
+    def prop_table(table: str, props: dict) -> None:
+        for name, spec in props.items():
+            if spec["type"] == "enum":
+                string_table(f"k{_c_ident(name)}Values", spec["values"])
+            if spec["type"] == "int_set":
+                lines.append(f"static const int k{_c_ident(name)}Ints[] = {{{', '.join(str(v) for v in spec['values'])}}};")
+        lines.append(f"static const PropSpec {table}[] = {{")
+        for name, spec in props.items():
+            values = f"k{_c_ident(name)}Values, {len(spec['values'])}" if spec["type"] == "enum" else "nullptr, 0"
+            ints = f"k{_c_ident(name)}Ints, {len(spec['values'])}" if spec["type"] == "int_set" else "nullptr, 0"
+            lines.append(
+                f"    {{{_c_string(name)}, PropKind::{kinds[spec['type']]}, {spec.get('min', 0)}, {spec.get('max', 0)}, "
+                f"{spec.get('max_items', 0)}, {spec.get('max_bytes', 0)}, {values}, {ints}}},")
+        lines.append("};")
+
     string_table("kColorProps", registry["color_props"])
     string_table("kColorTokens", registry["color_tokens"])
+    prop_table("kSharedProps", registry["shared_props"])
+    prop_table("kWidgetProps", registry["widget_props"])
     string_table("kEvents", registry["events"])
     string_table("kActions", registry["actions"])
+    string_table("kBindingKeys", registry["binding_keys"])
     for name, spec in registry["widgets"].items():
         if spec["props"]:
             string_table(f"k{_c_ident(name)}Props", spec["props"])
@@ -104,12 +158,12 @@ def render_header(registry: dict) -> str:
         count = len(spec["props"])
         lines.append(
             f"    {{{_c_string(name)}, {props}, {count}, {str(spec['children']).lower()}, "
-            f"{str(spec['requires_action']).lower()}}},")
+            f"{str(spec['requires_action']).lower()}, {spec.get('max_per_document', 0)}}},")
     lines.append("};")
-    lines.append("static const BindingSpec kBindings[] = {")
-    for binding in registry["bindings"]:
-        fields = ", ".join(_c_string(binding[key]) for key in ("widget", "property", "key", "type"))
-        lines.append(f"    {{{fields}}},")
+    lines.append("static const Bindable kBindable[] = {")
+    for widget, props in registry["bindable"].items():
+        for prop in props:
+            lines.append(f"    {{{_c_string(widget)}, {_c_string(prop)}}},")
     lines += ["};", "", "}  // namespace plugin_ui_registry", "", "#endif", ""]
     return "\n".join(lines)
 
@@ -128,11 +182,8 @@ def render_globals(registry: dict) -> str:
     for name, value in registry["color_token_names"].items():
         lines.append(f'    <color name="{name}" value="0x{value[1:]}"/>')
     lines += ["  </consts>", "  <subjects>"]
-    seen = set()
-    for binding in registry["bindings"]:
-        if binding["key"] not in seen:
-            seen.add(binding["key"])
-            lines.append(f'    <{binding["type"]} name="{binding["key"]}" value=""/>')
+    for key in registry["binding_keys"]:
+        lines.append(f'    <{registry["binding_type"]} name="{key}" value=""/>')
     lines += ["  </subjects>", "</globals>", ""]
     return "\n".join(lines)
 

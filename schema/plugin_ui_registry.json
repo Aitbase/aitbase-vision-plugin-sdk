@@ -2,9 +2,9 @@
   "format": "aitbase.plugin-ui",
   "version": 1,
   "limits": {
-    "max_representation_bytes": 16384,
+    "max_representation_bytes": 24576,
     "max_json_nesting": 32,
-    "max_nodes": 32,
+    "max_nodes": 64,
     "max_depth": 6,
     "max_text": 80,
     "max_id": 32,
@@ -14,46 +14,115 @@
     "max_image_dimension": 32,
     "max_pending_updates": 16,
     "max_events": 16,
-    "max_face_bytes": 8192,
-    "max_face_nodes": 24,
+    "max_face_bytes": 12288,
+    "max_face_nodes": 40,
     "max_face_keys": 16,
-    "max_face_value": 64
+    "max_face_value": 64,
+    "max_bindings_per_node": 8
   },
   "int_props": {
     "x": [-320, 320],
     "y": [-320, 320],
     "width": [1, 320],
     "height": [1, 320],
-    "padding": [0, 320]
+    "padding": [0, 320],
+    "radius": [0, 40],
+    "border_width": [0, 8],
+    "bg_opa": [0, 255],
+    "opa": [0, 255],
+    "pad_top": [0, 64],
+    "pad_bottom": [0, 64],
+    "pad_left": [0, 64],
+    "pad_right": [0, 64],
+    "pad_row": [0, 64],
+    "pad_column": [0, 64]
   },
-  "color_props": ["background", "color"],
+  "color_props": ["background", "color", "border_color", "indicator_color"],
   "color_tokens": ["#101820", "#ffffff", "#00e5ff", "#334455"],
   "color_token_names": {"surface": "#101820", "on_surface": "#ffffff", "accent": "#00e5ff", "control": "#334455"},
+  "color_any_hex": true,
+  "shared_props": {
+    "font": {"type": "int_set", "values": [14, 16, 20, 24, 28]},
+    "text_align": {"type": "enum", "values": ["left", "center", "right"]}
+  },
+  "widget_props": {
+    "text": {"type": "text"},
+    "src": {"type": "asset"},
+    "flex_flow": {"type": "enum", "values": ["row", "column", "row_wrap", "column_wrap"]},
+    "flex_main_place": {"type": "enum", "values": ["start", "center", "end", "space_between", "space_around", "space_evenly"]},
+    "flex_cross_place": {"type": "enum", "values": ["start", "center", "end"]},
+    "flex_track_place": {"type": "enum", "values": ["start", "center", "end", "space_between", "space_around", "space_evenly"]},
+    "value": {"type": "int", "min": -1000, "max": 1000},
+    "min": {"type": "int", "min": -1000, "max": 1000},
+    "max": {"type": "int", "min": -1000, "max": 1000},
+    "thickness": {"type": "int", "min": 2, "max": 16},
+    "rotation": {"type": "int", "min": 0, "max": 360},
+    "bg_start_angle": {"type": "int", "min": 0, "max": 360},
+    "bg_end_angle": {"type": "int", "min": 0, "max": 360},
+    "brightness": {"type": "int", "min": 0, "max": 255},
+    "duration": {"type": "int", "min": 500, "max": 5000},
+    "arc_length": {"type": "int", "min": 10, "max": 350},
+    "points": {"type": "int_list", "min": -320, "max": 320, "max_items": 32},
+    "scale_mode": {
+      "type": "enum",
+      "values": ["horizontal_top", "horizontal_bottom", "vertical_left", "vertical_right", "round_inner", "round_outer"]
+    },
+    "total_ticks": {"type": "int", "min": 2, "max": 41},
+    "major_every": {"type": "int", "min": 1, "max": 41},
+    "chart_type": {"type": "enum", "values": ["line", "bar"]},
+    "point_count": {"type": "int", "min": 1, "max": 32},
+    "series_count": {"type": "int", "min": 1, "max": 2},
+    "series_1": {"type": "int_list", "min": -1000, "max": 1000, "max_items": 32},
+    "series_2": {"type": "int_list", "min": -1000, "max": 1000, "max_items": 32},
+    "rows": {"type": "int", "min": 1, "max": 8},
+    "cols": {"type": "int", "min": 1, "max": 4},
+    "cells": {"type": "text_list", "max_items": 32, "max_bytes": 32}
+  },
   "widgets": {
-    "container": {"props": [], "children": true, "requires_action": false},
+    "container": {
+      "props": ["flex_flow", "flex_main_place", "flex_cross_place", "flex_track_place"],
+      "children": true,
+      "requires_action": false
+    },
     "label": {"props": ["text"], "children": false, "requires_action": false},
     "button": {"props": [], "children": true, "requires_action": true},
-    "image": {"props": ["src"], "children": false, "requires_action": false}
+    "image": {"props": ["src"], "children": false, "requires_action": false},
+    "bar": {"props": ["value", "min", "max"], "children": false, "requires_action": false},
+    "arc": {
+      "props": ["value", "min", "max", "thickness", "rotation", "bg_start_angle", "bg_end_angle"],
+      "children": false,
+      "requires_action": false
+    },
+    "led": {"props": ["brightness"], "children": false, "requires_action": false},
+    "spinner": {"props": ["duration", "arc_length"], "children": false, "requires_action": false, "max_per_document": 2},
+    "line": {"props": ["points"], "children": false, "requires_action": false},
+    "scale": {
+      "props": ["scale_mode", "min", "max", "total_ticks", "major_every"],
+      "children": false,
+      "requires_action": false
+    },
+    "chart": {
+      "props": ["chart_type", "min", "max", "point_count", "series_count", "series_1", "series_2"],
+      "children": false,
+      "requires_action": false
+    },
+    "table": {"props": ["rows", "cols", "cells"], "children": false, "requires_action": false}
   },
   "events": ["activate"],
   "actions": ["plugin.increment", "template.ok", "template.item1", "template.item2", "template.item3", "template.item4"],
-  "bindings": [
-    {"widget": "label", "property": "text", "key": "title", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.1", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.2", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.3", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.4", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.5", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.6", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.7", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.8", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.9", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.10", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.11", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.12", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.13", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.14", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.15", "type": "string"},
-    {"widget": "label", "property": "text", "key": "face.16", "type": "string"}
-  ]
+  "binding_type": "string",
+  "binding_keys": [
+    "title", "face.1", "face.2", "face.3", "face.4", "face.5", "face.6", "face.7", "face.8", "face.9",
+    "face.10", "face.11", "face.12", "face.13", "face.14", "face.15", "face.16", "value.1", "value.2",
+    "value.3", "value.4", "value.5", "value.6", "value.7", "value.8", "value.9", "value.10",
+    "value.11", "value.12", "value.13", "value.14", "value.15", "value.16"
+  ],
+  "bindable": {
+    "label": ["text"],
+    "bar": ["value"],
+    "arc": ["value"],
+    "led": ["brightness"],
+    "chart": ["series_1", "series_2"],
+    "table": ["row_0", "row_1", "row_2", "row_3", "row_4", "row_5", "row_6", "row_7"]
+  }
 }

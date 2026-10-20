@@ -235,12 +235,19 @@ func TestFaceProblem(t *testing.T) {
 	}
 	button := `{"id":"go","type":"button","props":{},"children":[],"action":{"event":"activate","id":"plugin.increment"}}`
 	title := `{"id":"t","type":"label","props":{"text":"-"},"children":[],"binding":{"property":"text","key":"title","type":"string"}}`
-	big := append(doc(label, 2), bytes.Repeat([]byte(" "), 8200)...)
+	big := append(doc(label, 2), bytes.Repeat([]byte(" "), 12300)...)
+	// D36: a chart binds several properties; every one must be a face key.
+	chart := `{"id":"h","type":"chart","props":{"series_count":2},"children":[],"bindings":[{"property":"series_1","key":"face.2","type":"string"},{"property":"series_2","key":"value.1","type":"string"}]}`
+	gauge := `{"id":"g","type":"bar","props":{},"children":[],"binding":{"property":"value","key":"face.3","type":"string"}}`
+	if p := FaceProblem(doc(gauge, 2)); p != "" {
+		t.Fatalf("a gauge bound to a face key: %s", p)
+	}
 	for name, compiled := range map[string][]byte{
-		"action":    doc(button, 2),
-		"title key": doc(title, 2),
-		"nodes":     doc(label, 25),
-		"size":      big,
+		"action":         doc(button, 2),
+		"title key":      doc(title, 2),
+		"nodes":          doc(label, 41),
+		"size":           big,
+		"chart bindings": doc(chart, 2),
 	} {
 		if FaceProblem(compiled) == "" {
 			t.Errorf("%s: want a problem", name)
