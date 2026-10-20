@@ -248,6 +248,8 @@ func TestFaceProblem(t *testing.T) {
 		"nodes":          doc(label, 41),
 		"size":           big,
 		"chart bindings": doc(chart, 2),
+		// D36 19c: an input widget, even unbound.
+		"input widget": doc(`{"id":"s","type":"switch","props":{},"children":[]}`, 2),
 	} {
 		if FaceProblem(compiled) == "" {
 			t.Errorf("%s: want a problem", name)

@@ -105,6 +105,7 @@ def render_header(registry: dict) -> str:
         "    bool children;",
         "    bool requires_action;",
         "    size_t max_per_document;  // 0: no limit",
+        "    bool input;  // an input widget (D36): focusable, sends changed; never on a face",
         "};",
         "",
         "// A widget property a document may bind to a binding key.",
@@ -158,7 +159,8 @@ def render_header(registry: dict) -> str:
         count = len(spec["props"])
         lines.append(
             f"    {{{_c_string(name)}, {props}, {count}, {str(spec['children']).lower()}, "
-            f"{str(spec['requires_action']).lower()}, {spec.get('max_per_document', 0)}}},")
+            f"{str(spec['requires_action']).lower()}, {spec.get('max_per_document', 0)}, "
+            f"{str(bool(spec.get('input'))).lower()}}},")
     lines.append("};")
     lines.append("static const Bindable kBindable[] = {")
     for widget, props in registry["bindable"].items():

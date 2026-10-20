@@ -18,7 +18,8 @@
     "max_face_nodes": 40,
     "max_face_keys": 16,
     "max_face_value": 64,
-    "max_bindings_per_node": 8
+    "max_bindings_per_node": 8,
+    "max_changed_per_second": 10
   },
   "int_props": {
     "x": [-320, 320],
@@ -76,7 +77,11 @@
     "series_2": {"type": "int_list", "min": -1000, "max": 1000, "max_items": 32},
     "rows": {"type": "int", "min": 1, "max": 8},
     "cols": {"type": "int", "min": 1, "max": 4},
-    "cells": {"type": "text_list", "max_items": 32, "max_bytes": 32}
+    "cells": {"type": "text_list", "max_items": 32, "max_bytes": 32},
+    "checked": {"type": "int", "min": 0, "max": 1},
+    "step": {"type": "int", "min": 1, "max": 1000},
+    "options": {"type": "text_list", "max_items": 8, "max_bytes": 24},
+    "selected": {"type": "int", "min": 0, "max": 7}
   },
   "widgets": {
     "container": {
@@ -106,7 +111,12 @@
       "children": false,
       "requires_action": false
     },
-    "table": {"props": ["rows", "cols", "cells"], "children": false, "requires_action": false}
+    "table": {"props": ["rows", "cols", "cells"], "children": false, "requires_action": false},
+    "checkbox": {"props": ["text", "checked"], "children": false, "requires_action": false, "input": true},
+    "switch": {"props": ["checked"], "children": false, "requires_action": false, "input": true},
+    "slider": {"props": ["value", "min", "max", "step"], "children": false, "requires_action": false, "input": true},
+    "roller": {"props": ["options", "selected"], "children": false, "requires_action": false, "input": true},
+    "dropdown": {"props": ["options", "selected"], "children": false, "requires_action": false, "input": true}
   },
   "events": ["activate"],
   "actions": ["plugin.increment", "template.ok", "template.item1", "template.item2", "template.item3", "template.item4"],
@@ -123,6 +133,11 @@
     "arc": ["value"],
     "led": ["brightness"],
     "chart": ["series_1", "series_2"],
-    "table": ["row_0", "row_1", "row_2", "row_3", "row_4", "row_5", "row_6", "row_7"]
+    "table": ["row_0", "row_1", "row_2", "row_3", "row_4", "row_5", "row_6", "row_7"],
+    "checkbox": ["checked"],
+    "switch": ["checked"],
+    "slider": ["value"],
+    "roller": ["selected"],
+    "dropdown": ["selected"]
   }
 }
