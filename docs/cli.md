@@ -151,7 +151,7 @@ With `--json`, a command prints exactly one JSON object on stdout, and nothing e
 {
   "ok": false,
   "command": "check",
-  "sdk_version": "0.11.0",
+  "sdk_version": "0.11.1",
   "diagnostics": [
     {
       "severity": "error",

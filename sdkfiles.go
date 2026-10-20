@@ -4,7 +4,7 @@ package aitbasesdk
 import "embed"
 
 // Version is the SDK release. It must match project(... VERSION) in CMakeLists.txt.
-const Version = "0.11.0"
+const Version = "0.11.1"
 
 // Template is the plugin project that `aitbase-plugin init` creates.
 //
