@@ -290,7 +290,7 @@ or zero-width characters.
 | `network_error` | -8 | DNS, connection or transfer failure. |
 | `tls_error` | -8 | The server's TLS certificate couldn't be verified. |
 | `module_only` | -5 | Only a firmware feature module (D25) may use this operation. |
-| `no_screen` | -6 | A firmware feature module has no screen (D25): ui operations aren't available to it. |
+| `no_screen` | -6 | Not sent since 2026-10-20: every plugin may open screens, firmware feature modules too. Older devices answered it for a module's ui operations (D25). |
 | `too_many` | -7 | The plugin already holds the most scheduler entries it may: 8 for a firmware module, 4 for a community plugin. |
 | `too_close` | -7 | Another entry of this plugin is due within 5 minutes of this one (community plugins, D26). |
 | `not_allowed` | -5 | No longer returned (D32 dropped "Allow alarms"). Devices before D32 returned it until the owner allowed a plugin's alarms (D26). |

@@ -44,6 +44,10 @@ More LVGL for plugin UI (device decision D36): display widgets, input widgets, s
 - **Change notice:** a running plugin gets `AITBASE_EVENT_DEVICE` with op `plugin.settings_changed` when the owner saves.
 - **`check`** reports `SETTINGS_FORMAT` and `SETTING_FIELD`.
 
+### Screens for every plugin
+
+- Firmware feature modules may use `ui` like any plugin. Devices from 2026-10-20 no longer answer `no_screen`; the code stays, marked as no longer sent.
+
 ### Upgrading from 0.11
 
 - **Existing plugins build and run unchanged.** No API was removed, `aitbase_event_t` keeps its layout, and screens that use only the 0.11 widgets keep working on every firmware.
