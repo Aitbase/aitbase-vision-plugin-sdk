@@ -19,6 +19,7 @@ Only what is listed here exists. Do not invent functions, widgets, colors, actio
 - **Capabilities:** a plugin may use all of these without listing them anywhere (there is no `requested_capabilities` since SDK 0.11):
   - screens (`aitbase_ui_*`);
   - storage: small text values kept across runs (needs an SD card in the device);
+  - settings the owner types in on the Device Console, such as a server address or a token: declare them in `plugin.json` (`"settings": [{"key": "ha_url", "label": "Address", "type": "url"}]`, types `text`, `url`, `secret`, at most 8) and read them with `aitbase_storage_get(p, "settings.ha_url")`; the plugin gets `AITBASE_EVENT_DEVICE` with op `plugin.settings_changed` when they change. The device has no keyboard, so this is the only way to get such values;
   - HTTP(S) requests to internet hosts and to other hosts on the local network (a Home Assistant, a NAS), never to the device itself;
   - sound: tones and the package's own sounds (`sounds/<name>.wav`, listed under `"sounds"`), only while its screen is visible;
   - audio streams: continuous 16-bit mono PCM (a radio, white noise), only while its screen is visible; the device's alarms, calls and voice assistant pause it;
