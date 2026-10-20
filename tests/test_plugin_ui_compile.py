@@ -105,7 +105,7 @@ class PluginUiCompileTest(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "UI_XML_ENCODING")
 
     def test_rejects_unknown_widgets_attributes_and_values(self):
-        self.rejected("UI_WIDGET", screen=SCREEN.replace('<lv_image name="logo" src="logo"/>', '<lv_slider name="s"/>'))
+        self.rejected("UI_WIDGET", screen=SCREEN.replace('<lv_image name="logo" src="logo"/>', '<lv_textarea name="s"/>'))
         self.rejected("UI_WIDGET", screen=SCREEN.replace('<lv_image name="logo" src="logo"/>', '<Card name="s"/>'))
         self.rejected("UI_PROPERTY", screen=SCREEN.replace('width="240"', 'hidden="true" width="240"'))
         self.rejected("UI_PROPERTY", screen=SCREEN.replace('width="240"', 'style_shadow_width="4" width="240"'))
@@ -152,7 +152,7 @@ class PluginUiCompileTest(unittest.TestCase):
         self.rejected("UI_COMPONENT_REF", card=CARD.replace(' default="Hello"', ''),
                       screen=SCREEN.replace(' title="Count: 0"', ''))
         self.rejected("UI_COMPONENT", card=CARD.replace('type="string"', 'type="lv_obj"'))
-        self.rejected("UI_COMPONENT", card=CARD.replace('<view ', '<view extends="lv_slider" '))
+        self.rejected("UI_COMPONENT", card=CARD.replace('<view ', '<view extends="lv_textarea" '))
         self.rejected("UI_COMPONENT_CYCLE", card=CARD.replace(
             '<lv_label name="title"', '<card name="again"/><lv_label name="title"'))
 
@@ -256,6 +256,44 @@ class PluginUiCompileTest(unittest.TestCase):
         for xml, code in cases:
             with self.subTest(xml=xml):
                 self.rejected(code, screen=f"<screen><view>{xml}</view></screen>")
+
+    def test_d36_input_widgets_compile(self):
+        widgets = (
+            '<lv_checkbox name="agree" text="I agree" checked="true" bind_checked="value.1"/>'
+            '<lv_switch name="dark" style_bg_color-indicator="#00ff00"/>'
+            '<lv_slider name="vol" min_value="0" max_value="10" step="2" value="4" bind_value="value.2"/>'
+            '<lv_roller name="city" options="Hanoi\\nHue\\nSaigon" selected="1"/>'
+            '<lv_dropdown name="unit" options="C\\nF" bind_value="value.3"/>')
+        self.write(screen=f"<screen><view>{widgets}</view></screen>")
+        nodes = {node["id"]: node for node in self.compile()["tree"]["children"]}
+        self.assertEqual(nodes["agree"]["type"], "checkbox")
+        self.assertEqual(nodes["agree"]["props"], {"text": "I agree", "checked": 1})
+        self.assertEqual(nodes["agree"]["binding"], {"property": "checked", "key": "value.1", "type": "string"})
+        self.assertEqual(nodes["dark"]["props"], {"indicator_color": "#00ff00"})
+        self.assertEqual(nodes["vol"]["props"], {"min": 0, "max": 10, "step": 2, "value": 4})
+        self.assertEqual(nodes["vol"]["binding"]["property"], "value")
+        self.assertEqual(nodes["city"]["props"], {"options": ["Hanoi", "Hue", "Saigon"], "selected": 1})
+        self.assertEqual(nodes["unit"]["binding"]["property"], "selected")
+        self.assertNotIn("action", nodes["vol"])
+
+    def test_d36_input_bounds(self):
+        cases = (
+            ('<lv_roller name="r"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_roller name="r" options="' + "\\n".join(str(i) for i in range(9)) + '"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_dropdown name="d" options="' + "x" * 25 + '"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_dropdown name="d" options="a\\n\\nb"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_roller name="r" options="a\\nb" selected="2"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_slider name="s" step="0"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_checkbox name="c" checked="yes"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_switch name="c" text="a"/>', "UI_PROPERTY"),
+            ('<lv_switch name="c" bind_value="value.1"/>', "UI_PROPERTY"),
+            ('<lv_slider name="s" bind_checked="value.1"/>', "UI_PROPERTY"),
+            ('<lv_slider name="s"><event_cb trigger="clicked" callback="aitbase_action" user_data="template.ok"/></lv_slider>',
+             "UI_EVENT"),
+        )
+        for widget, code in cases:
+            with self.subTest(widget=widget):
+                self.rejected(code, screen=f"<screen><view>{widget}</view></screen>")
 
     def test_update_is_typed_generation_scoped_and_bounded(self):
         update = {"generation": 4, "id": "status.title", "key": "title", "type": "string", "value": "Updated"}

@@ -83,6 +83,10 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             snprintf(text, sizeof(text), "stream %s %s", ev->detail, ev->reason);
             say(p, text);
             break;
+        case AITBASE_EVENT_CHANGED:
+            snprintf(text, sizeof(text), "changed %s %d", ev->node, ev->code);
+            say(p, text);
+            break;
         case AITBASE_EVENT_PREEMPTED:
             aitbase_plugin_stop(p);
             break;
@@ -251,6 +255,8 @@ int main(void) {
     EXPECT(deliver("{\"cap\":\"ui\",\"event\":\"key\",\"data\":{\"key\":\"up\",\"gesture\":\"press\"}}") == 0 &&
            deliver("{\"cap\":\"ui\",\"event\":\"key\",\"data\":{\"key\":\"left\",\"gesture\":\"double\"}}") == 0,
            "unknown keys and gestures are ignored");
+    EXPECT(deliver("{\"cap\":\"ui\",\"event\":\"changed\",\"data\":{\"node\":\"vol\",\"value\":-42}}") == 0, "changed");
+    expect_update(&next, "changed vol -42");
 
     EXPECT(deliver("{\"id\":4,\"status\":-1,\"error\":\"bad_request\",\"result\":{}}") == 0, "error reply");
     expect_update(&next, "error update -1 bad_request");

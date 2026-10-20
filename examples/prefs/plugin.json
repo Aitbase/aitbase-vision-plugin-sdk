@@ -1,0 +1,13 @@
+{
+  "id": "example.prefs",
+  "name": "Preferences",
+  "version": "0.1.0",
+  "api_version": 1,
+  "description": "A switch, a slider and a roller (input widgets, D36) whose values are saved.",
+  "entry": "prefs",
+  "ui": {
+    "screens": [
+      "main"
+    ]
+  }
+}

@@ -108,7 +108,10 @@ def _asset(root: Path, source: str, path: str) -> dict:
 # LVGL 9.4 widget tags accepted by the compiler, mapped to the neutral registry widget names (D36).
 LVGL_WIDGETS = {"lv_obj": "container", "lv_label": "label", "lv_button": "button", "lv_image": "image",
                 "lv_bar": "bar", "lv_arc": "arc", "lv_led": "led", "lv_spinner": "spinner", "lv_line": "line",
-                "lv_scale": "scale", "lv_chart": "chart", "lv_table": "table"}
+                "lv_scale": "scale", "lv_chart": "chart", "lv_table": "table",
+                # Input widgets (D36 19c): plugin screens only, never faces.
+                "lv_checkbox": "checkbox", "lv_switch": "switch", "lv_slider": "slider", "lv_roller": "roller",
+                "lv_dropdown": "dropdown"}
 # LVGL style attributes mapped to registry properties.
 STYLE_INT = {"style_pad_all": "padding", "style_pad_top": "pad_top", "style_pad_bottom": "pad_bottom",
              "style_pad_left": "pad_left", "style_pad_right": "pad_right", "style_pad_row": "pad_row",
@@ -122,7 +125,8 @@ STYLE_ATTRS = {**STYLE_INT, **STYLE_COLOR, **STYLE_TYPED}
 # chart's first series. A led's color is its own attribute, as in LVGL.
 INDICATOR_ATTRS = {"bar": "style_bg_color-indicator", "arc": "style_arc_color-indicator",
                    "spinner": "style_arc_color-indicator", "scale": "style_line_color-indicator",
-                   "chart": "style_line_color-indicator", "led": "color"}
+                   "chart": "style_line_color-indicator", "led": "color", "slider": "style_bg_color-indicator",
+                   "checkbox": "style_bg_color-indicator", "switch": "style_bg_color-indicator"}
 # Flex layout on containers: LVGL's flex_flow attribute and its style_flex_*_place styles.
 CONTAINER_ATTRS = {"flex_flow": "flex_flow", "style_flex_main_place": "flex_main_place",
                    "style_flex_cross_place": "flex_cross_place", "style_flex_track_place": "flex_track_place"}
@@ -138,7 +142,15 @@ WIDGET_ATTRS = {
               "major_tick_every": "major_every"},
     "chart": {"type": "chart_type", "point_count": "point_count", "min_value": "min", "max_value": "max"},
     "table": {"row_count": "rows", "column_count": "cols"},
+    "slider": {"value": "value", "min_value": "min", "max_value": "max", "step": "step"},
+    "roller": {"selected": "selected"},
+    "dropdown": {"selected": "selected"},
 }
+# Input widgets: checked="true|false" on checkboxes and switches, and the attribute that binds their
+# value (LVGL's bind_checked for the state, bind_value otherwise).
+CHECKABLE = ("checkbox", "switch")
+INPUT_BIND_ATTR = {"checkbox": "bind_checked", "switch": "bind_checked", "slider": "bind_value",
+                   "roller": "bind_value", "dropdown": "bind_value"}
 LAYOUT_ATTRS = ("x", "y", "width", "height")
 TOKEN_NAMES = REGISTRY["color_token_names"]
 TOKEN_BY_VALUE = {value: name for name, value in TOKEN_NAMES.items()}
@@ -242,6 +254,20 @@ def _check_combination(widget: str, props: dict, path: str) -> None:
         _fail("UI_PROPERTY_VALUE", path, "cells outside row_count x column_count")
     if widget == "scale" and props.get("major_every", 5) > props.get("total_ticks", 11):
         _fail("UI_PROPERTY_VALUE", path, "major_tick_every can't exceed total_tick_count")
+    if widget in ("roller", "dropdown") and props.get("selected", 0) >= len(props.get("options", [])):
+        _fail("UI_PROPERTY_VALUE", path, "selected must be the index of one of the options")
+
+
+def _options(raw: str, path: str) -> list:
+    """A roller's or dropdown's options, one per line: "\\n" in the attribute, as in LVGL XML."""
+    spec = WIDGET_PROPS["options"]
+    options = raw.replace("\\n", "\n").split("\n")
+    if not raw or len(options) > spec["max_items"]:
+        _fail("UI_PROPERTY_VALUE", path, f"options: 1 to {spec['max_items']} options, separated by \\n")
+    for option in options:
+        if not option or len(option.encode("utf-8")) > spec["max_bytes"] or any(ord(c) < 0x20 or c == "\x7f" for c in option):
+            _fail("UI_PROPERTY_VALUE", path, f"options: each option is 1 to {spec['max_bytes']} bytes of text")
+    return options
 
 
 def _load_images(ui_dir: Path, budget: list) -> dict:
@@ -355,6 +381,14 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
             allowed.add(INDICATOR_ATTRS[widget])
         if widget in ("bar", "arc", "led"):
             allowed.add("bind_value")
+        if widget in INPUT_BIND_ATTR:
+            allowed.add(INPUT_BIND_ATTR[widget])
+        if widget == "checkbox":
+            allowed.add("text")
+        if widget in CHECKABLE:
+            allowed.add("checked")
+        if widget in ("roller", "dropdown"):
+            allowed.add("options")
         unknown = sorted(set(attrib) - allowed)
         if unknown:
             _fail("UI_PROPERTY", path, f"unsupported attribute {unknown[0]}")
@@ -395,8 +429,21 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
             props["text"] = text
             if "bind_text" in attrib:
                 bindings.append(_binding(widget, "text", attrib["bind_text"], "bind_text", path))
-        if "bind_value" in attrib:
-            bindings.append(_binding(widget, BINDABLE[widget][0], attrib["bind_value"], "bind_value", path))
+        if widget == "checkbox":
+            text = resolve(attrib.get("text", ""), args, path, "text", "string")
+            if len(text.encode("utf-8")) > MAX_TEXT:
+                _fail("UI_TEXT_SIZE", path, f"text exceeds {MAX_TEXT} bytes")
+            props["text"] = text
+        if widget in CHECKABLE and "checked" in attrib:
+            checked = resolve(attrib["checked"], args, path, "checked", "string")
+            if checked not in ("true", "false"):
+                _fail("UI_PROPERTY_VALUE", path, "checked must be true or false")
+            props["checked"] = 1 if checked == "true" else 0
+        if widget in ("roller", "dropdown"):
+            props["options"] = _options(resolve(attrib.get("options", ""), args, path, "options", "string"), path)
+        bind_attr = INPUT_BIND_ATTR.get(widget, "bind_value")
+        if bind_attr in attrib:
+            bindings.append(_binding(widget, BINDABLE[widget][0], attrib[bind_attr], bind_attr, path))
         if widget == "image":
             name = attrib.get("src")
             if not name:

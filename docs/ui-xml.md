@@ -67,7 +67,7 @@ The source of truth is `schema/plugin_ui_registry.json`.
 | `<component>` | An optional `<api>` with `<prop name type [default]/>` (`type` is `string`, `int` or `color`), and one `<view [extends="lv_obj\|lv_button\|lv_label\|lv_image"]>`. `<previews>` is ignored. |
 | Component instance `<card name="…" …/>` | Attributes are `name`, the component's props and `x`/`y`/`width`/`height`. No children. Recursion is rejected. |
 | `$prop` | A whole attribute value can be `$prop`. The prop's type must match the attribute. |
-| Widgets | `lv_obj`, `lv_label`, `lv_button`, `lv_image`, and the display widgets below. Input widgets (checkbox, switch, slider, roller, dropdown) come with a later SDK. |
+| Widgets | `lv_obj`, `lv_label`, `lv_button`, `lv_image`, and the display and input widgets below. |
 | `name` | Required on every widget: lowercase letters, digits and `_`. It must be unique after component prefixing. |
 | `x`, `y`, `width`, `height` | Integer pixels (`240` or `240px`). `%` and `content` are not accepted yet. |
 | Colors (`style_bg_color`, `style_text_color`, `style_border_color`, `style_line_color`) | Any `#rrggbb` or `0xRRGGBB`, or a platform token: `#surface`, `#on_surface`, `#accent`, `#control`. |
@@ -100,9 +100,23 @@ They show values; they never take focus or input. Bound values are text, set wit
 
 Indicator colors use LVGL's part names with a hyphen (`style_bg_color-indicator`), because XML can't take `:` in an attribute name.
 
+### Input widgets (screens only)
+
+The user changes them with the device's two buttons (see [Focus and buttons](#focus-and-buttons)); the plugin hears each change as `AITBASE_EVENT_CHANGED`, with `event->node` the widget's name and `event->code` its value. Set a value from the plugin with `aitbase_ui_set_text` on the widget's binding; that sends no `CHANGED`. They're never allowed on an idle face.
+
+| Widget | Attributes | Value (`event->code`, and the binding) | Bounds |
+|---|---|---|---|
+| `lv_checkbox` | `text`, `checked` (`true` or `false`), `style_bg_color-indicator` | `bind_checked`: 0 or 1 | text ≤ 80 bytes |
+| `lv_switch` | `checked`, `style_bg_color-indicator` | `bind_checked`: 0 or 1 | — |
+| `lv_slider` | `value`, `min_value`, `max_value`, `step`, `style_bg_color-indicator` | `bind_value`: the value | -1000..1000; step 1–1000 |
+| `lv_roller` | `options` (separated by `\n`), `selected` | `bind_value`: the option's index from 0 | 1 to 8 options of 1 to 24 bytes |
+| `lv_dropdown` | `options`, `selected` | `bind_value`: the option's index | the same |
+
+`step` is AITBASE's: how far one button press moves a slider. A bound value is text, as for gauges: `"1"` checks a checkbox, `"40"` sets a slider.
+
 The platform constants and subjects are listed in `schema/aitbase_globals.xml`. Plugins can't define their own fonts or subjects.
 
-**Idle faces.** A screen named in `plugin.json`'s `idle_face` may be shown on the device's home screen instead of the clock, when the owner chooses it. It must be display only: no `lv_button` and no `<event_cb>`, widgets bound only to `face.1` to `face.16` (set with `aitbase_face_set`), at most 40 widgets and 12 KiB compiled. Display widgets are fine on a face. The device draws its "Plugin" badge in the top right corner, over the face. `aitbase-plugin check` reports `IDLE_FACE_BOUNDS` otherwise.
+**Idle faces.** A screen named in `plugin.json`'s `idle_face` may be shown on the device's home screen instead of the clock, when the owner chooses it. It must be display only: no `lv_button`, no input widget and no `<event_cb>`, widgets bound only to `face.1` to `face.16` (set with `aitbase_face_set`), at most 40 widgets and 12 KiB compiled. Display widgets are fine on a face. The device draws its "Plugin" badge in the top right corner, over the face. `aitbase-plugin check` reports `IDLE_FACE_BOUNDS` otherwise.
 
 Images are RGB565: `uint16 width`, `uint16 height`, then pixels. They must be at most 32×32 and 8 KB.
 
@@ -125,6 +139,15 @@ The registry will grow; each addition is a new, validated entry.
 
 ## Focus and buttons
 
-The device owns focus. LEFT moves focus between buttons in document order, RIGHT activates the focused button (the `clicked` trigger), and a LEFT long press always leaves the screen. Plugins can't style or hide the focus outline.
+The device owns focus. LEFT moves focus between buttons and input widgets in document order, RIGHT activates the focused one, and a LEFT long press always leaves the screen. Plugins can't style or hide the focus outline.
 
-The plugin also receives the buttons as `AITBASE_EVENT_KEY` while its screen shows: LEFT press, RIGHT press and RIGHT long press, each before the focus or `clicked` action of the same press. A screen without buttons is driven by these events alone. A LEFT long press is never delivered.
+- **A button** sends its action (the `clicked` trigger).
+- **A checkbox or switch** toggles, and the plugin gets `AITBASE_EVENT_CHANGED`.
+- **A slider, roller or dropdown** enters edit mode; the focus outline turns amber.
+  - In edit mode, LEFT press is one step down (the previous option) and RIGHT press one step up (the next option). Each change is an `AITBASE_EVENT_CHANGED`.
+  - A RIGHT long press confirms and leaves edit mode. A long press always comes after a press of the same button, so the device takes back that press's step first.
+  - A LEFT long press still leaves the screen.
+  - No `AITBASE_EVENT_KEY` arrives in edit mode, so a press is never both an edit and a key.
+- **`AITBASE_EVENT_CHANGED` is limited** to 10 a second per screen. Between two, the latest value of each widget waits, so holding a button never floods the plugin. A waiting value is sent before the screen closes.
+
+The plugin also receives the buttons as `AITBASE_EVENT_KEY` while its screen shows, outside edit mode: LEFT press, RIGHT press and RIGHT long press, each before the focus or `clicked` action of the same press. A screen without buttons or inputs is driven by these events alone. A LEFT long press is never delivered.

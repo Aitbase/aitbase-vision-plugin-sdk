@@ -20,7 +20,7 @@ ui/assets/                  RGB565 images: uint16 width, uint16 height, then pix
 
 | What | Rule |
 |---|---|
-| Widgets | `lv_obj`, `lv_label`, `lv_button`, `lv_image`; display widgets `lv_bar`, `lv_arc`, `lv_led`, `lv_spinner` (≤ 2), `lv_line`, `lv_scale`, `lv_chart`, `lv_table` (attributes in `sdk/docs/ui-xml.md`) |
+| Widgets | `lv_obj`, `lv_label`, `lv_button`, `lv_image`; display widgets `lv_bar`, `lv_arc`, `lv_led`, `lv_spinner` (≤ 2), `lv_line`, `lv_scale`, `lv_chart`, `lv_table`; input widgets `lv_checkbox`, `lv_switch`, `lv_slider`, `lv_roller`, `lv_dropdown` on screens, never a face (attributes in `sdk/docs/ui-xml.md`) |
 | `name` | Required on every widget. Lowercase letters, digits, `_`. Unique within the screen after component prefixing. |
 | `x`, `y`, `width`, `height` | Integer pixels (`120` or `120px`). Screen is 240×320. No `%` or `content`. |
 | `style_pad_all` | Integer pixels; `style_pad_top/_bottom/_left/_right/_row/_column` 0–64 |
@@ -29,15 +29,16 @@ ui/assets/                  RGB565 images: uint16 width, uint16 height, then pix
 | `lv_obj` layout | `flex_flow` (row, column, row_wrap, column_wrap) and `style_flex_main_place`, `style_flex_cross_place`, `style_flex_track_place` |
 | `lv_label` | `text` (at most 80 bytes); optional `bind_text="title"` or `value.1`–`value.16` (`face.1`–`face.16` on an idle face) |
 | Gauges | `lv_bar`, `lv_arc` and `lv_led` take `bind_value="value.N"`; the bound text's leading integer is the value (`"45%"` is 45) |
+| Inputs | `lv_checkbox text checked="true\|false" bind_checked`, `lv_switch checked bind_checked`, `lv_slider value min_value max_value step bind_value`, `lv_roller`/`lv_dropdown options="A\\nB\\nC" selected bind_value` (1–8 options of ≤ 24 bytes). Each change is `AITBASE_EVENT_CHANGED` (`ev->node`, value in `ev->code`) |
 | `lv_image` | `src` = an image name from `globals.xml` |
 | `lv_button` | Exactly one `<event_cb trigger="clicked" callback="aitbase_action" user_data="plugin.increment"/>` |
 | Component | `<api><prop name="..." type="string\|int\|color" default="..."/></api>`; use as `<card name="status" title="..."/>`; `$prop` as a whole attribute value |
 
-Limits: 64 nodes (40 on an idle face), depth 6, 4 images, 24 KiB compiled (12 KiB for a face). Needs device firmware with D36 for the display widgets and new styles.
+Limits: 64 nodes (40 on an idle face), depth 6, 4 images, 24 KiB compiled (12 KiB for a face). Needs device firmware with D36 for the display and input widgets and the new styles.
 
 ## Rejected (do not use)
 
-Other widgets (sliders, checkboxes, lists, text areas, keyboards, canvases, tab views...), `align`, `grid_*`, other `flex_*`, flags and states (`hidden`, `clickable`, `focused`), any other `style_*`, `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<animations>`, `<translations>`, `bind_text-fmt`, DTDs and entities.
+Other widgets (lists, text areas, keyboards, canvases, tab views...), `align`, `grid_*`, other `flex_*`, flags and states (`hidden`, `clickable`, `focused`), any other `style_*`, `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<animations>`, `<translations>`, `bind_text-fmt`, DTDs and entities.
 
 ## Layout tips
 

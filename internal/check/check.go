@@ -439,7 +439,7 @@ func compileScreens(r *Result, dir, sdkDir string, screens []string, face, pytho
 				data, err := os.ReadFile(out)
 				if problem := FaceProblem(data); err == nil && problem != "" {
 					r.add(Error, "IDLE_FACE_BOUNDS", "ui/screens/"+s+".xml", problem,
-						"a face is display only: no buttons; bind its widgets to face.1 to face.16")
+						"a face is display only: no buttons or input widgets; bind its widgets to face.1 to face.16")
 				}
 			}
 			continue
@@ -478,8 +478,28 @@ type uiBinding struct {
 	Key string `json:"key"`
 }
 
+// The input widgets of the UI registry (D36): a face can't have them.
+var inputWidgets = func() map[string]bool {
+	var reg struct {
+		Widgets map[string]struct {
+			Input bool `json:"input"`
+		} `json:"widgets"`
+	}
+	if err := json.Unmarshal(aitbasesdk.UIRegistry, &reg); err != nil {
+		panic("schema/plugin_ui_registry.json: " + err.Error())
+	}
+	out := map[string]bool{}
+	for name, w := range reg.Widgets {
+		if w.Input {
+			out[name] = true
+		}
+	}
+	return out
+}()
+
 type uiNode struct {
 	ID      string          `json:"id"`
+	Type    string          `json:"type"`
 	Action  json.RawMessage `json:"action"`
 	Binding *uiBinding      `json:"binding"`
 	// Charts and tables bind several properties (D36).
@@ -510,6 +530,9 @@ func FaceProblem(compiled []byte) string {
 	walk = func(n *uiNode) string {
 		if len(n.Action) > 0 && string(n.Action) != "null" {
 			return fmt.Sprintf("%s has an action; a face takes no input", n.ID)
+		}
+		if inputWidgets[n.Type] {
+			return fmt.Sprintf("%s is a %s, an input widget; a face takes no input", n.ID, n.Type)
 		}
 		bindings := n.Bindings
 		if n.Binding != nil {
