@@ -37,16 +37,16 @@ type Diagnostic struct {
 // Manifest is the draft plugin.json. Fields are optional here so that a missing field is a
 // diagnostic, not a decode failure.
 type Manifest struct {
-	ID                    string    `json:"id"`
-	Name                  string    `json:"name"`
-	Version               string    `json:"version"`
-	APIVersion            *int      `json:"api_version"`
-	Description           string    `json:"description"`
-	Entry                 string    `json:"entry"`
-	UI                    *UI       `json:"ui"`
-	Sounds                []string  `json:"sounds"`
-	Triggers              []Trigger `json:"triggers"`
-	IdleFace              string    `json:"idle_face"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Version     string    `json:"version"`
+	APIVersion  *int      `json:"api_version"`
+	Description string    `json:"description"`
+	Entry       string    `json:"entry"`
+	UI          *UI       `json:"ui"`
+	Sounds      []string  `json:"sounds"`
+	Triggers    []Trigger `json:"triggers"`
+	IdleFace    string    `json:"idle_face"`
 }
 
 // Trigger starts the plugin without the user opening it (D21 in the device app). Devices support
@@ -439,7 +439,7 @@ func compileScreens(r *Result, dir, sdkDir string, screens []string, face, pytho
 				data, err := os.ReadFile(out)
 				if problem := FaceProblem(data); err == nil && problem != "" {
 					r.add(Error, "IDLE_FACE_BOUNDS", "ui/screens/"+s+".xml", problem,
-						"a face is display only: labels and images, no buttons; bind labels to face.1 to face.16")
+						"a face is display only: no buttons; bind its widgets to face.1 to face.16")
 				}
 			}
 			continue
@@ -474,13 +474,17 @@ var faceLimits = func() (l struct {
 	return l
 }()
 
+type uiBinding struct {
+	Key string `json:"key"`
+}
+
 type uiNode struct {
 	ID      string          `json:"id"`
 	Action  json.RawMessage `json:"action"`
-	Binding *struct {
-		Key string `json:"key"`
-	} `json:"binding"`
-	Children []uiNode `json:"children"`
+	Binding *uiBinding      `json:"binding"`
+	// Charts and tables bind several properties (D36).
+	Bindings []uiBinding `json:"bindings"`
+	Children []uiNode    `json:"children"`
 }
 
 // FaceProblem says why a compiled screen can't be an idle face (D22), or "" when it can: the
@@ -507,8 +511,14 @@ func FaceProblem(compiled []byte) string {
 		if len(n.Action) > 0 && string(n.Action) != "null" {
 			return fmt.Sprintf("%s has an action; a face takes no input", n.ID)
 		}
-		if n.Binding != nil && !strings.HasPrefix(n.Binding.Key, "face.") {
-			return fmt.Sprintf("%s binds %q; a face binds only face.1 to face.16", n.ID, n.Binding.Key)
+		bindings := n.Bindings
+		if n.Binding != nil {
+			bindings = append(bindings, *n.Binding)
+		}
+		for _, b := range bindings {
+			if !strings.HasPrefix(b.Key, "face.") {
+				return fmt.Sprintf("%s binds %q; a face binds only face.1 to face.16", n.ID, b.Key)
+			}
 		}
 		for i := range n.Children {
 			if p := walk(&n.Children[i]); p != "" {

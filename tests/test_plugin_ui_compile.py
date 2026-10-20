@@ -113,9 +113,14 @@ class PluginUiCompileTest(unittest.TestCase):
         self.rejected("UI_PROPERTY_VALUE", screen=SCREEN.replace('width="240"', 'width="-1"'))
         self.rejected("UI_PROPERTY_VALUE", screen=SCREEN.replace('width="240"', 'width="50%"'))
 
-    def test_colors_must_be_platform_tokens(self):
+    def test_colors_are_hex_or_platform_tokens(self):
+        # D36: any #rrggbb or 0xRRGGBB, or a token; nothing else.
+        for color, expected in (('"#12AB9f"', "#12ab9f"), ('"0x123456"', "#123456"), ('"#accent"', "#00e5ff")):
+            self.write(screen=SCREEN.replace('"#surface"', color, 1))
+            self.assertEqual(self.compile()["tree"]["props"]["background"], expected)
+        self.write(screen=SCREEN)
         self.rejected("UI_STYLE", screen=SCREEN.replace('"#surface"', '"#brand"', 1))
-        self.rejected("UI_STYLE", screen=SCREEN.replace('"#surface"', '"0x123456"', 1))
+        self.rejected("UI_STYLE", screen=SCREEN.replace('"#surface"', '"#12345"', 1))
         self.rejected("UI_STYLE", screen=SCREEN.replace('"#surface"', '"red"', 1))
 
     def test_events_map_only_registered_actions(self):
@@ -169,9 +174,9 @@ class PluginUiCompileTest(unittest.TestCase):
     def test_rejects_depth_node_and_size_limits(self):
         body = "".join(f'<lv_obj name="n{i}">' for i in range(7)) + '<lv_label name="last"/>' + "</lv_obj>" * 7
         self.rejected("UI_DEPTH", screen=f"<screen><view>{body}</view></screen>")
-        labels = "".join(f'<lv_label name="n{i}"/>' for i in range(35))
+        labels = "".join(f'<lv_label name="n{i}"/>' for i in range(64))
         self.rejected("UI_NODE_LIMIT", screen=f"<screen><view>{labels}</view></screen>")
-        self.rejected("UI_XML_SIZE", screen=SCREEN + " " * (16 * 1024))
+        self.rejected("UI_XML_SIZE", screen=SCREEN + " " * (24 * 1024))
 
     def test_rejects_unsafe_or_invalid_assets(self):
         for src, code in (("../../etc/passwd", "UI_ASSET_PATH"), ("https://example.invalid/x.png", "UI_ASSET_PATH"),
@@ -190,8 +195,67 @@ class PluginUiCompileTest(unittest.TestCase):
         for i in range(4):
             (self.root / f"assets/i{i}.rgb565").write_bytes(struct.pack("<HH", 31, 32) + b"\0" * (31 * 32 * 2))
         images = "".join(f'<lv_image name="i{i}" src="i{i}"/>' for i in range(4))
+        # Styled labels on top: the XML fits, the compiled document doesn't (24 KiB, D36).
+        style = 'x="100" y="100" width="100" height="100" style_pad_all="10" style_radius="10" style_opa="200"'
+        labels = "".join(f'<lv_label name="l{i}" text="{"x" * 80}" {style}/>' for i in range(58))
         self.rejected("UI_REPRESENTATION_SIZE", globals_xml=f"<globals><images>{files}</images></globals>",
-                      screen=f"<screen><view>{images}</view></screen>")
+                      screen=f"<screen><view>{images}{labels}</view></screen>")
+
+    def test_d36_display_widgets_compile(self):
+        widgets = (
+            '<lv_bar name="cpu" value="40" min_value="0" max_value="100" style_bg_color-indicator="#00ff00" bind_value="value.1"/>'
+            '<lv_arc name="gauge" value="10" style_arc_width="6" rotation="90" bg_start_angle="0" bg_end_angle="270" bind_value="face.2"/>'
+            '<lv_led name="dot" brightness="120" color="0xff0000"/>'
+            '<lv_spinner name="wait" anim_duration="1000" arc_length="120"/>'
+            '<lv_line name="trace" points="0,0 40,20 80,0" style_line_color="#ffffff"/>'
+            '<lv_scale name="ruler" mode="round_inner" min_value="0" max_value="50" total_tick_count="11" major_tick_every="5"/>'
+            '<lv_chart name="history" type="bar" point_count="8" min_value="0" max_value="10">'
+            '<lv_chart-series values="1 2 3" bind_values="value.4"/><lv_chart-series bind_values="value.5"/></lv_chart>'
+            '<lv_table name="grid" row_count="2" column_count="2" style_text_font="16" style_text_align="center">'
+            '<lv_table-cell row="0" column="1" value="b"/><lv_table-row row="1" bind_value="value.6"/></lv_table>'
+            '<lv_obj name="box" flex_flow="row_wrap" style_flex_main_place="space_between" style_pad_row="4" '
+            'style_border_width="2" style_border_color="#control" style_bg_opa="128"/>')
+        self.write(screen=f"<screen><view>{widgets}</view></screen>")
+        tree = self.compile()["tree"]
+        nodes = {node["id"]: node for node in tree["children"]}
+        self.assertEqual(nodes["cpu"]["props"], {"value": 40, "min": 0, "max": 100, "indicator_color": "#00ff00"})
+        self.assertEqual(nodes["cpu"]["binding"], {"property": "value", "key": "value.1", "type": "string"})
+        self.assertEqual(nodes["gauge"]["props"]["thickness"], 6)
+        self.assertEqual(nodes["dot"]["props"], {"brightness": 120, "indicator_color": "#ff0000"})
+        self.assertEqual(nodes["wait"]["props"], {"duration": 1000, "arc_length": 120})
+        self.assertEqual(nodes["trace"]["props"]["points"], [0, 0, 40, 20, 80, 0])
+        self.assertEqual(nodes["ruler"]["props"]["scale_mode"], "round_inner")
+        self.assertEqual(nodes["history"]["props"]["series_count"], 2)
+        self.assertEqual(nodes["history"]["props"]["series_1"], [1, 2, 3])
+        self.assertEqual([b["property"] for b in nodes["history"]["bindings"]], ["series_1", "series_2"])
+        self.assertEqual(nodes["grid"]["props"]["cells"], ["", "b"])
+        self.assertEqual(nodes["grid"]["binding"]["property"], "row_1")
+        self.assertEqual(nodes["box"]["props"]["flex_flow"], "row_wrap")
+        self.assertEqual(nodes["box"]["props"]["bg_opa"], 128)
+
+    def test_d36_bounds_are_checked_at_compile_time(self):
+        cases = (
+            ('<lv_arc name="a" style_arc_width="17"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_bar name="b" min_value="10" max_value="10"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_line name="l" points="0,0 1"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_line name="l" points="' + " ".join("0,0" for _ in range(17)) + '"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_scale name="s" total_tick_count="5" major_tick_every="6"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_chart name="c" point_count="2"><lv_chart-series values="1 2 3"/></lv_chart>', "UI_PROPERTY_VALUE"),
+            ('<lv_chart name="c"><lv_chart-series/><lv_chart-series/><lv_chart-series/></lv_chart>', "UI_PROPERTY_VALUE"),
+            ('<lv_table name="t" row_count="1"><lv_table-cell row="1" column="0" value="x"/></lv_table>', "UI_PROPERTY_VALUE"),
+            ('<lv_table name="t"><lv_table-cell row="0" column="0" value="' + "x" * 33 + '"/></lv_table>', "UI_TEXT_SIZE"),
+            ('<lv_label name="x" style_text_font="15"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_label name="x" style_text_align="justify"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_label name="x" value="3"/>', "UI_PROPERTY"),
+            ('<lv_bar name="b" bind_value="secret"/>', "UI_BINDING"),
+            ('<lv_obj name="x" flex_flow="grid"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_label name="x" style_pad_all="4" style_pad_all2="4"/>', "UI_PROPERTY"),
+            ('<lv_spinner name="a"/><lv_spinner name="b"/><lv_spinner name="c"/>', "UI_WIDGET_LIMIT"),
+            ('<lv_label name="x" style_text_color="#ffffff" style_line_color="#000000"/>', "UI_PROPERTY"),
+        )
+        for xml, code in cases:
+            with self.subTest(xml=xml):
+                self.rejected(code, screen=f"<screen><view>{xml}</view></screen>")
 
     def test_update_is_typed_generation_scoped_and_bounded(self):
         update = {"generation": 4, "id": "status.title", "key": "title", "type": "string", "value": "Updated"}

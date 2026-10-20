@@ -40,15 +40,21 @@ ATTRS = {"id"} | set(INT_PROPS) | COLOR_PROPS
 STYLE_COLORS = set(REGISTRY["color_tokens"])
 EVENTS = set(REGISTRY["events"])
 ACTION_IDS = set(REGISTRY["actions"])
-BINDINGS = REGISTRY["bindings"]
+SHARED_PROPS = REGISTRY["shared_props"]
+WIDGET_PROPS = REGISTRY["widget_props"]
+BINDING_KEYS = REGISTRY["binding_keys"]
+BINDING_TYPE = REGISTRY["binding_type"]
+BINDABLE = REGISTRY["bindable"]
 ID_RE = re.compile(r"^[a-z][a-z0-9_.-]{0,%d}$" % (LIMITS["max_id"] - 1))
 
 
-def _binding_for(widget: str, attrib: dict):
-    for binding in BINDINGS:
-        if binding["widget"] == widget and attrib == {k: binding[k] for k in ("property", "key", "type")}:
-            return {k: binding[k] for k in ("property", "key", "type")}
-    return None
+def _binding(widget: str, prop: str, key: str, attr: str, path: str) -> dict:
+    """A binding of widget.prop to a platform subject (title, face.N, value.N)."""
+    if prop not in BINDABLE.get(widget, ()):
+        _fail("UI_BINDING", path, f"{attr}: {widget} has no bindable {prop}")
+    if key not in BINDING_KEYS:
+        _fail("UI_BINDING", path, f"{attr} subject {key} is not a platform subject")
+    return {"property": prop, "key": key, "type": BINDING_TYPE}
 
 
 class UIError(ValueError):
@@ -99,10 +105,40 @@ def _asset(root: Path, source: str, path: str) -> dict:
             "bytes": len(data), "data_hex": data[4:].hex()}
 
 
-# LVGL 9.4 widget tags accepted by the compiler, mapped to the neutral registry widget names.
-LVGL_WIDGETS = {"lv_obj": "container", "lv_label": "label", "lv_button": "button", "lv_image": "image"}
+# LVGL 9.4 widget tags accepted by the compiler, mapped to the neutral registry widget names (D36).
+LVGL_WIDGETS = {"lv_obj": "container", "lv_label": "label", "lv_button": "button", "lv_image": "image",
+                "lv_bar": "bar", "lv_arc": "arc", "lv_led": "led", "lv_spinner": "spinner", "lv_line": "line",
+                "lv_scale": "scale", "lv_chart": "chart", "lv_table": "table"}
 # LVGL style attributes mapped to registry properties.
-STYLE_ATTRS = {"style_pad_all": "padding", "style_bg_color": "background", "style_text_color": "color"}
+STYLE_INT = {"style_pad_all": "padding", "style_pad_top": "pad_top", "style_pad_bottom": "pad_bottom",
+             "style_pad_left": "pad_left", "style_pad_right": "pad_right", "style_pad_row": "pad_row",
+             "style_pad_column": "pad_column", "style_radius": "radius", "style_border_width": "border_width",
+             "style_bg_opa": "bg_opa", "style_opa": "opa"}
+STYLE_COLOR = {"style_bg_color": "background", "style_text_color": "color", "style_border_color": "border_color",
+               "style_line_color": "color"}
+STYLE_TYPED = {"style_text_font": "font", "style_text_align": "text_align"}
+STYLE_ATTRS = {**STYLE_INT, **STYLE_COLOR, **STYLE_TYPED}
+# The indicator part's color: the filled part of a bar or arc, a spinner's arc, a scale's major ticks, a
+# chart's first series. A led's color is its own attribute, as in LVGL.
+INDICATOR_ATTRS = {"bar": "style_bg_color-indicator", "arc": "style_arc_color-indicator",
+                   "spinner": "style_arc_color-indicator", "scale": "style_line_color-indicator",
+                   "chart": "style_line_color-indicator", "led": "color"}
+# Flex layout on containers: LVGL's flex_flow attribute and its style_flex_*_place styles.
+CONTAINER_ATTRS = {"flex_flow": "flex_flow", "style_flex_main_place": "flex_main_place",
+                   "style_flex_cross_place": "flex_cross_place", "style_flex_track_place": "flex_track_place"}
+# Widget attributes (LVGL 9.4 XML names) mapped to registry properties.
+WIDGET_ATTRS = {
+    "bar": {"value": "value", "min_value": "min", "max_value": "max"},
+    "arc": {"value": "value", "min_value": "min", "max_value": "max", "rotation": "rotation",
+            "bg_start_angle": "bg_start_angle", "bg_end_angle": "bg_end_angle", "style_arc_width": "thickness"},
+    "led": {"brightness": "brightness"},
+    "spinner": {"anim_duration": "duration", "arc_length": "arc_length"},
+    "line": {"points": "points"},
+    "scale": {"mode": "scale_mode", "min_value": "min", "max_value": "max", "total_tick_count": "total_ticks",
+              "major_tick_every": "major_every"},
+    "chart": {"type": "chart_type", "point_count": "point_count", "min_value": "min", "max_value": "max"},
+    "table": {"row_count": "rows", "column_count": "cols"},
+}
 LAYOUT_ATTRS = ("x", "y", "width", "height")
 TOKEN_NAMES = REGISTRY["color_token_names"]
 TOKEN_BY_VALUE = {value: name for name, value in TOKEN_NAMES.items()}
@@ -148,16 +184,64 @@ def _int_value(raw: str, key: str, path: str) -> int:
     return value
 
 
+HEX_COLOR = re.compile(r"^(#|0x)([0-9a-fA-F]{6})$")
+
+
 def _color_value(raw: str, key: str, path: str) -> str:
-    if raw.startswith("#"):
-        if raw[1:] not in TOKEN_NAMES:
-            _fail("UI_STYLE", path, f"{key}: unknown color token {raw} (use one of "
-                  + ", ".join("#" + name for name in TOKEN_NAMES) + ")")
+    """#rrggbb or 0xRRGGBB (any color since D36), or a platform token such as #accent."""
+    literal = HEX_COLOR.fullmatch(raw)
+    if literal:
+        return "#" + literal.group(2).lower()
+    if raw.startswith("#") and raw[1:] in TOKEN_NAMES:
         return TOKEN_NAMES[raw[1:]]
-    literal = "#" + raw[2:].lower() if raw.lower().startswith("0x") else None
-    if literal not in TOKEN_BY_VALUE:
-        _fail("UI_STYLE", path, f"{key}: colors must be platform tokens such as #{next(iter(TOKEN_NAMES))}")
-    return literal
+    _fail("UI_STYLE", path, f"{key}: expected #rrggbb, 0xRRGGBB or a token ("
+          + ", ".join("#" + name for name in TOKEN_NAMES) + ")")
+
+
+def _typed_value(raw: str, prop: str, key: str, path: str):
+    """A registry property's value from its XML text: ints, sets of ints, enums and integer lists."""
+    spec = WIDGET_PROPS.get(prop) or SHARED_PROPS[prop]
+    kind = spec["type"]
+    if kind in ("int", "int_set"):
+        try:
+            value = int(raw[:-2] if raw.endswith("px") else raw)
+        except ValueError:
+            _fail("UI_PROPERTY_VALUE", path, f"{key} must be an integer")
+        if kind == "int" and not spec["min"] <= value <= spec["max"]:
+            _fail("UI_PROPERTY_VALUE", path, f"{key} must be within [{spec['min']}, {spec['max']}]")
+        if kind == "int_set" and value not in spec["values"]:
+            _fail("UI_PROPERTY_VALUE", path, f"{key} must be one of {spec['values']}")
+        return value
+    if kind == "enum":
+        if raw not in spec["values"]:
+            _fail("UI_PROPERTY_VALUE", path, f"{key} must be one of {', '.join(spec['values'])}")
+        return raw
+    if kind == "int_list":
+        try:
+            values = [int(part) for part in re.split(r"[\s,]+", raw.strip()) if part]
+        except ValueError:
+            _fail("UI_PROPERTY_VALUE", path, f"{key} must be integers")
+        if len(values) > spec["max_items"] or any(not spec["min"] <= v <= spec["max"] for v in values):
+            _fail("UI_PROPERTY_VALUE", path,
+                  f"{key}: at most {spec['max_items']} values within [{spec['min']}, {spec['max']}]")
+        return values
+    _fail("UI_PROPERTY", path, f"{key} is not supported here")
+
+
+def _check_combination(widget: str, props: dict, path: str) -> None:
+    """The rules between a widget's properties, as the device checks them (D36)."""
+    if ("min" in props or "max" in props) and props.get("min", 0) >= props.get("max", 100):
+        _fail("UI_PROPERTY_VALUE", path, "min_value must be below max_value")
+    if widget == "line" and "points" in props and (len(props["points"]) < 4 or len(props["points"]) % 2):
+        _fail("UI_PROPERTY_VALUE", path, "points are x,y pairs, at least two of them")
+    if widget == "chart":
+        points = props.get("point_count", 10)
+        if any(len(props.get(s, [])) > points for s in ("series_1", "series_2")):
+            _fail("UI_PROPERTY_VALUE", path, f"a series has more values than point_count ({points})")
+    if widget == "table" and len(props.get("cells", [])) > props.get("rows", 1) * props.get("cols", 1):
+        _fail("UI_PROPERTY_VALUE", path, "cells outside row_count x column_count")
+    if widget == "scale" and props.get("major_every", 5) > props.get("total_ticks", 11):
+        _fail("UI_PROPERTY_VALUE", path, "major_tick_every can't exceed total_tick_count")
 
 
 def _load_images(ui_dir: Path, budget: list) -> dict:
@@ -228,6 +312,7 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
         return components[tag]
 
     ids, assets, count = set(), {}, 0
+    per_widget = {}  # widgets with max_per_document (spinners)
 
     def resolve(raw: str, args: dict, path: str, key: str, kind: str) -> str:
         if not raw.startswith("$"):
@@ -254,35 +339,64 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
             _fail("UI_DUPLICATE_ID", path, f"duplicate node name {node_id}")
         ids.add(node_id)
         spec = WIDGETS[widget]
-        allowed = set(LAYOUT_ATTRS) | set(STYLE_ATTRS)
+        if spec.get("max_per_document"):
+            per_widget[widget] = per_widget.get(widget, 0) + 1
+            if per_widget[widget] > spec["max_per_document"]:
+                _fail("UI_WIDGET_LIMIT", path, f"at most {spec['max_per_document']} {tag} per screen")
+        widget_attrs = WIDGET_ATTRS.get(widget, {})
+        allowed = set(LAYOUT_ATTRS) | set(STYLE_ATTRS) | set(widget_attrs)
         if widget == "label":
             allowed |= {"text", "bind_text"}
         if widget == "image":
             allowed |= {"src"}
+        if widget == "container":
+            allowed |= set(CONTAINER_ATTRS)
+        if widget in INDICATOR_ATTRS:
+            allowed.add(INDICATOR_ATTRS[widget])
+        if widget in ("bar", "arc", "led"):
+            allowed.add("bind_value")
         unknown = sorted(set(attrib) - allowed)
         if unknown:
             _fail("UI_PROPERTY", path, f"unsupported attribute {unknown[0]}")
         props = {}
+
+        def put(prop, value, key):
+            if prop in props:
+                _fail("UI_PROPERTY", path, f"{key} sets {prop} twice")
+            props[prop] = value
+
         for key in LAYOUT_ATTRS:
             if key in attrib:
                 props[key] = _int_value(resolve(attrib[key], args, path, key, "int"), key, path)
-        if "style_pad_all" in attrib:
-            props["padding"] = _int_value(resolve(attrib["style_pad_all"], args, path, "style_pad_all", "int"),
-                                          "padding", path)
-        for key in ("style_bg_color", "style_text_color"):
+        for key, prop in STYLE_INT.items():
             if key in attrib:
-                props[STYLE_ATTRS[key]] = _color_value(resolve(attrib[key], args, path, key, "color"), key, path)
+                put(prop, _int_value(resolve(attrib[key], args, path, key, "int"), prop, path), key)
+        for key, prop in STYLE_COLOR.items():
+            if key in attrib:
+                put(prop, _color_value(resolve(attrib[key], args, path, key, "color"), key, path), key)
+        if widget in INDICATOR_ATTRS and INDICATOR_ATTRS[widget] in attrib:
+            key = INDICATOR_ATTRS[widget]
+            put("indicator_color", _color_value(resolve(attrib[key], args, path, key, "color"), key, path), key)
+        for key, prop in STYLE_TYPED.items():
+            if key in attrib:
+                kind = "int" if SHARED_PROPS[prop]["type"] == "int_set" else "string"
+                put(prop, _typed_value(resolve(attrib[key], args, path, key, kind), prop, key, path), key)
+        typed = {**widget_attrs, **(CONTAINER_ATTRS if widget == "container" else {})}
+        for key, prop in typed.items():
+            if key in attrib:
+                kind = "int" if WIDGET_PROPS[prop]["type"] == "int" else "string"
+                put(prop, _typed_value(resolve(attrib[key], args, path, key, kind), prop, key, path), key)
         out = {"id": node_id, "type": widget, "props": props, "children": []}
+        bindings = []
         if widget == "label":
             text = resolve(attrib.get("text", ""), args, path, "text", "string")
             if len(text.encode("utf-8")) > MAX_TEXT:
                 _fail("UI_TEXT_SIZE", path, f"text exceeds {MAX_TEXT} bytes")
             props["text"] = text
             if "bind_text" in attrib:
-                binding = _binding_for(widget, {"property": "text", "key": attrib["bind_text"], "type": "string"})
-                if binding is None:
-                    _fail("UI_BINDING", path, f"bind_text subject {attrib['bind_text']} is not a platform subject")
-                out["binding"] = binding
+                bindings.append(_binding(widget, "text", attrib["bind_text"], "bind_text", path))
+        if "bind_value" in attrib:
+            bindings.append(_binding(widget, BINDABLE[widget][0], attrib["bind_value"], "bind_value", path))
         if widget == "image":
             name = attrib.get("src")
             if not name:
@@ -294,6 +408,7 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
             assets[node_id] = _asset(ui_dir, images[name], path)
             props["src"] = images[name]
             props["asset_id"] = node_id
+        series, cells = [], {}
         for child in children:
             child_path = f"{path}/{child.tag}"
             if child.tag == "event_cb":
@@ -309,7 +424,53 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
                     _fail("UI_EVENT", child_path, "a button supports one action")
                 out["action"] = {"event": "activate", "id": child.get("user_data")}
                 continue
+            if widget == "chart" and child.tag == "lv_chart-series":
+                # <lv_chart-series [values="1 2 3"] [bind_values="value.N"]/>, at most series_count.
+                if not set(child.attrib) <= {"values", "bind_values"} or len(child):
+                    _fail("UI_PROPERTY", child_path, "a series takes values and bind_values only")
+                series.append(child)
+                prop = f"series_{len(series)}"
+                if prop not in WIDGET_PROPS:
+                    _fail("UI_PROPERTY_VALUE", child_path, "a chart has at most 2 series")
+                if "values" in child.attrib:
+                    props[prop] = _typed_value(child.get("values"), prop, "values", child_path)
+                if "bind_values" in child.attrib:
+                    bindings.append(_binding(widget, prop, child.get("bind_values"), "bind_values", child_path))
+                continue
+            if widget == "table" and child.tag in ("lv_table-cell", "lv_table-row"):
+                # <lv_table-cell row col value/> sets a cell; <lv_table-row row bind_value/> binds a row,
+                # its cells separated by "|".
+                expected = {"row", "column", "value"} if child.tag == "lv_table-cell" else {"row", "bind_value"}
+                if set(child.attrib) != expected or len(child):
+                    _fail("UI_PROPERTY", child_path, f"{child.tag} takes {', '.join(sorted(expected))}")
+                try:
+                    row = int(child.get("row"))
+                    col = int(child.get("column", "0"))
+                except ValueError:
+                    _fail("UI_PROPERTY_VALUE", child_path, "row and column are integers")
+                if not 0 <= row < props.get("rows", 1) or not 0 <= col < props.get("cols", 1):
+                    _fail("UI_PROPERTY_VALUE", child_path, "the cell is outside row_count x column_count")
+                if child.tag == "lv_table-row":
+                    bindings.append(_binding(widget, f"row_{row}", child.get("bind_value"), "bind_value", child_path))
+                else:
+                    text = child.get("value")
+                    if len(text.encode("utf-8")) > WIDGET_PROPS["cells"]["max_bytes"]:
+                        _fail("UI_TEXT_SIZE", child_path, f"a cell is at most {WIDGET_PROPS['cells']['max_bytes']} bytes")
+                    cells[(row, col)] = text
+                continue
             out["children"].append(instantiate(child, scope, args, depth + 1, child_path, ancestry))
+        if series:
+            props["series_count"] = len(series)
+        if cells:
+            last = max(r * props.get("cols", 1) + c for r, c in cells)
+            props["cells"] = [cells.get(divmod(i, props.get("cols", 1)), "") for i in range(last + 1)]
+        if len({b["property"] for b in bindings}) != len(bindings):
+            _fail("UI_BINDING", path, "a property is bound twice")
+        if len(bindings) == 1:
+            out["binding"] = bindings[0]
+        elif bindings:
+            out["bindings"] = bindings
+        _check_combination(widget, props, path)
         if not spec["children"] and out["children"]:
             _fail("UI_CHILD", path, f"{tag} cannot contain widgets")
         if spec["requires_action"] and "action" not in out:
@@ -375,7 +536,7 @@ def validate_update(update: dict, generation: int, active: bool, document: dict)
         _fail("UI_UPDATE_STALE", "/update/generation", "screen is closed or update generation is stale")
     if set(update) != {"generation", "id", "key", "type", "value"}:
         _fail("UI_UPDATE_SCHEMA", "/update", "unexpected update fields")
-    if (not any(update["key"] == b["key"] and update["type"] == b["type"] for b in BINDINGS)
+    if (update["key"] not in BINDING_KEYS or update["type"] != BINDING_TYPE
             or not isinstance(update["value"], str)):
         _fail("UI_UPDATE_TYPE", "/update", "expected a registered binding key and type")
     if len(update["value"].encode("utf-8")) > MAX_TEXT or not ID_RE.fullmatch(update["id"]):
@@ -384,9 +545,9 @@ def validate_update(update: dict, generation: int, active: bool, document: dict)
     while pending:
         node = pending.pop()
         if node["id"] == update["id"]:
-            binding = node.get("binding")
-            if binding and binding["key"] == update["key"] and binding["type"] == update["type"]:
-                return
+            for binding in ([node["binding"]] if "binding" in node else node.get("bindings", [])):
+                if binding["key"] == update["key"] and binding["type"] == update["type"]:
+                    return
             break
         pending.extend(node["children"])
     _fail("UI_UPDATE_REFERENCE", "/update/id", "node is not bound to a registered binding with this key")
