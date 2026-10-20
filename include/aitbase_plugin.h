@@ -85,6 +85,11 @@ typedef enum aitbase_event_kind {
                                           action is the tool, request the call id for
                                           aitbase_tool_reply(), text the arguments as a JSON object.
                                           Since SDK 0.10 */
+    AITBASE_EVENT_CHANGED = 15,        /* the user changed an input widget: node is the widget, code its
+                                          value (0 or 1 for a checkbox or switch, a slider's value, a
+                                          roller's or dropdown's option index). At most 10 a second;
+                                          the latest value wins. Needs firmware with D36 input widgets.
+                                          Since SDK 0.12 */
 } aitbase_event_kind_t;
 
 /* The device's buttons, in AITBASE_EVENT_KEY. */
@@ -119,7 +124,8 @@ typedef struct aitbase_event {
                           as JSON. TOOL_CALL: the arguments as JSON. "" otherwise. Valid until aitbase_on_event returns; copy what
                           you keep. */
     size_t text_len;
-    int code;          /* RESULT: storage.get: 1 found, 0 missing; http.request: the HTTP status */
+    int code;          /* RESULT: storage.get: 1 found, 0 missing; http.request: the HTTP status.
+                          CHANGED: the input widget's value */
     int truncated;     /* RESULT of http.request: 1 when the body was cut to fit */
     const char *location; /* RESULT of http.request: the redirect target of a 3xx, else "" */
     /* Since SDK 0.8. */

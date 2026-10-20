@@ -8,6 +8,11 @@ More LVGL for plugin UI (device decision D36). Needs device firmware with D36; o
 - **Styles:** any `#rrggbb` or `0xRRGGBB` color, `style_border_*`, `style_radius`, `style_bg_opa`, `style_opa`, `style_pad_*`, `style_text_font` (14, 16, 20, 24, 28), `style_text_align`, and flex layout on `lv_obj` (`flex_flow`, `style_flex_*_place`). Indicator colors are `style_*_color-indicator`.
 - **Limits:** 64 widgets and 24 KiB per screen; an idle face may have 40 widgets and 12 KiB. Screens bind `value.1` to `value.16` as well as `title`.
 - **The registry format:** typed `widget_props` and `shared_props`, `bindable` and `binding_keys` replace the list of `bindings`. Tools that read `schema/plugin_ui_registry.json` need updating.
+- **Input widgets** (screens only): `lv_checkbox`, `lv_switch`, `lv_slider`, `lv_roller` and `lv_dropdown`, with `bind_checked` or `bind_value`.
+  - The device's two buttons drive them. RIGHT toggles a checkbox or switch, or puts a slider, roller or dropdown in edit mode, where LEFT and RIGHT step and a RIGHT long press confirms.
+  - Each change is the new **`AITBASE_EVENT_CHANGED`**, with `event->node` and the value in `event->code`, at most 10 a second. The protocol's new `ui` event is `changed {node, value}`.
+  - Key events are held in edit mode.
+  - The registry's widgets gain `input`, and `check` refuses input widgets on an idle face.
 
 ## 0.11.1 — 2026-10-20
 
