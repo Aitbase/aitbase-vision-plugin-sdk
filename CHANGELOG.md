@@ -31,6 +31,11 @@ More LVGL for plugin UI (device decision D36): display widgets, input widgets, s
 - 64 widgets and 24 KiB compiled per screen (from 32 and 16 KiB); an idle face may have 40 widgets and 12 KiB.
 - Screens bind `value.1` to `value.16` as well as `title`.
 
+### Local network over HTTP
+
+- `aitbase_http_request` may reach the local network on devices with D37: `10/8`, `172.16/12`, `192.168/16` and `fc00::/7`, `http://` included, for example a Home Assistant at `http://192.168.1.10:8123`.
+- The device's own addresses, loopback and link-local stay refused (`destination_blocked`). Older firmware refuses every local address.
+
 ### Upgrading from 0.11
 
 - **Existing plugins build and run unchanged.** No API was removed, `aitbase_event_t` keeps its layout, and screens that use only the 0.11 widgets keep working on every firmware.

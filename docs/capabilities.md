@@ -9,14 +9,14 @@ protocol operations behind it, the limits the device enforces, and every error c
 
 Every plugin may use every `community` capability: there is nothing to list or request (D32).
 `module` capabilities are for firmware feature modules only. What protects the device is in
-the rules of each operation: sound only while the plugin's screen shows, HTTP to public hosts
-only, sizes and rate limits.
+the rules of each operation: sound only while the plugin's screen shows, HTTP never to the
+device itself, sizes and rate limits.
 
 | Capability | Class | Rate limit | What it allows |
 |---|---|---|---|
 | `ui` | community | none | Show the plugin's own screens and update them. |
 | `storage` | community | 20/s, bursts of 40 | Keep small text values across runs, in a store only this plugin can reach. Needs an SD card. |
-| `http` | community | 1/s, bursts of 5 | Make HTTP and HTTPS requests to public internet hosts. Local network, loopback and reserved addresses are refused. |
+| `http` | community | 1/s, bursts of 5 | Make HTTP and HTTPS requests to internet hosts and to the local network (10/8, 172.16/12, 192.168/16, fc00::/7; D37), for example a Home Assistant at http://192.168.1.10:8123. The device's own addresses, loopback, link-local and reserved addresses are refused. |
 | `audio.output` | community | 5/s, bursts of 10 | Play tones and the package's own sounds on the speaker, only while the plugin's screen is visible. |
 | `schedule` | community | 1/s, bursts of 5 | Ring the device at set times, with the entry's label and a built-in sound; the device shows its own alarm screen, titled with the plugin's name. A community plugin holds at most 4 entries, 5 minutes apart, and each ring stops after 60 s (D26, D32). |
 | `settings` | module | 10/s, bursts of 20 | Keep the module's settings on internal flash. Firmware feature modules only (D25). Firmware feature modules only. |
@@ -278,7 +278,7 @@ or zero-width characters.
 | `streaming` | -3 | The plugin's audio stream is open; sounds wait until it closes. |
 | `no_memory` | -4 | The device ran out of memory. |
 | `no_grant` | -5 | No longer returned (D32): every plugin may use every community capability. Devices before D32 returned it when plugin.json didn't list the capability in requested_capabilities. |
-| `destination_blocked` | -5 | The URL isn't http or https, or its host resolves to a loopback, private, link-local or other non-public address. |
+| `destination_blocked` | -5 | The URL isn't http or https, or its host resolves to the device's own address, loopback, link-local, multicast or another reserved address. Public and LAN addresses are allowed (D37). |
 | `not_foreground` | -6 | Sound plays only while the plugin's screen is visible. |
 | `no_channel` | -6 | The plugin has no working audio channel: it doesn't hold audio.stream, or an earlier malformed frame ended the channel for this run (D28). |
 | `no_storage` | -6 | Plugin storage isn't available: no SD card, or it can't be written. |
