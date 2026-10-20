@@ -1,18 +1,45 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 — unreleased
 
-More LVGL for plugin UI (device decision D36). Needs device firmware with D36; older devices refuse the new widgets and styles.
+More LVGL for plugin UI (device decision D36): display widgets, input widgets, styles and higher limits. Needs device firmware with D36. An older device refuses a screen that uses any of them (`UI_REPRESENTATION_INVALID`): the screen doesn't open, and an idle face falls back to the clock. `check` can't tell which firmware a device runs.
 
-- **Display widgets:** `lv_bar`, `lv_arc`, `lv_led`, `lv_spinner` (at most 2), `lv_line` (up to 16 points), `lv_scale`, `lv_chart` (2 series of up to 32 points, `<lv_chart-series>`) and `lv_table` (8 × 4, `<lv_table-cell>`, `<lv_table-row>`). Gauges and leds bind with `bind_value` and take the leading integer of the bound text. Chart series and table rows bind too. They work on idle faces.
-- **Styles:** any `#rrggbb` or `0xRRGGBB` color, `style_border_*`, `style_radius`, `style_bg_opa`, `style_opa`, `style_pad_*`, `style_text_font` (14, 16, 20, 24, 28), `style_text_align`, and flex layout on `lv_obj` (`flex_flow`, `style_flex_*_place`). Indicator colors are `style_*_color-indicator`.
-- **Limits:** 64 widgets and 24 KiB per screen; an idle face may have 40 widgets and 12 KiB. Screens bind `value.1` to `value.16` as well as `title`.
-- **The registry format:** typed `widget_props` and `shared_props`, `bindable` and `binding_keys` replace the list of `bindings`. Tools that read `schema/plugin_ui_registry.json` need updating.
-- **Input widgets** (screens only): `lv_checkbox`, `lv_switch`, `lv_slider`, `lv_roller` and `lv_dropdown`, with `bind_checked` or `bind_value`.
-  - The device's two buttons drive them. RIGHT toggles a checkbox or switch, or puts a slider, roller or dropdown in edit mode, where LEFT and RIGHT step and a RIGHT long press confirms.
-  - Each change is the new **`AITBASE_EVENT_CHANGED`**, with `event->node` and the value in `event->code`, at most 10 a second. The protocol's new `ui` event is `changed {node, value}`.
-  - Key events are held in edit mode.
-  - The registry's widgets gain `input`, and `check` refuses input widgets on an idle face.
+### Display widgets (screens and idle faces)
+
+- `lv_bar`, `lv_arc`, `lv_led`, `lv_spinner` (at most 2 per screen), `lv_line` (up to 16 points), `lv_scale`, `lv_chart` (2 series of up to 32 points, `<lv_chart-series>`) and `lv_table` (8 × 4, `<lv_table-cell>`, `<lv_table-row>`).
+- Gauges and leds bind with `bind_value` and take the leading integer of the bound text, so one value (`"45%"`) feeds a label and a gauge. Chart series bind comma-separated integers; table rows bind cells separated by `|`.
+
+### Input widgets (screens only)
+
+- `lv_checkbox`, `lv_switch`, `lv_slider`, `lv_roller` and `lv_dropdown`, with `bind_checked` or `bind_value`.
+- **The device's two buttons drive them:**
+  - RIGHT toggles a checkbox or switch, or puts a slider, roller or dropdown in edit mode.
+  - In edit mode, LEFT and RIGHT step, and a RIGHT long press confirms. The device takes back the step of the long press's own press first.
+  - LEFT long press still leaves the screen.
+- **New event `AITBASE_EVENT_CHANGED`:** `event->node` is the widget and `event->code` its value. At most 10 arrive a second per screen; the latest value per widget waits, and is sent before the screen closes. `AITBASE_EVENT_KEY` is held while a widget is in edit mode.
+- Setting a widget through its binding (`aitbase_ui_set_text`) sends no `AITBASE_EVENT_CHANGED`.
+- `examples/prefs` saves a switch, a slider and a roller and restores them on start.
+
+### Styles
+
+- Any `#rrggbb` or `0xRRGGBB` color, as well as the four platform tokens.
+- `style_border_*`, `style_radius`, `style_bg_opa`, `style_opa`, `style_pad_*`, `style_text_font` (14, 16, 20, 24, 28), `style_text_align`, and flex layout on `lv_obj` (`flex_flow`, `style_flex_*_place`).
+- Indicator colors are written `style_*_color-indicator`, because XML can't take `:` in an attribute name.
+
+### Limits
+
+- 64 widgets and 24 KiB compiled per screen (from 32 and 16 KiB); an idle face may have 40 widgets and 12 KiB.
+- Screens bind `value.1` to `value.16` as well as `title`.
+
+### Upgrading from 0.11
+
+- **Existing plugins build and run unchanged.** No API was removed, `aitbase_event_t` keeps its layout, and screens that use only the 0.11 widgets keep working on every firmware.
+- **Plugin protocol:** the device sends the new `ui` event `changed {node, value}`. A plugin built with an older SDK ignores it.
+- **Tools that read `schema/plugin_ui_registry.json`** need updating:
+  - typed `widget_props` and `shared_props`, `bindable` and `binding_keys` replace the list of `bindings`;
+  - widgets gain `input`;
+  - limits gain `max_changed_per_second`.
+- **`check`:** `IDLE_FACE_BOUNDS` now also reports input widgets on an idle face.
 
 ## 0.11.1 — 2026-10-20
 
