@@ -38,7 +38,7 @@
     {"code": "network_error", "status": "failed", "summary": "DNS, connection or transfer failure."},
     {"code": "tls_error", "status": "failed", "summary": "The server's TLS certificate couldn't be verified."},
     {"code": "module_only", "status": "denied", "summary": "Only a firmware feature module (D25) may use this operation."},
-    {"code": "no_screen", "status": "unavailable", "summary": "A firmware feature module has no screen (D25): ui operations aren't available to it."},
+    {"code": "no_screen", "status": "unavailable", "summary": "Not sent since 2026-10-20: every plugin may open screens, firmware feature modules too. Older devices answered it for a module's ui operations (D25)."},
     {"code": "too_many", "status": "limit", "summary": "The plugin already holds the most scheduler entries it may: 8 for a firmware module, 4 for a community plugin."},
     {"code": "too_close", "status": "limit", "summary": "Another entry of this plugin is due within 5 minutes of this one (community plugins, D26)."},
     {"code": "not_allowed", "status": "denied", "summary": "No longer returned (D32 dropped \"Allow alarms\"). Devices before D32 returned it until the owner allowed a plugin's alarms (D26)."},
