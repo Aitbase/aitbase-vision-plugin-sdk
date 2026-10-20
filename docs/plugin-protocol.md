@@ -83,6 +83,7 @@ The device never sends a message longer than the plugin's `rx_max`. A result tha
 | `action` | The user activated a focusable widget with RIGHT. | `node`, `action` |
 | `key` | A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press, before the `action` of the same press. A long press comes after a press of the same button; LEFT long press is never sent. | `key`: `left` or `right`; `gesture`: `press` or `long_press` |
 | `update_rejected` | An update was refused when the device applied it. | `node`, `detail` |
+| `changed` | The user changed an input widget (since SDK 0.12, devices with D36). At most 10 a second per screen; the latest value per widget wins. No `key` events arrive while a widget is in edit mode. | `node`; `value`: 0 or 1 (checkbox, switch), the value (slider), the option's index (roller, dropdown) |
 
 `cap` `audio`:
 

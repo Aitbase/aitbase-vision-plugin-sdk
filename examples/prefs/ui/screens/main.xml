@@ -1,0 +1,8 @@
+<screen>
+  <view width="240" height="320" style_bg_color="#surface" style_pad_all="12" flex_flow="column" style_pad_row="12">
+    <lv_label name="summary" text="" style_text_color="#on_surface" bind_text="title"/>
+    <lv_switch name="sound" style_bg_color-indicator="#accent" bind_checked="value.1"/>
+    <lv_slider name="level" width="200" min_value="0" max_value="10" step="1" value="5" bind_value="value.2"/>
+    <lv_roller name="city" width="200" options="Hanoi\nHue\nDa Nang\nSaigon" bind_value="value.3"/>
+  </view>
+</screen>

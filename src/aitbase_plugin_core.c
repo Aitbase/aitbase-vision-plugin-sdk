@@ -374,7 +374,7 @@ static aitbase_event_kind_t kind_from_name(const char *name) {
         {"closed", AITBASE_EVENT_CLOSED},     {"preempted", AITBASE_EVENT_PREEMPTED},
         {"action", AITBASE_EVENT_ACTION},     {"update_rejected", AITBASE_EVENT_UPDATE_REJECTED},
         {"sound_done", AITBASE_EVENT_SOUND_DONE}, {"key", AITBASE_EVENT_KEY},
-        {"stream_state", AITBASE_EVENT_STREAM_STATE},
+        {"stream_state", AITBASE_EVENT_STREAM_STATE}, {"changed", AITBASE_EVENT_CHANGED},
     };
     for (size_t i = 0; i < sizeof(kinds) / sizeof(kinds[0]); ++i) {
         if (strcmp(name, kinds[i].name) == 0) return kinds[i].kind;
@@ -564,6 +564,10 @@ int aitbase_core_handle_message(aitbase_plugin_t *plugin, const char *line, size
             copy_field(out.action, sizeof(out.action), data, "action");
             copy_field(out.detail, sizeof(out.detail), data, "detail");
             out.request = cJSON_IsNumber(request) ? (uint32_t)request->valuedouble : 0;
+            if (out.kind == AITBASE_EVENT_CHANGED) {
+                const cJSON *value = cJSON_GetObjectItemCaseSensitive(data, "value");
+                out.code = cJSON_IsNumber(value) ? (int)value->valuedouble : 0;
+            }
             if (out.kind == AITBASE_EVENT_STREAM_STATE) {
                 copy_field(out.detail, sizeof(out.detail), data, "state");
                 copy_field(out.reason, sizeof(out.reason), data, "reason");
@@ -613,6 +617,7 @@ const char *aitbase_event_kind_name(aitbase_event_kind_t kind) {
         case AITBASE_EVENT_DEVICE: return "device";
         case AITBASE_EVENT_STREAM_STATE: return "stream_state";
         case AITBASE_EVENT_TOOL_CALL: return "tool_call";
+        case AITBASE_EVENT_CHANGED: return "changed";
         default: return "none";
     }
 }
