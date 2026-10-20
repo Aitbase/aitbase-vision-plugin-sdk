@@ -316,8 +316,13 @@ int main(void) {
         EXPECT(req && strcmp(str(req, "cap"), "audio") == 0 && strcmp(str(req, "op"), "stream_open") == 0 &&
                num(cJSON_GetObjectItem(req, "args"), "rate") == 22050, "audio.stream_open with the rate");
         cJSON_Delete(req);
+        g_audio_len = 0;
+        EXPECT(aitbase_audio_stream_write(g_p, pcm, 4) == 0 && g_audio_len == 0,
+               "samples wait until the device answers the open (since 0.12): nothing reaches the channel");
+        snprintf(line, sizeof(line), "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{}}", open_id);
+        EXPECT(deliver(line) == 0, "stream_open accepted");
         EXPECT(aitbase_audio_stream_write(g_p, pcm, 4) == 4 && g_audio_len == 8 && memcmp(g_audio, pcm, 8) == 0,
-               "samples go to audio_write as bytes");
+               "then samples go to audio_write as bytes");
         g_audio_result = 0;
         EXPECT(aitbase_audio_stream_write(g_p, pcm, 0) == AITBASE_ERR_ARGUMENT &&
                aitbase_audio_stream_write(g_p, big, AITBASE_AUDIO_STREAM_FRAME_SAMPLES + 1) == AITBASE_ERR_ARGUMENT &&
@@ -330,9 +335,14 @@ int main(void) {
         g_audio_result = -8;
         EXPECT(aitbase_audio_stream_write(g_p, pcm, 4) == AITBASE_ERR_UNSUPPORTED, "no grant is AITBASE_ERR_UNSUPPORTED");
         g_audio_result = 0;
-        snprintf(line, sizeof(line), "{\"id\":%d,\"status\":-3,\"error\":\"speaker_busy\",\"result\":{}}", open_id);
+        const int refused_id = aitbase_audio_stream_open(g_p, 22050);
+        cJSON_Delete(take(&next));
+        snprintf(line, sizeof(line), "{\"id\":%d,\"status\":-3,\"error\":\"speaker_busy\",\"result\":{}}", refused_id);
         EXPECT(deliver(line) == 0, "stream_open refused");
         expect_update(&next, "error audio.stream_open -3 speaker_busy");
+        g_audio_len = 0;
+        EXPECT(aitbase_audio_stream_write(g_p, pcm, 4) == AITBASE_ERR_IO && g_audio_len == 0,
+               "after a refused open, writes fail without touching the channel");
         EXPECT(deliver("{\"cap\":\"audio\",\"event\":\"stream_state\",\"data\":{\"state\":\"paused\"}}") == 0, "paused");
         expect_update(&next, "stream paused ");
         EXPECT(deliver("{\"cap\":\"audio\",\"event\":\"stream_state\",\"data\":{\"state\":\"stopped\",\"reason\":\"idle_timeout\"}}") == 0,

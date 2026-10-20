@@ -48,6 +48,12 @@ More LVGL for plugin UI (device decision D36): display widgets, input widgets, s
 
 - Firmware feature modules may use `ui` like any plugin. Devices from 2026-10-20 no longer answer `no_screen`; the code stays, marked as no longer sent.
 
+### Audio streams: write right after opening
+
+- `aitbase_audio_stream_write` now returns 0 ("send again later") until the device has answered `aitbase_audio_stream_open` or `aitbase_audio_stream_open_background`, and `AITBASE_ERR_IO` when it refused. The refusal also arrives as `AITBASE_EVENT_ERROR`, as before.
+- Writing in the same callback as the open used to send samples before the device had opened the stream, which ended the channel for the run (`bad_stream`). A successful open sends no event, so a plugin couldn't tell when to start. Found on a device with the music module.
+- Plugins need no change: a write that returns 0 is retried on the next timer, as they already do for a full buffer.
+
 ### Upgrading from 0.11
 
 - **Existing plugins build and run unchanged.** No API was removed, `aitbase_event_t` keeps its layout, and screens that use only the 0.11 widgets keep working on every firmware.
