@@ -214,7 +214,7 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `TOOL_NAME` | A tool's name isn't lowercase letters, digits and `_` starting with a letter (at most 24), or is declared twice. |
 | `TOOL_DESCRIPTION` | A tool has no description, or it isn't one line of at most 120 bytes without control or invisible characters. |
 | `TOOL_ARG` | A tool has more than 4 arguments, or an argument isn't a `string` (`max` 1 to 120), an `int` (`min` and `max`) or an `enum` (1 to 8 values). |
-| `IDLE_FACE_BOUNDS` | The `idle_face` screen can't be a face: it has a button or action, binds a key other than `face.1` to `face.16`, or has more than 24 widgets or 8 KiB compiled. |
+| `IDLE_FACE_BOUNDS` | The `idle_face` screen can't be a face: it has a button or action, binds a key other than `face.1` to `face.16`, or has more than 40 widgets or 12 KiB compiled. |
 | `SOUND_NAME` | A sound name is not lowercase letters, digits and `_` (at most 32), or is listed twice. |
 | `SOUND_MISSING` | A listed sound has no `sounds/<name>.wav`. |
 | `SOUND_FORMAT` | The sound is not a 16 kHz, mono, 16-bit PCM WAV of at most 10 seconds. |
