@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.0 — unreleased
+## 0.12.0 — 2026-10-21
 
 More LVGL for plugin UI (device decision D36): display widgets, input widgets, styles and higher limits. Needs device firmware with D36. An older device refuses a screen that uses any of them (`UI_REPRESENTATION_INVALID`): the screen doesn't open, and an idle face falls back to the clock. `check` can't tell which firmware a device runs.
 
