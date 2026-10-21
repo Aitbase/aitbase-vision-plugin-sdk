@@ -109,7 +109,7 @@ class PluginUiCompileTest(unittest.TestCase):
         self.rejected("UI_WIDGET", screen=SCREEN.replace('<lv_image name="logo" src="logo"/>', '<Card name="s"/>'))
         self.rejected("UI_PROPERTY", screen=SCREEN.replace('width="240"', 'hidden="true" width="240"'))
         self.rejected("UI_PROPERTY", screen=SCREEN.replace('width="240"', 'style_shadow_width="4" width="240"'))
-        self.rejected("UI_PROPERTY", screen=SCREEN.replace('width="240"', 'align="center" width="240"'))
+        self.rejected("UI_PROPERTY", screen=SCREEN.replace('width="240"', 'hidden="true" width="240"'))
         self.rejected("UI_PROPERTY_VALUE", screen=SCREEN.replace('width="240"', 'width="-1"'))
         self.rejected("UI_PROPERTY_VALUE", screen=SCREEN.replace('width="240"', 'width="50%"'))
 
@@ -233,6 +233,21 @@ class PluginUiCompileTest(unittest.TestCase):
         self.assertEqual(nodes["box"]["props"]["flex_flow"], "row_wrap")
         self.assertEqual(nodes["box"]["props"]["bg_opa"], 128)
 
+    def test_placement_and_label_attributes_compile(self):
+        widgets = (
+            '<lv_obj name="gauge" width="72" height="72">'
+            '<lv_arc name="ring" width="72" height="72" style_arc_color="#3a3a3a" style_arc_color-indicator="#ff6a00"/>'
+            '<lv_label name="pct" floating="true" align="center" text="45%"/></lv_obj>'
+            '<lv_obj name="row" flex_flow="row"><lv_bar name="fill" width="1" flex_grow="1"/>'
+            '<lv_label name="cpu" width="80" long_mode="scroll_circular" text="AMD Ryzen 9"/></lv_obj>')
+        self.write(screen=f"<screen><view>{widgets}</view></screen>")
+        tree = self.compile()["tree"]
+        gauge, row = tree["children"]
+        self.assertEqual(gauge["children"][0]["props"]["track_color"], "#3a3a3a")
+        self.assertEqual(gauge["children"][1]["props"], {"floating": 1, "align": "center", "text": "45%"})
+        self.assertEqual(row["children"][0]["props"]["flex_grow"], 1)
+        self.assertEqual(row["children"][1]["props"]["long_mode"], "scroll_circular")
+
     def test_d36_bounds_are_checked_at_compile_time(self):
         cases = (
             ('<lv_arc name="a" style_arc_width="17"/>', "UI_PROPERTY_VALUE"),
@@ -252,6 +267,12 @@ class PluginUiCompileTest(unittest.TestCase):
             ('<lv_label name="x" style_pad_all="4" style_pad_all2="4"/>', "UI_PROPERTY"),
             ('<lv_spinner name="a"/><lv_spinner name="b"/><lv_spinner name="c"/>', "UI_WIDGET_LIMIT"),
             ('<lv_label name="x" style_text_color="#ffffff" style_line_color="#000000"/>', "UI_PROPERTY"),
+            ('<lv_label name="x" long_mode="marquee"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_bar name="x" long_mode="clip"/>', "UI_PROPERTY"),
+            ('<lv_label name="x" align="middle"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_label name="x" floating="yes"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_bar name="x" flex_grow="9"/>', "UI_PROPERTY_VALUE"),
+            ('<lv_bar name="x" style_arc_color="#3a3a3a"/>', "UI_PROPERTY"),
         )
         for xml, code in cases:
             with self.subTest(xml=xml):
