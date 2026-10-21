@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+Guidance for device firmware with D40 and D41; no API change.
+
+- **The plugin screen fills the display (D41).** Devices with D41 draw no status bar and no button bar over a plugin screen. Draw your own header and footer, and map LEFT press, RIGHT press and RIGHT long press with `AITBASE_EVENT_KEY`. A LEFT long press still always leaves, and the device shows "◀ Hold to exit" for 3 s when the screen opens. See "The screen is yours, edge to edge" in `template/AGENTS.md`.
+- **Leaving ends the plugin (D41).** After `AITBASE_EVENT_PREEMPTED` (LEFT long press, the assistant, a call…) a plugin can't open its screen again (`denied`, `user_left`), and the device ends it 1.5 s later. Save state when the event arrives.
+- **No button shortcut (D40).** Devices with D40 have no RIGHT long-press shortcut on the home screen, so `aitbase_trigger()` is never `"shortcut"` there.
+
 ## 0.12.0 — 2026-10-21
 
 More LVGL for plugin UI (device decision D36): display widgets, input widgets, styles and higher limits. Needs device firmware with D36. An older device refuses a screen that uses any of them (`UI_REPRESENTATION_INVALID`): the screen doesn't open, and an idle face falls back to the clock. `check` can't tell which firmware a device runs.

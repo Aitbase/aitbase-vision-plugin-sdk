@@ -31,7 +31,7 @@ Only what is listed here exists. Do not invent functions, widgets, colors, actio
 - **UI:** widgets `lv_obj`, `lv_label`, `lv_button`, `lv_image`, display widgets `lv_bar`, `lv_arc`, `lv_led`, `lv_spinner`, `lv_line`, `lv_scale`, `lv_chart`, `lv_table`, and input widgets `lv_checkbox`, `lv_switch`, `lv_slider`, `lv_roller`, `lv_dropdown` (screens only). Any `#rrggbb` color, or the tokens `#surface`, `#on_surface`, `#accent`, `#control`. Bindable subjects: `title` and `value.1`–`value.16` (`face.1`–`face.16` on an idle face). One action: `plugin.increment`. Full rules: the `plugin-ui-xml` skill and `sdk/schema/plugin_ui_registry.json`.
 - **Screen:** 240×320 pixels.
 - **Signing:** `pack --wasm` signs the package with the user's key, created on the first pack (`aitbase-plugin key` shows it). The device remembers the first key per plugin id and refuses updates signed with another, so tell the user to back the key file up. Never print, copy or commit the key file.
-- **How it starts:** `aitbase_trigger(p)` in `aitbase_on_start` says why: `"autorun"` (copied to the card or `dev`), `"voice"`, `"shortcut"` (the owner's RIGHT long press on the home screen) or `"schedule"`. A plugin can run by itself on a schedule with `"triggers": [{"event": "schedule", "every_min": 60}]` in `plugin.json` (15 to 1440 minutes). A scheduled run happens only while the device is idle, nobody asked for it, and it is ended after 30 s unless it shows its screen: do the work (for example an HTTP request and `storage`), then stop, or open the screen only when there is something to show.
+- **How it starts:** `aitbase_trigger(p)` in `aitbase_on_start` says why: `"autorun"` (copied to the card or `dev`), `"voice"`, `"shortcut"` (older devices only) or `"schedule"`. A plugin can run by itself on a schedule with `"triggers": [{"event": "schedule", "every_min": 60}]` in `plugin.json` (15 to 1440 minutes). A scheduled run happens only while the device is idle, nobody asked for it, and it is ended after 30 s unless it shows its screen: do the work (for example an HTTP request and `storage`), then stop, or open the screen only when there is something to show.
 - **Voice start:** the user can open the plugin by asking the device's assistant ("open <name>"). The assistant matches the manifest's `name`, so keep it short and easy to say, and unlike other plugins' names. The screen appears when the assistant finishes speaking, which is why `aitbase_ui_open` should wait (`AITBASE_UI_MAX_WAIT_MS`).
 
 ## Input: two buttons, no touch
@@ -40,10 +40,18 @@ The device has two physical buttons and no touchscreen.
 - LEFT moves focus to the next button or input widget on screen.
 - RIGHT activates the focused button (`AITBASE_EVENT_ACTION`) or toggles a checkbox or switch (`AITBASE_EVENT_CHANGED`).
 - RIGHT on a slider, roller or dropdown enters edit mode: LEFT steps down, RIGHT steps up (each an `AITBASE_EVENT_CHANGED`), and a RIGHT long press confirms. In edit mode no `AITBASE_EVENT_KEY` arrives.
-- A LEFT long press always leaves the plugin. The plugin gets `AITBASE_EVENT_PREEMPTED` and should stop.
+- A LEFT long press always leaves the plugin, and so does anything the device puts first (the voice assistant, a call, an alarm). The plugin gets `AITBASE_EVENT_PREEMPTED`: save what it needs right away. On devices with D41 it can't open its screen again, and the device ends it 1.5 s later.
 - The plugin also hears the buttons themselves while its screen shows: `AITBASE_EVENT_KEY` with `ev->key` (`AITBASE_KEY_LEFT` or `AITBASE_KEY_RIGHT`) and `ev->gesture` (`AITBASE_GESTURE_PRESS` or `AITBASE_GESTURE_LONG_PRESS`). It comes before the `ACTION` of the same press. A long press always comes after a press of the same button. LEFT long press is never delivered.
 
 Design every screen for this. With buttons on the screen: a few large ones in a sensible order. Without any: the screen is driven by `AITBASE_EVENT_KEY` alone, for a game or a stopwatch (RIGHT press, RIGHT long press and LEFT press). No text input, no scrolling lists.
+
+## The screen is yours, edge to edge
+
+On devices with D41 the plugin's screen fills the whole display: the device draws no status bar at the top and no button bar at the bottom. Older devices keep both, with "Next" and "Select" in the bottom bar.
+- **Draw your own bars.** Put a header row (a title, maybe a status) at the top and a footer row at the bottom that says what LEFT and RIGHT do right now, for example `◀ Back` and `Play ▶`. Update the footer labels with `aitbase_ui_set_text` when the meaning changes.
+- **Map the buttons yourself.** For custom actions, handle `AITBASE_EVENT_KEY` (LEFT press, RIGHT press, RIGHT long press) and keep the screen free of focusable widgets, so LEFT doesn't also move focus. With focusable widgets, LEFT moves focus and RIGHT activates, as above.
+- **Size with flex and percentages,** not fixed pixel heights: the display's size and orientation differ between devices.
+- **Leave the bottom edge readable for 3 s.** When the screen opens, the device shows "◀ Hold to exit" over its bottom edge for 3 seconds. A LEFT long press always leaves; you can't change that.
 
 ## Project layout
 
