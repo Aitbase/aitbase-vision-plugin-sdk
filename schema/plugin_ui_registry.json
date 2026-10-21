@@ -36,18 +36,26 @@
     "pad_left": [0, 64],
     "pad_right": [0, 64],
     "pad_row": [0, 64],
-    "pad_column": [0, 64]
+    "pad_column": [0, 64],
+    "flex_grow": [0, 8],
+    "floating": [0, 1]
   },
-  "color_props": ["background", "color", "border_color", "indicator_color"],
+  "color_props": ["background", "color", "border_color", "indicator_color", "track_color"],
   "color_tokens": ["#101820", "#ffffff", "#00e5ff", "#334455"],
   "color_token_names": {"surface": "#101820", "on_surface": "#ffffff", "accent": "#00e5ff", "control": "#334455"},
   "color_any_hex": true,
   "shared_props": {
     "font": {"type": "int_set", "values": [14, 16, 20, 24, 28]},
-    "text_align": {"type": "enum", "values": ["left", "center", "right"]}
+    "text_align": {"type": "enum", "values": ["left", "center", "right"]},
+    "align": {
+      "type": "enum",
+      "values": ["top_left", "top_mid", "top_right", "left_mid", "center", "right_mid", "bottom_left", "bottom_mid",
+                 "bottom_right"]
+    }
   },
   "widget_props": {
     "text": {"type": "text"},
+    "long_mode": {"type": "enum", "values": ["wrap", "scroll", "scroll_circular", "dots", "clip"]},
     "src": {"type": "asset"},
     "flex_flow": {"type": "enum", "values": ["row", "column", "row_wrap", "column_wrap"]},
     "flex_main_place": {"type": "enum", "values": ["start", "center", "end", "space_between", "space_around", "space_evenly"]},
@@ -89,7 +97,7 @@
       "children": true,
       "requires_action": false
     },
-    "label": {"props": ["text"], "children": false, "requires_action": false},
+    "label": {"props": ["text", "long_mode"], "children": false, "requires_action": false},
     "button": {"props": [], "children": true, "requires_action": true},
     "image": {"props": ["src"], "children": false, "requires_action": false},
     "bar": {"props": ["value", "min", "max"], "children": false, "requires_action": false},

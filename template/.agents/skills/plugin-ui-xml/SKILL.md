@@ -27,22 +27,23 @@ ui/assets/                  RGB565 images: uint16 width, uint16 height, then pix
 | Colors: `style_bg_color`, `style_text_color`, `style_border_color`, `style_line_color` | `#rrggbb`, `0xRRGGBB`, or `#surface`, `#on_surface`, `#accent`, `#control` |
 | Other styles | `style_radius` 0–40, `style_border_width` 0–8, `style_bg_opa` and `style_opa` 0–255, `style_text_font` 14/16/20/24/28, `style_text_align` left/center/right |
 | `lv_obj` layout | `flex_flow` (row, column, row_wrap, column_wrap) and `style_flex_main_place`, `style_flex_cross_place`, `style_flex_track_place` |
-| `lv_label` | `text` (at most 80 bytes); optional `bind_text="title"` or `value.1`–`value.16` (`face.1`–`face.16` on an idle face) |
-| Gauges | `lv_bar`, `lv_arc` and `lv_led` take `bind_value="value.N"`; the bound text's leading integer is the value (`"45%"` is 45) |
+| Placement (any widget) | `flex_grow` 0–8; `floating="true"` with `align` (top_left, top_mid, top_right, left_mid, center, right_mid, bottom_left, bottom_mid, bottom_right) to sit over a sibling, `x`/`y` as the offset |
+| `lv_label` | `text` (at most 80 bytes); `long_mode` wrap/scroll/scroll_circular/dots/clip; optional `bind_text="title"` or `value.1`–`value.16` (`face.1`–`face.16` on an idle face) |
+| Gauges | `lv_arc` and `lv_spinner` take `style_arc_color` for the track. `lv_bar`, `lv_arc` and `lv_led` take `bind_value="value.N"`; the bound text's leading integer is the value (`"45%"` is 45) |
 | Inputs | `lv_checkbox text checked="true\|false" bind_checked`, `lv_switch checked bind_checked`, `lv_slider value min_value max_value step bind_value`, `lv_roller`/`lv_dropdown options="A\\nB\\nC" selected bind_value` (1–8 options of ≤ 24 bytes). Each change is `AITBASE_EVENT_CHANGED` (`ev->node`, value in `ev->code`) |
 | `lv_image` | `src` = an image name from `globals.xml` |
 | `lv_button` | Exactly one `<event_cb trigger="clicked" callback="aitbase_action" user_data="plugin.increment"/>` |
 | Component | `<api><prop name="..." type="string\|int\|color" default="..."/></api>`; use as `<card name="status" title="..."/>`; `$prop` as a whole attribute value |
 
-Limits: 64 nodes (40 on an idle face), depth 6, 4 images, 24 KiB compiled (12 KiB for a face). Needs device firmware with D36 for the display and input widgets and the new styles.
+Limits: 64 nodes (40 on an idle face), depth 6, 4 images, 24 KiB compiled (12 KiB for a face). Needs device firmware with D36 for the display and input widgets and the new styles, and the firmware after SDK 0.12.1 for `long_mode`, `flex_grow`, `floating`, `align` and `style_arc_color`.
 
 ## Rejected (do not use)
 
-Other widgets (lists, text areas, keyboards, canvases, tab views...), `align`, `grid_*`, other `flex_*`, flags and states (`hidden`, `clickable`, `focused`), any other `style_*`, `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<animations>`, `<translations>`, `bind_text-fmt`, DTDs and entities.
+Other widgets (lists, text areas, keyboards, canvases, tab views...), `grid_*`, other `flex_*`, flags and states other than `floating` (`hidden`, `clickable`, `focused`), any other `style_*`, `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<animations>`, `<translations>`, `bind_text-fmt`, DTDs and entities.
 
 ## Layout tips
 
-- The device lays out every `<view>` and `lv_obj` as a column unless `flex_flow` says otherwise: children follow each other in document order. Inside a flex layout, `x` and `y` have no effect. Control spacing with `style_pad_*` and sizes with `width`/`height`.
+- The device lays out every `<view>` and `lv_obj` as a column unless `flex_flow` says otherwise: children follow each other in document order. Inside a flex layout, `x` and `y` have no effect, except on a `floating="true"` widget, where they offset its `align`. Control spacing with `style_pad_*` and sizes with `width`/`height`.
 - Buttons get focus in document order, so put them in the order the user should step through them with LEFT.
 - Keep text short. Labels are capped at 80 bytes.
 
