@@ -2,7 +2,7 @@
 
 Build plugins that put their own screen on an AITBASE VISION device.
 
-> **Status: 0.11.1 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs signed WebAssembly plugins from the SD card. Plugins can show screens, keep small values, make HTTP requests, play sounds and audio streams, set alarms and answer the voice assistant ([capabilities](docs/capabilities.md)). Packages are signed `.avp` files; store distribution is not available yet.
+> **Status: 0.12.0 preview.** API version 1 and UI schema v1 may still change before 1.0. Current device firmware runs signed WebAssembly plugins from the SD card. Plugins can show screens, keep small values, make HTTP requests, play sounds and audio streams, set alarms and answer the voice assistant ([capabilities](docs/capabilities.md)). Packages are signed `.avp` files; store distribution is not available yet.
 
 ## Quick start
 
