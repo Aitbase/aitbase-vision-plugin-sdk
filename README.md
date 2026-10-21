@@ -65,7 +65,7 @@ The device owns the screen:
 - **Rendering:** it validates and draws the plugin's UI itself.
 - **Buttons:** LEFT moves focus, RIGHT activates the focused widget, and a LEFT long press always leaves. The plugin also hears LEFT press, RIGHT press and RIGHT long press as `AITBASE_EVENT_KEY`.
 - **Taking the screen back:** this happens at any time, for example for the voice assistant.
-- **Starting:** by the user (voice, the owner's button shortcut) or by itself on a schedule (`"triggers"` in `plugin.json`); `aitbase_trigger()` tells the plugin which.
+- **Starting:** by the user (voice) or by itself on a schedule (`"triggers"` in `plugin.json`); `aitbase_trigger()` tells the plugin which.
 
 A plugin never touches LVGL, files or drivers.
 

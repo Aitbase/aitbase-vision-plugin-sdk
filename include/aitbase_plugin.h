@@ -386,7 +386,7 @@ void aitbase_plugin_stop(aitbase_plugin_t *plugin);
 /* Why the device started the plugin, from aitbase_on_start on (since SDK 0.9):
  *   "autorun"  a new or changed package on the SD card, or `aitbase-plugin dev`;
  *   "voice"    the user asked the assistant to open it;
- *   "shortcut" the owner's button shortcut (RIGHT long press on the home screen);
+ *   "shortcut" the owner's button shortcut, on older devices only (devices with D40 never send it);
  *   "schedule" the manifest's schedule ("triggers"): the user didn't ask, so do the work and stop,
  *              or open the screen only when there is something to show. A scheduled run without a
  *              screen is ended after 30 s;

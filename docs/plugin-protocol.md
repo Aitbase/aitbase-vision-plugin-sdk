@@ -79,7 +79,7 @@ The device never sends a message longer than the plugin's `rx_max`. A result tha
 | `opened` | The screen is visible. | |
 | `rejected` | The open was refused, cancelled by another device state, or timed out. | `detail` |
 | `closed` | The screen was closed after a `close` request. | |
-| `preempted` | The device took the screen back: LEFT long press, voice assistant, settings… | |
+| `preempted` | The device took the screen back: LEFT long press, voice assistant, settings… On devices with D41 the user has left the plugin: another `ui` `open` is refused (`denied`, `user_left`) and the device ends the plugin 1.5 s later. | |
 | `action` | The user activated a focusable widget with RIGHT. | `node`, `action` |
 | `key` | A button was pressed while the plugin's screen shows: LEFT press, RIGHT press or RIGHT long press, before the `action` of the same press. A long press comes after a press of the same button; LEFT long press is never sent. | `key`: `left` or `right`; `gesture`: `press` or `long_press` |
 | `update_rejected` | An update was refused when the device applied it. | `node`, `detail` |
