@@ -78,8 +78,10 @@ The source of truth is `schema/plugin_ui_registry.json`.
 | `style_bg_opa`, `style_opa` | 0–255. |
 | `style_text_font` | The device's font sizes: `14`, `16`, `20`, `24` or `28` (Latin and Vietnamese). |
 | `style_text_align` | `left`, `center` or `right`. |
+| `flex_grow` | 0–8: the widget's share of its flex parent's free space, as in LVGL. A bar with `width="1" flex_grow="1"` fills what its row's other widgets leave. |
+| `floating`, `align` | `floating="true"` takes a widget out of its parent's flex layout; `align` (`top_left`, `top_mid`, `top_right`, `left_mid`, `center`, `right_mid`, `bottom_left`, `bottom_mid`, `bottom_right`) then places it in the parent, with `x`/`y` as the offset. Use it to put a value over a sibling, such as in the middle of an arc. |
 | `lv_obj` layout | `flex_flow` (`row`, `column`, `row_wrap`, `column_wrap`); `style_flex_main_place` and `style_flex_track_place` (`start`, `center`, `end`, `space_between`, `space_around`, `space_evenly`); `style_flex_cross_place` (`start`, `center`, `end`). |
-| `lv_label` | `text` (at most 80 bytes); `bind_text` (a platform subject: `title` or `value.1` to `value.16` on a screen, `face.1` to `face.16` on an idle face). |
+| `lv_label` | `text` (at most 80 bytes); `long_mode` (`wrap`, the default, `scroll`, `scroll_circular`, `dots` or `clip`: what a text wider than the label's `width` does); `bind_text` (a platform subject: `title` or `value.1` to `value.16` on a screen, `face.1` to `face.16` on an idle face). |
 | `lv_image` | `src` is the name of an image declared in `globals.xml`: `<images><file name="logo" src_path="assets/logo.rgb565"/></images>`. |
 | `lv_button` | Must contain exactly one `<event_cb trigger="clicked" callback="aitbase_action" user_data="<action>"/>`, where `<action>` is a registered action (`plugin.increment`). |
 
@@ -90,9 +92,9 @@ They show values; they never take focus or input. Bound values are text, set wit
 | Widget | Attributes | Binding | Bounds |
 |---|---|---|---|
 | `lv_bar` | `value`, `min_value`, `max_value`, `style_bg_color-indicator` | `bind_value` | -1000..1000; min below max |
-| `lv_arc` | `value`, `min_value`, `max_value`, `rotation`, `bg_start_angle`, `bg_end_angle`, `style_arc_width`, `style_arc_color-indicator` | `bind_value` | angles 0–360; width 2–16; no knob |
+| `lv_arc` | `value`, `min_value`, `max_value`, `rotation`, `bg_start_angle`, `bg_end_angle`, `style_arc_width`, `style_arc_color` (the track), `style_arc_color-indicator` | `bind_value` | angles 0–360; width 2–16; no knob |
 | `lv_led` | `brightness`, `color` | `bind_value` (the brightness) | 0–255 |
-| `lv_spinner` | `anim_duration`, `arc_length`, `style_arc_color-indicator` | — | 500–5000 ms; at most 2 per screen |
+| `lv_spinner` | `anim_duration`, `arc_length`, `style_arc_color` (the track), `style_arc_color-indicator` | — | 500–5000 ms; at most 2 per screen |
 | `lv_line` | `points="x,y x,y …"`, `style_line_color` | — | 2 to 16 points, each within ±320 |
 | `lv_scale` | `mode` (`horizontal_top`, `horizontal_bottom`, `vertical_left`, `vertical_right`, `round_inner`, `round_outer`), `min_value`, `max_value`, `total_tick_count`, `major_tick_every`, `style_line_color-indicator` | — | ≤ 41 ticks |
 | `lv_chart` | `type` (`line`, `bar`), `point_count`, `min_value`, `max_value`, `style_line_color-indicator`; up to two `<lv_chart-series [values="1 2 3"] [bind_values="value.N"]/>` children | `bind_values` per series: comma-separated integers | ≤ 32 points |
