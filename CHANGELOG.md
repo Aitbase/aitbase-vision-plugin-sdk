@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 — 2026-10-21
 
 Placement and label attributes for plugin UI, so a face can redraw a card the device firmware drew in C (the AIDA64 face). Needs device firmware with them; an older device refuses a screen that uses one (`UI_REPRESENTATION_INVALID`), and an idle face falls back to the clock.
 
