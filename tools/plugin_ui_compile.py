@@ -127,6 +127,8 @@ INDICATOR_ATTRS = {"bar": "style_bg_color-indicator", "arc": "style_arc_color-in
                    "spinner": "style_arc_color-indicator", "scale": "style_line_color-indicator",
                    "chart": "style_line_color-indicator", "led": "color", "slider": "style_bg_color-indicator",
                    "checkbox": "style_bg_color-indicator", "switch": "style_bg_color-indicator"}
+# The main part's arc color (the track under the indicator), LVGL's style_arc_color.
+TRACK_ATTRS = {"arc": "style_arc_color", "spinner": "style_arc_color"}
 # Flex layout on containers: LVGL's flex_flow attribute and its style_flex_*_place styles.
 CONTAINER_ATTRS = {"flex_flow": "flex_flow", "style_flex_main_place": "flex_main_place",
                    "style_flex_cross_place": "flex_cross_place", "style_flex_track_place": "flex_track_place"}
@@ -152,6 +154,9 @@ CHECKABLE = ("checkbox", "switch")
 INPUT_BIND_ATTR = {"checkbox": "bind_checked", "switch": "bind_checked", "slider": "bind_value",
                    "roller": "bind_value", "dropdown": "bind_value"}
 LAYOUT_ATTRS = ("x", "y", "width", "height")
+# Any widget: its share of the parent's free flex space, and floating over the parent's layout, placed by
+# align (LVGL's flex_grow, floating and align attributes).
+PLACEMENT_ATTRS = ("flex_grow", "floating", "align")
 TOKEN_NAMES = REGISTRY["color_token_names"]
 TOKEN_BY_VALUE = {value: name for name, value in TOKEN_NAMES.items()}
 # <event_cb callback> value that marks a registry action; user_data carries the action id.
@@ -370,15 +375,17 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
             if per_widget[widget] > spec["max_per_document"]:
                 _fail("UI_WIDGET_LIMIT", path, f"at most {spec['max_per_document']} {tag} per screen")
         widget_attrs = WIDGET_ATTRS.get(widget, {})
-        allowed = set(LAYOUT_ATTRS) | set(STYLE_ATTRS) | set(widget_attrs)
+        allowed = set(LAYOUT_ATTRS) | set(PLACEMENT_ATTRS) | set(STYLE_ATTRS) | set(widget_attrs)
         if widget == "label":
-            allowed |= {"text", "bind_text"}
+            allowed |= {"text", "bind_text", "long_mode"}
         if widget == "image":
             allowed |= {"src"}
         if widget == "container":
             allowed |= set(CONTAINER_ATTRS)
         if widget in INDICATOR_ATTRS:
             allowed.add(INDICATOR_ATTRS[widget])
+        if widget in TRACK_ATTRS:
+            allowed.add(TRACK_ATTRS[widget])
         if widget in ("bar", "arc", "led"):
             allowed.add("bind_value")
         if widget in INPUT_BIND_ATTR:
@@ -402,6 +409,18 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
         for key in LAYOUT_ATTRS:
             if key in attrib:
                 props[key] = _int_value(resolve(attrib[key], args, path, key, "int"), key, path)
+        if "flex_grow" in attrib:
+            props["flex_grow"] = _int_value(resolve(attrib["flex_grow"], args, path, "flex_grow", "int"), "flex_grow", path)
+        if "floating" in attrib:
+            floating = resolve(attrib["floating"], args, path, "floating", "string")
+            if floating not in ("true", "false"):
+                _fail("UI_PROPERTY_VALUE", path, "floating must be true or false")
+            props["floating"] = 1 if floating == "true" else 0
+        if "align" in attrib:
+            props["align"] = _typed_value(resolve(attrib["align"], args, path, "align", "string"), "align", "align", path)
+        if widget == "label" and "long_mode" in attrib:
+            props["long_mode"] = _typed_value(resolve(attrib["long_mode"], args, path, "long_mode", "string"),
+                                              "long_mode", "long_mode", path)
         for key, prop in STYLE_INT.items():
             if key in attrib:
                 put(prop, _int_value(resolve(attrib[key], args, path, key, "int"), prop, path), key)
@@ -411,6 +430,9 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
         if widget in INDICATOR_ATTRS and INDICATOR_ATTRS[widget] in attrib:
             key = INDICATOR_ATTRS[widget]
             put("indicator_color", _color_value(resolve(attrib[key], args, path, key, "color"), key, path), key)
+        if widget in TRACK_ATTRS and TRACK_ATTRS[widget] in attrib:
+            key = TRACK_ATTRS[widget]
+            put("track_color", _color_value(resolve(attrib[key], args, path, key, "color"), key, path), key)
         for key, prop in STYLE_TYPED.items():
             if key in attrib:
                 kind = "int" if SHARED_PROPS[prop]["type"] == "int_set" else "string"

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+Placement and label attributes for plugin UI, so a face can redraw a card the device firmware drew in C (the AIDA64 face). Needs device firmware with them; an older device refuses a screen that uses one (`UI_REPRESENTATION_INVALID`), and an idle face falls back to the clock.
+
+- `lv_label` `long_mode`: `wrap` (the default), `scroll`, `scroll_circular`, `dots`, `clip`.
+- Any widget: `flex_grow` (0–8), and `floating="true"` with `align` to place a widget over its siblings, such as a value in the middle of an arc.
+- `lv_arc` and `lv_spinner`: `style_arc_color`, the track's color.
+
 ## 0.12.1 — 2026-10-21
 
 Guidance for device firmware with D40 and D41; no API change.
