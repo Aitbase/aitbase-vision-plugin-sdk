@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.1 — 2026-10-21
 
 Guidance for device firmware with D40 and D41; no API change.
 
