@@ -35,7 +35,7 @@ ui/assets/                  RGB565 images: uint16 width, uint16 height, then pix
 | `lv_button` | Exactly one `<event_cb trigger="clicked" callback="aitbase_action" user_data="plugin.increment"/>` |
 | Component | `<api><prop name="..." type="string\|int\|color" default="..."/></api>`; use as `<card name="status" title="..."/>`; `$prop` as a whole attribute value |
 
-Limits: 64 nodes (40 on an idle face), depth 6, 4 images, 24 KiB compiled (12 KiB for a face). Needs device firmware with D36 for the display and input widgets and the new styles, and the firmware after SDK 0.12.1 for `long_mode`, `flex_grow`, `floating`, `align` and `style_arc_color`.
+Limits: 64 nodes (40 on an idle face), depth 6, 4 images, 24 KiB compiled (12 KiB for a face). Needs device firmware with D36 for the display and input widgets and the new styles, and firmware with SDK 0.13.0's attributes for `long_mode`, `flex_grow`, `floating`, `align` and `style_arc_color`.
 
 ## Rejected (do not use)
 
