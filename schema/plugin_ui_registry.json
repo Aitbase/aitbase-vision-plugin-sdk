@@ -19,7 +19,10 @@
     "max_face_keys": 16,
     "max_face_value": 64,
     "max_bindings_per_node": 8,
-    "max_changed_per_second": 10
+    "max_changed_per_second": 10,
+    "max_face_samples": 8,
+    "min_face_sample_interval_ms": 1000,
+    "max_face_sample_interval_ms": 10000
   },
   "int_props": {
     "x": [-320, 320],
@@ -55,6 +58,8 @@
   },
   "widget_props": {
     "text": {"type": "text"},
+    "text_en": {"type": "text"},
+    "text_vi": {"type": "text"},
     "long_mode": {"type": "enum", "values": ["wrap", "scroll", "scroll_circular", "dots", "clip"]},
     "src": {"type": "asset"},
     "flex_flow": {"type": "enum", "values": ["row", "column", "row_wrap", "column_wrap"]},
@@ -97,7 +102,7 @@
       "children": true,
       "requires_action": false
     },
-    "label": {"props": ["text", "long_mode"], "children": false, "requires_action": false},
+    "label": {"props": ["text", "text_en", "text_vi", "long_mode"], "children": false, "requires_action": false},
     "button": {"props": [], "children": true, "requires_action": true},
     "image": {"props": ["src"], "children": false, "requires_action": false},
     "bar": {"props": ["value", "min", "max"], "children": false, "requires_action": false},

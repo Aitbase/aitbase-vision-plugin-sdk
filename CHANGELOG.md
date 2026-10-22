@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 — 2026-10-22
+
+Plugin UI in the device's language, and made-up values on an idle face until its first real one, so the AIDA64 face can be the device's old card in full. Needs device firmware with them; an older device refuses a screen that uses one (`UI_REPRESENTATION_INVALID`), and an idle face falls back to the clock.
+
+- **Translations.** `<translations languages="en vi">` with `<translation tag="…" en="…" vi="…"/>` in `globals.xml`, as in LVGL 9.4, and `translation_tag` on `lv_label`. The device shows the text for its language (English, or Vietnamese). New compiler code: `UI_TRANSLATION`.
+- **Samples on an idle face.** `<samples interval="ms"><frame face.N="…" …/></samples>` after the face's `<view>`: 1 to 8 frames the device shows in turn, every 1 to 10 s, until the face's first value. Only on the idle face: compiler code `UI_SAMPLES`, and `check` reports `UI_SAMPLES_NOT_FACE` on another screen.
+
 ## 0.13.0 — 2026-10-21
 
 Placement and label attributes for plugin UI, so a face can redraw a card the device firmware drew in C (the AIDA64 face). Needs device firmware with them; an older device refuses a screen that uses one (`UI_REPRESENTATION_INVALID`), and an idle face falls back to the clock.

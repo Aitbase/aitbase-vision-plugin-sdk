@@ -28,18 +28,20 @@ ui/assets/                  RGB565 images: uint16 width, uint16 height, then pix
 | Other styles | `style_radius` 0–40, `style_border_width` 0–8, `style_bg_opa` and `style_opa` 0–255, `style_text_font` 14/16/20/24/28, `style_text_align` left/center/right |
 | `lv_obj` layout | `flex_flow` (row, column, row_wrap, column_wrap) and `style_flex_main_place`, `style_flex_cross_place`, `style_flex_track_place` |
 | Placement (any widget) | `flex_grow` 0–8; `floating="true"` with `align` (top_left, top_mid, top_right, left_mid, center, right_mid, bottom_left, bottom_mid, bottom_right) to sit over a sibling, `x`/`y` as the offset |
-| `lv_label` | `text` (at most 80 bytes); `long_mode` wrap/scroll/scroll_circular/dots/clip; optional `bind_text="title"` or `value.1`–`value.16` (`face.1`–`face.16` on an idle face) |
+| `lv_label` | `text` (at most 80 bytes), or `translation_tag="t"` with `<translations languages="en vi"><translation tag="t" en="…" vi="…"/></translations>` in `globals.xml` (the device shows its language's text); `long_mode` wrap/scroll/scroll_circular/dots/clip; optional `bind_text="title"` or `value.1`–`value.16` (`face.1`–`face.16` on an idle face) |
 | Gauges | `lv_arc` and `lv_spinner` take `style_arc_color` for the track. `lv_bar`, `lv_arc` and `lv_led` take `bind_value="value.N"`; the bound text's leading integer is the value (`"45%"` is 45) |
 | Inputs | `lv_checkbox text checked="true\|false" bind_checked`, `lv_switch checked bind_checked`, `lv_slider value min_value max_value step bind_value`, `lv_roller`/`lv_dropdown options="A\\nB\\nC" selected bind_value` (1–8 options of ≤ 24 bytes). Each change is `AITBASE_EVENT_CHANGED` (`ev->node`, value in `ev->code`) |
 | `lv_image` | `src` = an image name from `globals.xml` |
 | `lv_button` | Exactly one `<event_cb trigger="clicked" callback="aitbase_action" user_data="plugin.increment"/>` |
 | Component | `<api><prop name="..." type="string\|int\|color" default="..."/></api>`; use as `<card name="status" title="..."/>`; `$prop` as a whole attribute value |
 
-Limits: 64 nodes (40 on an idle face), depth 6, 4 images, 24 KiB compiled (12 KiB for a face). Needs device firmware with D36 for the display and input widgets and the new styles, and firmware with SDK 0.13.0's attributes for `long_mode`, `flex_grow`, `floating`, `align` and `style_arc_color`.
+Limits: 64 nodes (40 on an idle face), depth 6, 4 images, 24 KiB compiled (12 KiB for a face). Needs device firmware with D36 for the display and input widgets and the new styles, firmware with SDK 0.13.0's attributes for `long_mode`, `flex_grow`, `floating`, `align` and `style_arc_color`, and firmware with SDK 0.14.0's for `translation_tag` and `<samples>`.
+
+An idle face may follow its `<view>` with `<samples interval="2000"><frame face.4="45%" .../></samples>`: 1 to 8 frames of made-up `face.N` values, shown in turn every 1–10 s until the face's first real value. Only the idle face (`UI_SAMPLES_NOT_FACE` otherwise).
 
 ## Rejected (do not use)
 
-Other widgets (lists, text areas, keyboards, canvases, tab views...), `grid_*`, other `flex_*`, flags and states other than `floating` (`hidden`, `clickable`, `focused`), any other `style_*`, `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<animations>`, `<translations>`, `bind_text-fmt`, DTDs and entities.
+Other widgets (lists, text areas, keyboards, canvases, tab views...), `grid_*`, other `flex_*`, flags and states other than `floating` (`hidden`, `clickable`, `focused`), any other `style_*`, `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<animations>`, `bind_text-fmt`, DTDs and entities.
 
 ## Layout tips
 

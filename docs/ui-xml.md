@@ -14,7 +14,7 @@ A bounded subset is accepted (device decision D36). The compiler turns a screen 
 
 ```
 ui/
-  globals.xml            optional: images used by the screens
+  globals.xml            optional: images and translations used by the screens
   screens/<screen>.xml   one per screen, opened with aitbase_ui_open(p, "<screen>", ...)
   components/<name>.xml  reusable components, used as <name name="..."/>
   assets/                RGB565 images
@@ -63,7 +63,7 @@ The source of truth is `schema/plugin_ui_registry.json`.
 
 | Element / attribute | Rule |
 |---|---|
-| `<screen>` | Holds exactly one `<view>`. The view's name is the file name. `<previews>` is ignored. |
+| `<screen>` | Holds exactly one `<view>`, and on the idle face an optional `<samples>` after it ([Samples](#samples-idle-faces)). The view's name is the file name. `<previews>` is ignored. |
 | `<component>` | An optional `<api>` with `<prop name type [default]/>` (`type` is `string`, `int` or `color`), and one `<view [extends="lv_obj\|lv_button\|lv_label\|lv_image"]>`. `<previews>` is ignored. |
 | Component instance `<card name="…" …/>` | Attributes are `name`, the component's props and `x`/`y`/`width`/`height`. No children. Recursion is rejected. |
 | `$prop` | A whole attribute value can be `$prop`. The prop's type must match the attribute. |
@@ -81,7 +81,7 @@ The source of truth is `schema/plugin_ui_registry.json`.
 | `flex_grow` | 0–8: the widget's share of its flex parent's free space, as in LVGL. A bar with `width="1" flex_grow="1"` fills what its row's other widgets leave. |
 | `floating`, `align` | `floating="true"` takes a widget out of its parent's flex layout; `align` (`top_left`, `top_mid`, `top_right`, `left_mid`, `center`, `right_mid`, `bottom_left`, `bottom_mid`, `bottom_right`) then places it in the parent, with `x`/`y` as the offset. Use it to put a value over a sibling, such as in the middle of an arc. |
 | `lv_obj` layout | `flex_flow` (`row`, `column`, `row_wrap`, `column_wrap`); `style_flex_main_place` and `style_flex_track_place` (`start`, `center`, `end`, `space_between`, `space_around`, `space_evenly`); `style_flex_cross_place` (`start`, `center`, `end`). |
-| `lv_label` | `text` (at most 80 bytes); `long_mode` (`wrap`, the default, `scroll`, `scroll_circular`, `dots` or `clip`: what a text wider than the label's `width` does); `bind_text` (a platform subject: `title` or `value.1` to `value.16` on a screen, `face.1` to `face.16` on an idle face). |
+| `lv_label` | `text` (at most 80 bytes), or `translation_tag` for a text in the device's language ([Translations](#translations)); `long_mode` (`wrap`, the default, `scroll`, `scroll_circular`, `dots` or `clip`: what a text wider than the label's `width` does); `bind_text` (a platform subject: `title` or `value.1` to `value.16` on a screen, `face.1` to `face.16` on an idle face). |
 | `lv_image` | `src` is the name of an image declared in `globals.xml`: `<images><file name="logo" src_path="assets/logo.rgb565"/></images>`. |
 | `lv_button` | Must contain exactly one `<event_cb trigger="clicked" callback="aitbase_action" user_data="<action>"/>`, where `<action>` is a registered action (`plugin.increment`). |
 
@@ -120,6 +120,37 @@ The platform constants and subjects are listed in `schema/aitbase_globals.xml`. 
 
 **Idle faces.** A screen named in `plugin.json`'s `idle_face` may be shown on the device's home screen instead of the clock, when the owner chooses it. It must be display only: no `lv_button`, no input widget and no `<event_cb>`, widgets bound only to `face.1` to `face.16` (set with `aitbase_face_set`), at most 40 widgets and 12 KiB compiled. Display widgets are fine on a face. The device draws its "Plugin" badge in the top right corner, over the face. `aitbase-plugin check` reports `IDLE_FACE_BOUNDS` otherwise.
 
+### Translations
+
+A label can show its text in the device's language, English (`en`) or Vietnamese (`vi`). Declare the texts once in `globals.xml`, as LVGL 9.4 does, and name one with `translation_tag`:
+
+```xml
+<globals>
+  <translations languages="en vi">
+    <translation tag="memory" en="Memory" vi="Bộ nhớ"/>
+  </translations>
+</globals>
+```
+
+```xml
+<lv_label name="title" translation_tag="memory"/>
+```
+
+The device shows the text for its language, and English (else the first language the translation has) in any other. A label has `text` or `translation_tag`, not both; `bind_text` still replaces either. A translation sets at least one of the declared languages, each at most 80 bytes. The compiler writes each text as `text_<code>`: device firmware without translations refuses the screen, and an idle face falls back to the clock. A plugin screen takes a language change the next time it opens; the idle face redraws at once.
+
+### Samples (idle faces)
+
+Before anything has written a face's values, the device can show made-up ones, so the owner sees what the face is for. Add `<samples>` after the face's `<view>`:
+
+```xml
+<samples interval="2000">
+  <frame face.4="45%" face.6="12%"/>
+  <frame face.4="61%" face.6="38%"/>
+</samples>
+```
+
+The device shows the frames in turn, one every `interval` milliseconds (1000 to 10000), until the face's first value, which replaces them all and stops them for good: a key the writer never sets shows the widget's own text again. 1 to 8 frames, each setting any of `face.1` to `face.16` to at most 64 bytes. Only the idle face may have samples; on another screen `check` reports `UI_SAMPLES_NOT_FACE` and the device refuses the screen.
+
 Images are RGB565: `uint16 width`, `uint16 height`, then pixels. They must be at most 32×32 and 8 KB.
 
 The registry's `limits` cap nodes (64 per screen), nesting depth, text length and total size (24 KiB compiled). Devices older than D36 refuse the new widgets and styles; `check` can't tell which firmware a device runs.
@@ -132,7 +163,7 @@ Everything not listed above is rejected with a stable error code (`UI_WIDGET`, `
 - `align`, `grid_*`, and flex properties other than those above;
 - other `style_*` properties, and styles on parts other than the indicators above;
 - fonts other than the device's sizes, and images over 32×32;
-- `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<gradients>`, `<animations>` and `<translations>`;
+- `<styles>`, `<consts>`, `<subjects>`, `<fonts>`, `<gradients>` and `<animations>`;
 - `screen_load_event` and the `subject_*_event` elements;
 - `bind_text-fmt`;
 - DTDs and entities.

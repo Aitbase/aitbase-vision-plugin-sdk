@@ -439,12 +439,15 @@ func compileScreens(r *Result, dir, sdkDir string, screens []string, face, pytho
 		cmd := exec.Command(python, "-I", compiler, filepath.Join(dir, "ui"), s, out)
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err == nil {
+			data, err := os.ReadFile(out)
 			if s == face {
-				data, err := os.ReadFile(out)
 				if problem := FaceProblem(data); err == nil && problem != "" {
 					r.add(Error, "IDLE_FACE_BOUNDS", "ui/screens/"+s+".xml", problem,
 						"a face is display only: no buttons or input widgets; bind its widgets to face.1 to face.16")
 				}
+			} else if err == nil && hasSamples(data) {
+				r.add(Error, "UI_SAMPLES_NOT_FACE", "ui/screens/"+s+".xml", "only the idle face has <samples>",
+					"remove <samples>, or make this screen the manifest's idle_face")
 			}
 			continue
 		}
@@ -455,6 +458,15 @@ func compileScreens(r *Result, dir, sdkDir string, screens []string, face, pytho
 			r.add(Error, "UI_COMPILE", "ui/screens/"+s+".xml", msg, "see docs/ui-xml.md for what is accepted")
 		}
 	}
+}
+
+// hasSamples says whether a compiled screen has <samples>, which only the idle face may have: the
+// device refuses them on a plugin screen.
+func hasSamples(compiled []byte) bool {
+	var doc struct {
+		Samples json.RawMessage `json:"samples"`
+	}
+	return json.Unmarshal(compiled, &doc) == nil && doc.Samples != nil
 }
 
 func screensOf(m *Manifest) []string {
