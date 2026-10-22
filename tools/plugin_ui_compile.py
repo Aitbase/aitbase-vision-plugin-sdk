@@ -165,6 +165,13 @@ ACTION_CALLBACK = "aitbase_action"
 ACTION_TRIGGER = "clicked"
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,%d}$" % (LIMITS["max_id"] - 1))
 PROP_TYPES = {"string", "int", "color"}
+# The device languages: a label's text in each is the registry's text_<code>. LVGL's <translations> in
+# globals.xml and translation_tag on a label compile to them; the device shows the one for its language.
+LANGUAGES = [prop[len("text_"):] for prop, spec in WIDGET_PROPS.items()
+             if prop.startswith("text_") and spec["type"] == "text"]
+# An idle face's samples: <samples interval="ms"><frame face.N="text" .../></samples> in the face's
+# screen file, shown in turn on the device until the face's first value.
+FACE_KEYS = [key for key in BINDING_KEYS if key.startswith("face.")]
 
 
 def _read_xml(path: Path, label: str, budget: list) -> ET.Element:
@@ -275,19 +282,51 @@ def _options(raw: str, path: str) -> list:
     return options
 
 
-def _load_images(ui_dir: Path, budget: list) -> dict:
+def _load_translations(section: ET.Element, where: str, translations: dict) -> None:
+    """<translations languages="en vi"><translation tag="..." en="..." vi="..."/></translations>."""
+    if set(section.attrib) != {"languages"}:
+        _fail("UI_TRANSLATION", where, "expected <translations languages=\"...\">")
+    languages = section.get("languages").split()
+    if not languages or len(set(languages)) != len(languages) or any(code not in LANGUAGES for code in languages):
+        _fail("UI_TRANSLATION", where, f"languages: one or more of {' '.join(LANGUAGES)}, each once")
+    for entry in section:
+        entry_path = f"{where}/{entry.tag}"
+        texts = {code: entry.get(code) for code in languages if code in entry.attrib}
+        if entry.tag != "translation" or len(entry) or "tag" not in entry.attrib or not texts \
+                or set(entry.attrib) - {"tag"} - set(languages):
+            _fail("UI_TRANSLATION", entry_path, "expected <translation tag=... " +
+                  " ".join(f"{code}=..." for code in languages) + "/> with the declared languages")
+        tag = entry.get("tag")
+        if not NAME_RE.fullmatch(tag):
+            _fail("UI_TRANSLATION", entry_path, f"invalid tag {tag}")
+        if tag in translations:
+            _fail("UI_DUPLICATE_ID", entry_path, f"duplicate translation {tag}")
+        for code, text in texts.items():
+            if len(text.encode("utf-8")) > MAX_TEXT:
+                _fail("UI_TEXT_SIZE", entry_path, f"{code} exceeds {MAX_TEXT} bytes")
+        translations[tag] = texts
+
+
+def _load_globals(ui_dir: Path, budget: list) -> tuple:
+    """The plugin's images and translations from globals.xml."""
+    images, translations, seen_translations = {}, {}, False
     path = ui_dir / "globals.xml"
     if not path.exists():
-        return {}
+        return images, translations
     root = _read_xml(path, "globals.xml", budget)
     if root.tag != "globals" or root.attrib:
         _fail("UI_SCHEMA", "globals.xml", "expected a <globals> root without attributes")
-    images = {}
     for section in root:
         where = f"globals.xml/{section.tag}"
+        if section.tag == "translations":
+            if seen_translations:
+                _fail("UI_TRANSLATION", where, "globals.xml has one <translations>")
+            seen_translations = True
+            _load_translations(section, where, translations)
+            continue
         if section.tag != "images" or section.attrib:
-            _fail("UI_SCHEMA", where, "plugin globals may only declare <images>; colors and "
-                  "subjects come from the platform globals")
+            _fail("UI_SCHEMA", where, "plugin globals may only declare <images> and <translations>; "
+                  "colors and subjects come from the platform globals")
         for entry in section:
             entry_path = f"{where}/{entry.tag}"
             if entry.tag != "file" or set(entry.attrib) != {"name", "src_path"} or len(entry):
@@ -298,7 +337,33 @@ def _load_images(ui_dir: Path, budget: list) -> dict:
             if name in images:
                 _fail("UI_DUPLICATE_ID", entry_path, f"duplicate image {name}")
             images[name] = entry.get("src_path")
-    return images
+    return images, translations
+
+
+def _samples(section: ET.Element, label: str) -> dict:
+    """<samples interval="2000"><frame face.6="12%" .../>...</samples>: an idle face's made-up values."""
+    where = f"{label}/samples"
+    if set(section.attrib) != {"interval"}:
+        _fail("UI_SAMPLES", where, "expected <samples interval=\"milliseconds\">")
+    low, high = LIMITS["min_face_sample_interval_ms"], LIMITS["max_face_sample_interval_ms"]
+    raw = section.get("interval")
+    interval = int(raw) if re.fullmatch(r"[0-9]{1,6}", raw) else -1
+    if not low <= interval <= high:
+        _fail("UI_SAMPLES", where, f"interval: {low} to {high} milliseconds")
+    frames = []
+    for index, frame in enumerate(section):
+        frame_path = f"{where}/frame[{index}]"
+        if frame.tag != "frame" or len(frame) or not frame.attrib:
+            _fail("UI_SAMPLES", frame_path, "expected <frame face.N=\"text\" .../>")
+        for key, value in frame.attrib.items():
+            if key not in FACE_KEYS:
+                _fail("UI_SAMPLES", frame_path, f"{key}: a frame sets face.1 to face.{len(FACE_KEYS)}")
+            if len(value.encode("utf-8")) > LIMITS["max_face_value"]:
+                _fail("UI_SAMPLES", frame_path, f"{key} exceeds {LIMITS['max_face_value']} bytes")
+        frames.append(dict(frame.attrib))
+    if not 1 <= len(frames) <= LIMITS["max_face_samples"]:
+        _fail("UI_SAMPLES", where, f"1 to {LIMITS['max_face_samples']} frames")
+    return {"interval_ms": interval, "frames": frames}
 
 
 def compile_package(ui_dir: Path, screen: str) -> dict:
@@ -306,7 +371,7 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
     if not NAME_RE.fullmatch(screen or ""):
         _fail("UI_SCREEN", "/", f"invalid screen name {screen!r}")
     budget = [0]
-    images = _load_images(ui_dir, budget)
+    images, translations = _load_globals(ui_dir, budget)
     components = {}
 
     def component(tag: str, path: str):
@@ -377,7 +442,7 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
         widget_attrs = WIDGET_ATTRS.get(widget, {})
         allowed = set(LAYOUT_ATTRS) | set(PLACEMENT_ATTRS) | set(STYLE_ATTRS) | set(widget_attrs)
         if widget == "label":
-            allowed |= {"text", "bind_text", "long_mode"}
+            allowed |= {"text", "bind_text", "long_mode", "translation_tag"}
         if widget == "image":
             allowed |= {"src"}
         if widget == "container":
@@ -444,7 +509,22 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
                 put(prop, _typed_value(resolve(attrib[key], args, path, key, kind), prop, key, path), key)
         out = {"id": node_id, "type": widget, "props": props, "children": []}
         bindings = []
-        if widget == "label":
+        if widget == "label" and "translation_tag" in attrib:
+            # The text in every language the translation has: text is English (else the first
+            # one), and text_<code> each other text, which the device shows in that language.
+            if "text" in attrib:
+                _fail("UI_PROPERTY", path, "a label takes text or translation_tag, not both")
+            tag = resolve(attrib["translation_tag"], args, path, "translation_tag", "string")
+            if tag not in translations:
+                _fail("UI_TRANSLATION", path, f"translation_tag {tag} is not in globals.xml <translations>")
+            texts = translations[tag]
+            props["text"] = texts.get("en", next(iter(texts.values())))
+            for code in LANGUAGES:
+                if code in texts and texts[code] != props["text"]:
+                    props["text_" + code] = texts[code]
+            if "bind_text" in attrib:
+                bindings.append(_binding(widget, "text", attrib["bind_text"], "bind_text", path))
+        elif widget == "label":
             text = resolve(attrib.get("text", ""), args, path, "text", "string")
             if len(text.encode("utf-8")) > MAX_TEXT:
                 _fail("UI_TEXT_SIZE", path, f"text exceeds {MAX_TEXT} bytes")
@@ -585,8 +665,8 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
     if root.tag != "screen" or root.attrib:
         _fail("UI_SCREEN", label, "expected a <screen> root without attributes")
     sections = [child for child in root if child.tag != "previews"]
-    if len(sections) != 1 or sections[0].tag != "view":
-        _fail("UI_SCREEN", label, "a screen contains exactly one <view>")
+    if [s.tag for s in sections] not in (["view"], ["view", "samples"]):
+        _fail("UI_SCREEN", label, "a screen contains one <view>, then for an idle face optional <samples>")
     view = sections[0]
     if "name" in view.attrib or "extends" in view.attrib:
         _fail("UI_SCREEN", f"{label}/view", "the screen view takes its name from the file")
@@ -595,6 +675,8 @@ def compile_package(ui_dir: Path, screen: str) -> dict:
         _fail("UI_ASSET_SIZE", label, "total declared asset bytes exceed the profile")
     normalized = {"format": FORMAT, "version": FORMAT_VERSION, "screen": screen, "tree": tree,
                   "assets": assets, "limits": {"nodes": count, "max_depth": MAX_DEPTH}}
+    if len(sections) == 2:
+        normalized["samples"] = _samples(sections[1], label)
     if len(json.dumps(normalized, separators=(",", ":")).encode("utf-8")) > MAX_XML_BYTES:
         _fail("UI_REPRESENTATION_SIZE", label, "compiled screen exceeds the device limit")
     return normalized

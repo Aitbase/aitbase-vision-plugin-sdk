@@ -156,7 +156,7 @@ class PluginUiCompileTest(unittest.TestCase):
         self.rejected("UI_COMPONENT_CYCLE", card=CARD.replace(
             '<lv_label name="title"', '<card name="again"/><lv_label name="title"'))
 
-    def test_globals_only_declare_images(self):
+    def test_globals_only_declare_images_and_translations(self):
         self.rejected("UI_SCHEMA", globals_xml='<globals><subjects><int name="x" value="0"/></subjects></globals>')
         self.rejected("UI_SCHEMA", globals_xml='<globals><fonts><bin name="f" src_path="f.bin"/></fonts></globals>')
         self.rejected("UI_ASSET_MISSING", screen=SCREEN.replace('src="logo"', 'src="other"'))
@@ -247,6 +247,64 @@ class PluginUiCompileTest(unittest.TestCase):
         self.assertEqual(gauge["children"][1]["props"], {"floating": 1, "align": "center", "text": "45%"})
         self.assertEqual(row["children"][0]["props"]["flex_grow"], 1)
         self.assertEqual(row["children"][1]["props"]["long_mode"], "scroll_circular")
+
+    def test_translations_compile_to_a_text_per_language(self):
+        translations = ('<translations languages="en vi">'
+                        '<translation tag="memory" en="Memory" vi="Bộ nhớ"/>'
+                        '<translation tag="ram" en="RAM" vi="RAM"/>'
+                        '<translation tag="load" vi="Tải"/></translations>')
+        self.write(globals_xml=GLOBALS.replace("</globals>", translations + "</globals>"),
+                   screen='<screen><view><lv_label name="a" translation_tag="memory"/>'
+                          '<lv_label name="b" translation_tag="ram"/>'
+                          '<lv_label name="c" translation_tag="load" bind_text="title"/></view></screen>')
+        a, b, c = self.compile()["tree"]["children"]
+        self.assertEqual(a["props"], {"text": "Memory", "text_vi": "Bộ nhớ"})
+        self.assertEqual(b["props"], {"text": "RAM"}, "a text the same in every language is written once")
+        self.assertEqual(c["props"], {"text": "Tải"}, "without English, the first language is the text")
+        self.assertEqual(c["binding"]["key"], "title")
+        tagged = '<screen><view><lv_label name="a" translation_tag="memory"/></view></screen>'
+        declared = GLOBALS.replace("</globals>", translations + "</globals>")
+        self.rejected("UI_TRANSLATION", screen=tagged, globals_xml=GLOBALS)
+        self.rejected("UI_TRANSLATION", screen=tagged.replace("memory", "missing"), globals_xml=declared)
+        self.rejected("UI_PROPERTY", screen=tagged.replace('translation_tag', 'text="x" translation_tag'), globals_xml=declared)
+        self.rejected("UI_PROPERTY", screen=tagged.replace("lv_label", "lv_bar"), globals_xml=declared)
+        for bad in ('<translations languages="en fr"><translation tag="t" en="a"/></translations>',
+                    '<translations languages="en en"><translation tag="t" en="a"/></translations>',
+                    '<translations><translation tag="t" en="a"/></translations>',
+                    '<translations languages="en"><translation tag="t" vi="a"/></translations>',
+                    '<translations languages="en"><translation tag="t"/></translations>',
+                    '<translations languages="en"><translation tag="T" en="a"/></translations>',
+                    '<translations languages="en"><text tag="t" en="a"/></translations>',
+                    '<translations languages="en"/><translations languages="vi"/>'):
+            self.rejected("UI_TRANSLATION", globals_xml=GLOBALS.replace("</globals>", bad + "</globals>"))
+        self.rejected("UI_DUPLICATE_ID", globals_xml=GLOBALS.replace("</globals>", '<translations languages="en">'
+                      '<translation tag="t" en="a"/><translation tag="t" en="b"/></translations></globals>'))
+        self.rejected("UI_TEXT_SIZE", globals_xml=GLOBALS.replace("</globals>", '<translations languages="en">'
+                      f'<translation tag="t" en="{"x" * 81}"/></translations></globals>'))
+
+    def test_samples_compile_for_a_face(self):
+        face = ('<screen><view><lv_label name="cpu" text="--" bind_text="face.6"/></view>'
+                '<samples interval="2000"><frame face.6="12%" face.16="CPU - Unknown CPU"/>'
+                '<frame face.6="40%"/></samples></screen>')
+        self.write(screen=face)
+        self.assertEqual(self.compile()["samples"], {"interval_ms": 2000, "frames": [
+            {"face.6": "12%", "face.16": "CPU - Unknown CPU"}, {"face.6": "40%"}]})
+        self.write(screen=SCREEN)
+        self.assertNotIn("samples", self.compile(), "a screen without samples has none")
+        frame = '<frame face.6="1%"/>'
+        for bad in ('<samples interval="500">' + frame + '</samples>',
+                    '<samples interval="20000">' + frame + '</samples>',
+                    '<samples>' + frame + '</samples>',
+                    '<samples interval="2000"></samples>',
+                    '<samples interval="2000">' + frame * 9 + '</samples>',
+                    '<samples interval="2000"><frame/></samples>',
+                    '<samples interval="2000"><frame title="x"/></samples>',
+                    '<samples interval="2000"><frame face.17="x"/></samples>',
+                    f'<samples interval="2000"><frame face.6="{"x" * 65}"/></samples>',
+                    '<samples interval="2000"><row face.6="1%"/></samples>'):
+            self.rejected("UI_SAMPLES", screen=face.split("<samples")[0] + bad + "</screen>")
+        self.rejected("UI_SCREEN", screen='<screen><samples interval="2000">' + frame + '</samples>'
+                                          '<view><lv_label name="cpu" bind_text="face.6"/></view></screen>')
 
     def test_d36_bounds_are_checked_at_compile_time(self):
         cases = (
