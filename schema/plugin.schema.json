@@ -50,7 +50,7 @@
       }
     },
     "idle_face": {
-      "description": "One of ui.screens, offered as the device's home screen face (since SDK 0.10). The owner chooses it on the Device Console; the device shows it display only (no buttons or actions, at most 24 widgets and 8 KiB compiled) under its own badge. Its labels bind to face.1 to face.16, set with aitbase_face_set.",
+      "description": "One of ui.screens, offered as the device's home screen face (since SDK 0.10). The owner chooses it on the Device Console; the device shows it display only (no buttons or actions, at most 24 widgets and 8 KiB compiled); firmware before 2026-10-22 also draws its badge over it. Its labels bind to face.1 to face.16, set with aitbase_face_set.",
       "type": "string",
       "maxLength": 32,
       "pattern": "^[a-z][a-z0-9_]*$"
