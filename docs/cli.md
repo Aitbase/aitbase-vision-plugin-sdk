@@ -230,6 +230,7 @@ Codes are stable: a code keeps its meaning once released. `path` is relative to 
 | `SOURCE_ID_DUPLICATE` | `AITBASE_PLUGIN_ID(...)` appears more than once. |
 | `UI_COMPILER_UNAVAILABLE` | Warning: Python 3 or the UI compiler was not found, so screens were not compiled. |
 | `UI_COMPILE` | The UI compiler failed without a specific code. |
+| `UI_SAMPLES_NOT_FACE` | A screen other than the `idle_face` has `<samples>`: only the idle face shows samples. |
 | `UI_*` | Any other `UI_` code comes from the UI compiler; see [UI XML](ui-xml.md). |
 | `USAGE` | The command line is wrong. |
 | `INIT_FAILED` | `init` could not create the project, for example because the directory is not empty. |
