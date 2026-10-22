@@ -118,7 +118,7 @@ The user changes them with the device's two buttons (see [Focus and buttons](#fo
 
 The platform constants and subjects are listed in `schema/aitbase_globals.xml`. Plugins can't define their own fonts or subjects.
 
-**Idle faces.** A screen named in `plugin.json`'s `idle_face` may be shown on the device's home screen instead of the clock, when the owner chooses it. It must be display only: no `lv_button`, no input widget and no `<event_cb>`, widgets bound only to `face.1` to `face.16` (set with `aitbase_face_set`), at most 40 widgets and 12 KiB compiled. Display widgets are fine on a face. The device draws its "Plugin" badge in the top right corner, over the face. `aitbase-plugin check` reports `IDLE_FACE_BOUNDS` otherwise.
+**Idle faces.** A screen named in `plugin.json`'s `idle_face` may be shown on the device's home screen instead of the clock, when the owner chooses it. It must be display only: no `lv_button`, no input widget and no `<event_cb>`, widgets bound only to `face.1` to `face.16` (set with `aitbase_face_set`), at most 40 widgets and 12 KiB compiled. Display widgets are fine on a face. Device firmware before 2026-10-22 draws its "Plugin" badge in the top right corner, over the face; later firmware draws none. `aitbase-plugin check` reports `IDLE_FACE_BOUNDS` otherwise.
 
 ### Translations
 
