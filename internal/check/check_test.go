@@ -295,6 +295,15 @@ func TestFaceProblem(t *testing.T) {
 	}
 }
 
+// Samples are the idle face's: check reports UI_SAMPLES_NOT_FACE for a compiled screen that has them.
+func TestHasSamples(t *testing.T) {
+	plain := `{"format":"aitbase.plugin-ui","version":1,"screen":"main","tree":{},"assets":{},"limits":{}}`
+	withSamples := strings.TrimSuffix(plain, "}") + `,"samples":{"interval_ms":2000,"frames":[{"face.1":"1"}]}}`
+	if hasSamples([]byte(plain)) || !hasSamples([]byte(withSamples)) || hasSamples([]byte("not json")) {
+		t.Fatal("hasSamples must find samples only in a document that has them")
+	}
+}
+
 func TestScheduleIsCommunity(t *testing.T) {
 	m := `{"id":"alice.counter","name":"C","version":"1.0.0","api_version":1,"entry":"c","requested_capabilities":["ui","schedule"]}`
 	r := Project(writeProject(t, m, goodSource), "", Options{SkipUI: true})
