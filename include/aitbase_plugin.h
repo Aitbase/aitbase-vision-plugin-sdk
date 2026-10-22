@@ -240,8 +240,8 @@ int aitbase_schedule_ring(aitbase_plugin_t *plugin, const char *id);
 
 /* A plugin may offer one of its screens as the device's home screen face, in place of the clock:
  * "idle_face": "<screen>" in plugin.json, naming one of ui.screens (device decision D22). The owner
- * chooses it on the Device Console; the device then shows it display only, under its own "Plugin"
- * badge, without running the plugin. A face has no buttons or actions, at most 24 widgets and
+ * chooses it on the Device Console; the device then shows it display only, without running the
+ * plugin (firmware before 2026-10-22 also draws its "Plugin" badge over it). A face has no buttons or actions, at most 24 widgets and
  * 8 KiB compiled; `aitbase-plugin check` tells. Its labels bind to "face.1" to "face.16"
  * (<lv_label bind_text="face.1"/>). */
 
