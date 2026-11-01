@@ -251,6 +251,24 @@ int aitbase_schedule_ring(aitbase_plugin_t *plugin, const char *id);
  * At most 1 a second with bursts of 5. Silent on success. */
 int aitbase_face_set(aitbase_plugin_t *plugin, const char *key, const char *value);
 
+/* --- Motors ("motor"): the device's pan and tilt motors (since SDK 0.15) ------------------------- */
+
+/* Positions are motor steps, from 0 to the limits aitbase_motor_status() reports (4096 and 1024 on
+ * current devices, which is 360 and 90 degrees); both motors start in the middle. A plugin may move
+ * them without a visible screen, at most 10 requests a second with bursts of 20. When the plugin
+ * ends, the device stops a move it started. A device without motors answers with AITBASE_EVENT_ERROR
+ * and detail "no_motor"; firmware before device decision D43 with "unknown_op". */
+
+/* Starts moving to x, y and returns at once; a new move replaces one still running. Outside the
+ * limits the device moves to the nearest limit. speed is 0 (slowest) to 17 (fastest). Silent on
+ * success. */
+int aitbase_motor_move(aitbase_plugin_t *plugin, int x, int y, int speed);
+/* Stops a running move. The motors slow down first, so they finish a moment later. Silent on
+ * success. */
+int aitbase_motor_stop(aitbase_plugin_t *plugin);
+/* RESULT: text = {"x","y","max_x","max_y","moving"} as JSON. */
+int aitbase_motor_status(aitbase_plugin_t *plugin);
+
 /* --- HTTP ("http"): requests to internet and local network hosts --------------------------------- */
 
 /* The device makes the request. http:// and https:// only. Internet hosts and, on devices with D37

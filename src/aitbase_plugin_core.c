@@ -211,6 +211,26 @@ int aitbase_face_set(aitbase_plugin_t *plugin, const char *key, const char *valu
     return send_request(plugin, "face", "set", args);
 }
 
+int aitbase_motor_move(aitbase_plugin_t *plugin, int x, int y, int speed) {
+    if (!plugin || x < 0 || y < 0 || speed < 0 || speed > 17) return AITBASE_ERR_ARGUMENT;
+    cJSON *args = cJSON_CreateObject();
+    if (!args) return AITBASE_ERR_NO_MEMORY;
+    cJSON_AddNumberToObject(args, "x", x);
+    cJSON_AddNumberToObject(args, "y", y);
+    cJSON_AddNumberToObject(args, "speed", speed);
+    return send_request(plugin, "motor", "move", args);
+}
+
+int aitbase_motor_stop(aitbase_plugin_t *plugin) {
+    if (!plugin) return AITBASE_ERR_ARGUMENT;
+    return send_request(plugin, "motor", "stop", cJSON_CreateObject());
+}
+
+int aitbase_motor_status(aitbase_plugin_t *plugin) {
+    if (!plugin) return AITBASE_ERR_ARGUMENT;
+    return send_tracked(plugin, "motor", "status", cJSON_CreateObject(), 1);
+}
+
 int aitbase_http_request(aitbase_plugin_t *plugin, const aitbase_http_request_t *request) {
     if (!plugin || !request || !request->url) return AITBASE_ERR_ARGUMENT;
     cJSON *args = cJSON_CreateObject();
@@ -485,6 +505,9 @@ static void fill_result(const cJSON *result, const char *op, aitbase_event_t *ou
         const cJSON *entries = cJSON_GetObjectItemCaseSensitive(result, "entries");
         *keys = cJSON_IsArray(entries) ? cJSON_PrintUnformatted(entries) : NULL;
         out->text = *keys ? *keys : "[]";
+    } else if (strcmp(op, "motor.status") == 0) {
+        *keys = cJSON_PrintUnformatted(result);
+        out->text = *keys ? *keys : "{}";
     } else if (strcmp(op, "http.request") == 0) {
         const cJSON *status = cJSON_GetObjectItemCaseSensitive(result, "status");
         out->code = cJSON_IsNumber(status) ? status->valueint : 0;

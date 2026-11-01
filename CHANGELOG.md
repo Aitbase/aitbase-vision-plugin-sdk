@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.15.0 — 2026-11-02
+
+Plugins can move the device's motors (device decision D43).
+
+- **`aitbase_motor_move(p, x, y, speed)`**, **`aitbase_motor_stop(p)`** and **`aitbase_motor_status(p)`**, capability `motor`. Positions are motor steps from 0 to `max_x` and `max_y` in the status; moves outside them go to the nearest limit. They work without a visible screen, and the device stops a running move when the plugin ends.
+- New error codes `no_motor`, `motor_not_ready` and `motor_busy`. Firmware before D43 answers `unknown_op`.
+
 ## 0.14.0 — 2026-10-22
 
 Plugin UI in the device's language, and made-up values on an idle face until its first real one, so the AIDA64 face can be the device's old card in full. Needs device firmware with them; an older device refuses a screen that uses one (`UI_REPRESENTATION_INVALID`), and an idle face falls back to the clock.
