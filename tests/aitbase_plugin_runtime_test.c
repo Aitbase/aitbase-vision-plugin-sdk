@@ -72,6 +72,12 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
                 aitbase_face_set(p, "face.1", "21 C");
                 break;
             }
+            if (strcmp(ev->node, "motor") == 0) {
+                aitbase_motor_move(p, 2148, 562, 7);
+                aitbase_motor_stop(p);
+                aitbase_motor_status(p);
+                break;
+            }
             if (strcmp(ev->node, "call") == 0 || strcmp(ev->node, "call_timeout") == 0) {
                 /* A synchronous call (since 0.10): the result comes back here, before any event. */
                 char result[128];
@@ -335,6 +341,29 @@ int main(void) {
                    strcmp(str(fargs, "key"), "face.1") == 0 && strcmp(str(fargs, "value"), "21 C") == 0,
                "aitbase_face_set sends face.set");
     }
+    if (req) reply_ok(dev, req);
+    cJSON_Delete(req);
+
+    /* aitbase_motor_*: the device's motors (since 0.15). */
+    device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"motor\",\"action\":\"x\",\"detail\":\"\"}}");
+    req = next_request(dev, 2000);
+    {
+        const cJSON *margs = cJSON_GetObjectItem(req, "args");
+        EXPECT(req && strcmp(str(req, "cap"), "motor") == 0 && strcmp(str(req, "op"), "move") == 0 &&
+                   cJSON_GetObjectItem(margs, "x")->valueint == 2148 && cJSON_GetObjectItem(margs, "y")->valueint == 562 &&
+                   cJSON_GetObjectItem(margs, "speed")->valueint == 7,
+               "aitbase_motor_move sends motor.move");
+    }
+    if (req) reply_ok(dev, req);
+    cJSON_Delete(req);
+    req = next_request(dev, 2000);
+    EXPECT(req && strcmp(str(req, "cap"), "motor") == 0 && strcmp(str(req, "op"), "stop") == 0,
+           "aitbase_motor_stop sends motor.stop");
+    if (req) reply_ok(dev, req);
+    cJSON_Delete(req);
+    req = next_request(dev, 2000);
+    EXPECT(req && strcmp(str(req, "cap"), "motor") == 0 && strcmp(str(req, "op"), "status") == 0,
+           "aitbase_motor_status sends motor.status");
     if (req) reply_ok(dev, req);
     cJSON_Delete(req);
 

@@ -45,7 +45,10 @@
     {"code": "not_due", "status": "stale", "summary": "No entry of this plugin is due to ring now."},
     {"code": "tool_unknown", "status": "invalid", "summary": "plugins.call named a tool the plugin doesn't declare in assistant_tools, or tool.reply named no call waiting for this plugin's reply: a second reply, or a reply to another call (D31)."},
     {"code": "tool_timeout", "status": "failed", "summary": "The plugin didn't reply to plugins.call within assistant_tool_timeout_ms (D31)."},
-    {"code": "tool_busy", "status": "busy", "summary": "Another plugins.call is running; the device takes one at a time (D31)."}
+    {"code": "tool_busy", "status": "busy", "summary": "Another plugins.call is running; the device takes one at a time (D31)."},
+    {"code": "no_motor", "status": "unavailable", "summary": "This device has no motors the plugin can move (D43)."},
+    {"code": "motor_not_ready", "status": "busy", "summary": "The motors are still calibrating after boot; try again in a moment (D43)."},
+    {"code": "motor_busy", "status": "busy", "summary": "The device's own camera software is moving the motors; try again in a moment (D43)."}
   ],
   "grants": [
     {
@@ -129,6 +132,13 @@
       "rate_per_s": 5,
       "burst": 10,
       "summary": "Answer the voice assistant through the tools the plugin declares in assistant_tools (D31). The assistant reads the reply, labelled as the plugin's output; the device may start the plugin without a screen to answer."
+    },
+    {
+      "name": "motor",
+      "class": "community",
+      "rate_per_s": 10,
+      "burst": 20,
+      "summary": "Move the device's pan and tilt motors, also without a visible screen (D43). The device keeps moves inside the motors' range and stops a running move when the plugin ends."
     }
   ],
   "limits": {
@@ -357,6 +367,25 @@
         "call": {"type": "int", "min": 1, "max": 2147483647},
         "text": {"type": "string", "max": 2048}
       }
+    },
+    {
+      "cap": "motor", "op": "move", "grant": "motor", "adapter": "motor",
+      "summary": "Starts moving to position x, y and returns at once (D43). Positions are motor steps from 0 to max_x and max_y in motor.status; outside them the device moves to the nearest limit. A new move replaces one still running. speed is 0 (slowest) to 17 (fastest), 5 by default.",
+      "args": {
+        "x": {"type": "int", "min": 0, "max": 65535},
+        "y": {"type": "int", "min": 0, "max": 65535},
+        "speed": {"type": "int", "min": 0, "max": 17, "optional": true}
+      }
+    },
+    {
+      "cap": "motor", "op": "stop", "grant": "motor", "adapter": "motor",
+      "summary": "Stops a running move (D43). The motors slow down first, so they finish a moment later.",
+      "args": {}
+    },
+    {
+      "cap": "motor", "op": "status", "grant": "motor", "adapter": "motor", "result": true,
+      "summary": "The result has the position x, y, the limits max_x, max_y, and whether the motors are moving (D43).",
+      "args": {}
     }
   ],
   "events": [

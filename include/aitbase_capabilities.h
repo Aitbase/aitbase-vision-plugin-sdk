@@ -28,6 +28,7 @@
 #define AITBASE_CAP_AUDIO_BACKGROUND "audio.background"
 #define AITBASE_CAP_NET "net"
 #define AITBASE_CAP_ASSISTANT_TOOLS "assistant.tools"
+#define AITBASE_CAP_MOTOR "motor"
 
 /* Device limits. */
 #define AITBASE_LIMIT_RX_DEFAULT 4096u

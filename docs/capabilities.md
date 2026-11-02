@@ -26,6 +26,7 @@ device itself, sizes and rate limits.
 | `audio.background` | module | 10/s, bursts of 20 | Keep an audio stream playing after the plugin's screen closes (D29). Firmware feature modules only; the owner stops it with LEFT long press. Firmware feature modules only. |
 | `net` | module | 1/s, bursts of 1 | Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, on every target (D34). Firmware feature modules only. |
 | `assistant.tools` | community | 5/s, bursts of 10 | Answer the voice assistant through the tools the plugin declares in assistant_tools (D31). The assistant reads the reply, labelled as the plugin's output; the device may start the plugin without a screen to answer. |
+| `motor` | community | 10/s, bursts of 20 | Move the device's pan and tilt motors, also without a visible screen (D43). The device keeps moves inside the motors' range and stops a running move when the plugin ends. |
 
 ## Operations
 
@@ -223,6 +224,24 @@ Capability `assistant.tools`. Answers the tool.call event with this call id (D31
 | `call` | int | 1 to 2147483647 |
 | `text` | string | at most 2048 bytes |
 
+### `motor.move`
+
+Capability `motor`. Starts moving to position x, y and returns at once (D43). Positions are motor steps from 0 to max_x and max_y in motor.status; outside them the device moves to the nearest limit. A new move replaces one still running. speed is 0 (slowest) to 17 (fastest), 5 by default.
+
+| Argument | Type | Bounds |
+|---|---|---|
+| `x` | int | 0 to 65535 |
+| `y` | int | 0 to 65535 |
+| `speed` | int | 0 to 17; optional |
+
+### `motor.stop`
+
+Capability `motor`. Stops a running move (D43). The motors slow down first, so they finish a moment later.
+
+### `motor.status`
+
+Capability `motor`. The result has the position x, y, the limits max_x, max_y, and whether the motors are moving (D43).
+
 Charsets: `name` is `[a-z][a-z0-9_]*`; `key` is letters, digits, `.`, `_` and `-`; `text` is
 UTF-8 without control characters other than tab, newline and carriage return; `url` is printable
 ASCII without spaces; `label` is one line of UTF-8 text without control, bidirectional-override
@@ -298,6 +317,9 @@ or zero-width characters.
 | `tool_unknown` | -1 | plugins.call named a tool the plugin doesn't declare in assistant_tools, or tool.reply named no call waiting for this plugin's reply: a second reply, or a reply to another call (D31). |
 | `tool_timeout` | -8 | The plugin didn't reply to plugins.call within assistant_tool_timeout_ms (D31). |
 | `tool_busy` | -3 | Another plugins.call is running; the device takes one at a time (D31). |
+| `no_motor` | -6 | This device has no motors the plugin can move (D43). |
+| `motor_not_ready` | -3 | The motors are still calibrating after boot; try again in a moment (D43). |
+| `motor_busy` | -3 | The device's own camera software is moving the motors; try again in a moment (D43). |
 
 ## Limits
 
