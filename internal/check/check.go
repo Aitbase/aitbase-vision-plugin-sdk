@@ -179,7 +179,7 @@ func checkManifest(r *Result, dir string, opt Options) *Manifest {
 	}
 
 	if m.ID == "" {
-		r.add(Error, "MANIFEST_FIELD", file+"#id", "id is required", `set "id" to a reverse-DNS name such as "yourname.weather"`)
+		r.add(Error, "MANIFEST_FIELD", file+"#id", "id is required", `set "id" to a name in the community namespace, such as "community.weather"`)
 	} else if d := IDProblem(m.ID, opt.AllowReservedID); d != nil {
 		d.Path = file + "#id"
 		r.Diagnostics = append(r.Diagnostics, *d)
@@ -289,10 +289,10 @@ func IDProblem(id string, allowReserved bool) *Diagnostic {
 	switch {
 	case len(id) > 64 || !idPattern.MatchString(id):
 		return &Diagnostic{Error, "ID_FORMAT", "", fmt.Sprintf("id %q is not valid", id),
-			"use at least two dot-separated parts of lowercase letters, digits, '-' or '_', at most 64 characters, e.g. \"yourname.weather\""}
+			"use at least two dot-separated parts of lowercase letters, digits, '-' or '_', at most 64 characters, e.g. \"community.weather\""}
 	case strings.HasPrefix(id, "aitbase.") && !allowReserved:
 		return &Diagnostic{Error, "ID_RESERVED", "", "the aitbase.* namespace is reserved for official plugins",
-			"use your own prefix, e.g. \"yourname." + strings.TrimPrefix(id, "aitbase.") + "\""}
+			"use the community prefix, e.g. \"community." + strings.TrimPrefix(id, "aitbase.") + "\""}
 	}
 	return nil
 }

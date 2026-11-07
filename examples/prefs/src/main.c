@@ -9,7 +9,7 @@
 
 #include "aitbase_plugin.h"
 
-AITBASE_PLUGIN_ID("example.prefs"); /* must match "id" in plugin.json */
+AITBASE_PLUGIN_ID("community.prefs"); /* must match "id" in plugin.json */
 
 static const char *const kCities[] = {"Hanoi", "Hue", "Da Nang", "Saigon"};
 

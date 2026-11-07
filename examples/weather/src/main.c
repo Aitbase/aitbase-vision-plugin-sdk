@@ -8,7 +8,7 @@
 
 #include "aitbase_plugin.h"
 
-AITBASE_PLUGIN_ID("example.weather"); /* must match "id" in plugin.json */
+AITBASE_PLUGIN_ID("community.weather"); /* must match "id" in plugin.json */
 
 /* The call being answered: its id, and the HTTP request made for it. */
 static uint32_t g_call = 0;

@@ -10,11 +10,11 @@ Build plugins that put their own screen on an AITBASE VISION device.
 # Install the CLI and the WebAssembly toolchain (Windows: see docs/cli.md#install)
 curl -fsSL https://raw.githubusercontent.com/Aitbase/aitbase-vision-plugin-sdk/main/install.sh | sh
 
-aitbase-plugin init my-plugin --id yourname.my-plugin
+aitbase-plugin init my-plugin --id community.my-plugin
 cd my-plugin
 aitbase-plugin check
 aitbase-plugin build --wasm   # downloads the WebAssembly toolchain the first time
-aitbase-plugin pack --wasm    # dist/yourname.my-plugin-0.1.0.avp, signed
+aitbase-plugin pack --wasm    # dist/community.my-plugin-0.1.0.avp, signed
 ```
 
 Copy the `.avp` into `aitbase/plugins/` on the device's SD card, and the device runs it. The first `pack --wasm` creates your signing key: back it up. See [WebAssembly](docs/cli.md#webassembly).
@@ -73,7 +73,7 @@ A plugin never touches LVGL, files or drivers.
 #include <stdio.h>
 #include "aitbase_plugin.h"
 
-AITBASE_PLUGIN_ID("example.counter");
+AITBASE_PLUGIN_ID("community.counter");
 
 static int count = 0;
 

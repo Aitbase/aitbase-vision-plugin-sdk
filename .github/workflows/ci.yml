@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        os: [ubuntu-24.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        os: [ubuntu-24.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     env:
       AITBASE_SKIP_TOOLCHAIN: "1"

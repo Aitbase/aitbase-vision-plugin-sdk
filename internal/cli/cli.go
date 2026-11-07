@@ -256,7 +256,7 @@ func runVersion(e env, args []string) int {
 
 func runInit(e env, args []string) int {
 	fs, asJSON := newFlags(e, "init")
-	id := fs.String("id", "", "plugin id, e.g. yourname.weather (required)")
+	id := fs.String("id", "", "plugin id, e.g. community.weather (required)")
 	name := fs.String("name", "", "display name (default: from the id)")
 	pos, err := parse(fs, args)
 	if err != nil {
