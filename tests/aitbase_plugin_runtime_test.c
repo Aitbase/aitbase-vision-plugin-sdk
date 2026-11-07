@@ -72,6 +72,10 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
                 aitbase_face_set(p, "face.1", "21 C");
                 break;
             }
+            if (strcmp(ev->node, "camera") == 0) {
+                aitbase_camera_capture(p);
+                break;
+            }
             if (strcmp(ev->node, "motor") == 0) {
                 aitbase_motor_move(p, 2148, 562, 7);
                 aitbase_motor_stop(p);
@@ -95,6 +99,20 @@ void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
             say(p, text);
             break;
         case AITBASE_EVENT_RESULT:
+            if (strcmp(ev->op, "camera.capture") == 0) {
+                /* Send it: a multipart upload by id (since 0.16). */
+                static const char *const form[] = {"chat_id=42"};
+                aitbase_http_request_t up;
+                memset(&up, 0, sizeof(up));
+                up.method = "POST";
+                up.url = "https://example.com/up";
+                up.photo = ev->photo;
+                up.photo_mode = "multipart";
+                up.form = form;
+                up.form_count = 1;
+                aitbase_http_request(p, &up);
+                break;
+            }
             if (strcmp(ev->op, "schedule.list") == 0) {
                 snprintf(text, sizeof(text), "list %s", ev->text);
                 say(p, text);
@@ -364,6 +382,29 @@ int main(void) {
     req = next_request(dev, 2000);
     EXPECT(req && strcmp(str(req, "cap"), "motor") == 0 && strcmp(str(req, "op"), "status") == 0,
            "aitbase_motor_status sends motor.status");
+    if (req) reply_ok(dev, req);
+    cJSON_Delete(req);
+
+    /* aitbase_camera_capture: a photo, then sent by id (since 0.16). */
+    device_send(dev, "{\"cap\":\"ui\",\"event\":\"action\",\"data\":{\"node\":\"camera\",\"action\":\"x\",\"detail\":\"\"}}");
+    req = next_request(dev, 2000);
+    EXPECT(req && strcmp(str(req, "cap"), "camera") == 0 && strcmp(str(req, "op"), "capture") == 0,
+           "aitbase_camera_capture sends camera.capture");
+    if (req) {
+        device_send(dev, "{\"id\":%d,\"status\":0,\"error\":\"\",\"result\":{\"photo\":\"p7\",\"width\":640,"
+                         "\"height\":360,\"bytes\":31000,\"time\":1800000000}}",
+                    num(req, "id"));
+    }
+    cJSON_Delete(req);
+    req = next_request(dev, 2000);
+    {
+        const cJSON *hargs = cJSON_GetObjectItem(req, "args");
+        const cJSON *form = cJSON_GetObjectItem(hargs, "form");
+        EXPECT(req && strcmp(str(req, "cap"), "http") == 0 && strcmp(str(hargs, "photo"), "p7") == 0 &&
+                   strcmp(str(hargs, "photo_mode"), "multipart") == 0 && strcmp(str(form, "chat_id"), "42") == 0 &&
+                   !cJSON_GetObjectItem(hargs, "body"),
+               "the RESULT's event->photo goes to http.request by id, with the form");
+    }
     if (req) reply_ok(dev, req);
     cJSON_Delete(req);
 

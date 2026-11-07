@@ -48,7 +48,12 @@
     {"code": "tool_busy", "status": "busy", "summary": "Another plugins.call is running; the device takes one at a time (D31)."},
     {"code": "no_motor", "status": "unavailable", "summary": "This device has no motors the plugin can move (D43)."},
     {"code": "motor_not_ready", "status": "busy", "summary": "The motors are still calibrating after boot; try again in a moment (D43)."},
-    {"code": "motor_busy", "status": "busy", "summary": "The device's own camera software is moving the motors; try again in a moment (D43)."}
+    {"code": "motor_busy", "status": "busy", "summary": "The device's own camera software is moving the motors; try again in a moment (D43)."},
+    {"code": "no_camera", "status": "unavailable", "summary": "This device has no camera that plugins may use (D44)."},
+    {"code": "camera_not_allowed", "status": "denied", "summary": "The owner hasn't allowed this plugin to use the camera: Device Console, Plugins, Allow camera (D44)."},
+    {"code": "camera_failed", "status": "failed", "summary": "The camera didn't give a photo; try again (D44)."},
+    {"code": "no_photo", "status": "invalid", "summary": "No photo with that id: this plugin didn't take it, or it expired after camera_photo_keep_s (D44)."},
+    {"code": "photo_token", "status": "invalid", "summary": "With photo_mode base64, body must contain {{photo}} exactly once; with raw or multipart, body must be empty (D44)."}
   ],
   "grants": [
     {
@@ -139,6 +144,13 @@
       "rate_per_s": 10,
       "burst": 20,
       "summary": "Move the device's pan and tilt motors, also without a visible screen (D43). The device keeps moves inside the motors' range and stops a running move when the plugin ends."
+    },
+    {
+      "name": "camera",
+      "class": "owner",
+      "rate_per_s": 1,
+      "burst": 3,
+      "summary": "Take photos with the camera, also without a visible screen (D44). A community plugin needs the owner's Allow camera in the Device Console; official plugins always may. Every photo shows a camera notice on the device's screen that the plugin can't hide. A photo stays on the device unless the plugin sends it with http.request."
     }
   ],
   "limits": {
@@ -181,7 +193,12 @@
     "plugin_settings_max": 8,
     "plugin_setting_key_max": 32,
     "plugin_setting_label_max": 48,
-    "plugin_setting_value_max": 1024
+    "plugin_setting_value_max": 1024,
+    "camera_photo_max": 262144,
+    "camera_photos_kept": 2,
+    "camera_photo_keep_s": 60,
+    "http_form_fields_max": 8,
+    "http_form_value_max": 512
   },
   "ops": [
     {
@@ -252,13 +269,17 @@
     },
     {
       "cap": "http", "op": "request", "grant": "http", "adapter": "http", "result": true,
-      "summary": "Makes one HTTP request and returns status, content_type, body (text, cut to fit) and truncated. Redirects are returned, not followed. One request at a time.",
+      "summary": "Makes one HTTP request and returns status, content_type, body (text, cut to fit) and truncated. Redirects are returned, not followed. One request at a time. With photo, it sends a photo from camera.capture without copying it through the plugin (D44). photo_mode raw (the default) sends the JPEG as the body, as image/jpeg. multipart sends multipart/form-data with the photo as the file field photo_field (photo by default) and form's string values as text fields. base64 puts the base64 JPEG in place of {{photo}} in body, for JSON APIs.",
       "args": {
         "method": {"type": "enum", "values": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]},
         "url": {"type": "string", "max": 1024, "charset": "url"},
         "headers": {"type": "object", "optional": true},
         "body": {"type": "string", "max": 8192, "optional": true},
-        "timeout_ms": {"type": "int", "min": 1000, "max": 15000, "optional": true}
+        "timeout_ms": {"type": "int", "min": 1000, "max": 15000, "optional": true},
+        "photo": {"type": "string", "max": 16, "charset": "name", "optional": true},
+        "photo_mode": {"type": "enum", "values": ["raw", "multipart", "base64"], "optional": true},
+        "photo_field": {"type": "string", "max": 32, "charset": "key", "optional": true},
+        "form": {"type": "object", "optional": true}
       }
     },
     {
@@ -385,6 +406,11 @@
     {
       "cap": "motor", "op": "status", "grant": "motor", "adapter": "motor", "result": true,
       "summary": "The result has the position x, y, the limits max_x, max_y, and whether the motors are moving (D43).",
+      "args": {}
+    },
+    {
+      "cap": "camera", "op": "capture", "grant": "camera", "adapter": "camera", "result": true,
+      "summary": "Takes a photo (D44). The reply comes when the photo is ready: photo (an id for http.request), width, height, bytes (the JPEG's size) and time (Unix seconds). The device keeps the plugin's last camera_photos_kept photos for camera_photo_keep_s seconds in memory, never on the SD card, and forgets them when the plugin ends. One capture at a time.",
       "args": {}
     }
   ],

@@ -133,7 +133,7 @@
       "description": "Ignored since SDK 0.11 (device decision D32): every plugin may use every capability. Devices before 2026-10-20 still need it. check warns CAPABILITIES_IGNORED.",
       "type": "array",
       "uniqueItems": true,
-      "items": {"enum": ["ui", "storage", "http", "audio.output", "schedule", "idle.face", "audio.stream", "assistant.tools", "motor"]}
+      "items": {"enum": ["ui", "storage", "http", "audio.output", "schedule", "idle.face", "audio.stream", "assistant.tools", "motor", "camera"]}
     }
   }
 }
