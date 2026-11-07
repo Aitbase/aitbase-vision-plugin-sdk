@@ -28,7 +28,7 @@
  * Minimal plugin:
  *
  *   #include "aitbase_plugin.h"
- *   AITBASE_PLUGIN_ID("example.hello");
+ *   AITBASE_PLUGIN_ID("community.hello");
  *   int aitbase_on_start(aitbase_plugin_t *p) { return aitbase_ui_open(p, "hello", 0); }
  *   void aitbase_on_event(aitbase_plugin_t *p, const aitbase_event_t *ev) {
  *       if (ev->kind == AITBASE_EVENT_PREEMPTED) aitbase_plugin_stop(p);

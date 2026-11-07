@@ -8,7 +8,7 @@
   "required": ["id", "name", "version", "api_version", "entry"],
   "properties": {
     "id": {
-      "description": "Stable plugin id: two or more dot-separated lowercase parts. aitbase.* is reserved for official plugins. Must match AITBASE_PLUGIN_ID(...) in the source.",
+      "description": "Stable plugin id: two or more dot-separated lowercase parts. Community plugins use community.<name>; aitbase.* is reserved for official plugins. Must match AITBASE_PLUGIN_ID(...) in the source.",
       "type": "string",
       "maxLength": 64,
       "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$"

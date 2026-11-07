@@ -15,7 +15,7 @@ import (
 )
 
 type Params struct {
-	ID     string // e.g. "yourname.weather"
+	ID     string // e.g. "community.weather"
 	Name   string // display name
 	Target string // build target and manifest entry, e.g. "weather"
 }

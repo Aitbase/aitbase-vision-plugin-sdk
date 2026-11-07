@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Community plugins use the `community.*` namespace: `aitbase-plugin init`, `check`'s hints, the examples (`community.weather`, `community.prefs`) and the docs say `community.<name>` instead of `yourname.*` and `example.*`. Any id other than `aitbase.*` still works.
+
 ## 0.16.0 — 2026-11-07
 
 Plugins can take photos, with the owner's permission (device decision D44).

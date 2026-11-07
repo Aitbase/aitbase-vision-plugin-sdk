@@ -5,7 +5,7 @@
 Do not work inside this repository. Create a plugin project and follow the `AGENTS.md` it contains:
 
 ```sh
-aitbase-plugin init my-plugin --id yourname.my-plugin
+aitbase-plugin init my-plugin --id community.my-plugin
 ```
 
 That project includes the SDK in `sdk/`, task skills in `.agents/skills/` and `.claude/skills/`, and the commands to check, build and package. The same instructions live here in [`template/AGENTS.md`](template/AGENTS.md).
