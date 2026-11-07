@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.0 — 2026-11-07
+
+Plugins can take photos, with the owner's permission (device decision D44).
+
+- **`aitbase_camera_capture(p)`**, capability `camera`. The RESULT has the photo's id in `event->photo` (new field), and its size and time in `event->text` as JSON. It works with or without a visible screen. A community plugin needs the owner's **Allow camera** in the Device Console; add `"camera"` to `requested_capabilities` so the owner sees the plugin asks for it. The device shows a notice for every photo.
+- **`aitbase_http_request_t`** gains `photo`, `photo_mode`, `photo_field`, `form` and `form_count`: send a photo by its id, as the raw body, a multipart upload (Telegram, Discord) or base64 inside a JSON body (`{{photo}}`). The picture never passes through the plugin.
+- New error codes `no_camera`, `camera_not_allowed`, `camera_failed`, `no_photo` and `photo_token`. Firmware before D44 answers `unknown_op`.
+
 ## 0.15.0 — 2026-11-02
 
 Plugins can move the device's motors (device decision D43).

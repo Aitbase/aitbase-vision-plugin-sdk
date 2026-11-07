@@ -256,7 +256,35 @@ int aitbase_http_request(aitbase_plugin_t *plugin, const aitbase_http_request_t 
     }
     if (request->body) cJSON_AddStringToObject(args, "body", request->body);
     if (request->timeout_ms) cJSON_AddNumberToObject(args, "timeout_ms", request->timeout_ms);
+    if (request->photo) {
+        cJSON_AddStringToObject(args, "photo", request->photo);
+        if (request->photo_mode) cJSON_AddStringToObject(args, "photo_mode", request->photo_mode);
+        if (request->photo_field) cJSON_AddStringToObject(args, "photo_field", request->photo_field);
+        if (request->form_count > 0) {
+            cJSON *form = cJSON_AddObjectToObject(args, "form");
+            for (size_t i = 0; form && i < request->form_count; ++i) {
+                const char *f = request->form ? request->form[i] : NULL;
+                const char *eq = f ? strchr(f, '=') : NULL;
+                char name[33];
+                if (!eq || eq == f || (size_t)(eq - f) >= sizeof(name)) {
+                    cJSON_Delete(args);
+                    return AITBASE_ERR_ARGUMENT;
+                }
+                memcpy(name, f, (size_t)(eq - f));
+                name[eq - f] = '\0';
+                cJSON_AddStringToObject(form, name, eq + 1);
+            }
+        }
+    } else if (request->photo_mode || request->photo_field || request->form_count > 0) {
+        cJSON_Delete(args);
+        return AITBASE_ERR_ARGUMENT;
+    }
     return send_tracked(plugin, "http", "request", args, 1);
+}
+
+int aitbase_camera_capture(aitbase_plugin_t *plugin) {
+    if (!plugin) return AITBASE_ERR_ARGUMENT;
+    return send_tracked(plugin, "camera", "capture", cJSON_CreateObject(), 1);
 }
 
 int aitbase_http_get(aitbase_plugin_t *plugin, const char *url) {
@@ -508,6 +536,10 @@ static void fill_result(const cJSON *result, const char *op, aitbase_event_t *ou
     } else if (strcmp(op, "motor.status") == 0) {
         *keys = cJSON_PrintUnformatted(result);
         out->text = *keys ? *keys : "{}";
+    } else if (strcmp(op, "camera.capture") == 0) {
+        *keys = cJSON_PrintUnformatted(result);
+        out->text = *keys ? *keys : "{}";
+        snprintf(out->photo, sizeof(out->photo), "%s", string_or_empty(result, "photo"));
     } else if (strcmp(op, "http.request") == 0) {
         const cJSON *status = cJSON_GetObjectItemCaseSensitive(result, "status");
         out->code = cJSON_IsNumber(status) ? status->valueint : 0;

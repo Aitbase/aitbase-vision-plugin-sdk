@@ -134,6 +134,8 @@ typedef struct aitbase_event {
     /* Since SDK 0.10. */
     char reason[17];   /* STREAM_STATE "stopped": "closed", "preempted", "replaced", "idle_timeout",
                           "bad_stream", "user" or "failed"; "" otherwise */
+    /* Since SDK 0.16. */
+    char photo[17];    /* RESULT of camera.capture: the photo's id, for aitbase_http_request_t.photo */
 } aitbase_event_t;
 
 typedef enum aitbase_log_level {
@@ -269,6 +271,24 @@ int aitbase_motor_stop(aitbase_plugin_t *plugin);
 /* RESULT: text = {"x","y","max_x","max_y","moving"} as JSON. */
 int aitbase_motor_status(aitbase_plugin_t *plugin);
 
+/* --- Camera ("camera"): photos, with the owner's permission (since SDK 0.16) ---------------------- */
+
+/* A community plugin may take photos only after the device's owner switches on "Allow camera" for it
+ * in the Device Console; until then the answer is AITBASE_EVENT_ERROR with detail
+ * "camera_not_allowed". Add "camera" to requested_capabilities in plugin.json, so the owner sees the
+ * plugin asks for it. Photos may be taken with or without a visible screen, at most 1 a second with
+ * bursts of 3, one at a time ("in_flight"). The device shows a notice on its screen for every photo,
+ * which the plugin can't hide.
+ *
+ * The plugin never gets the picture itself. The device keeps the plugin's last 2 photos for 60
+ * seconds, and the plugin sends one with aitbase_http_request() by its id (request.photo). Other
+ * errors: "no_camera" (none on this device), "camera_failed" (try again); firmware before device
+ * decision D44 answers "unknown_op". */
+
+/* RESULT: event->photo = the id; text = {"photo","width","height","bytes","time"} as JSON (time in
+ * Unix seconds). */
+int aitbase_camera_capture(aitbase_plugin_t *plugin);
+
 /* --- HTTP ("http"): requests to internet and local network hosts --------------------------------- */
 
 /* The device makes the request. http:// and https:// only. Internet hosts and, on devices with D37
@@ -285,6 +305,18 @@ typedef struct aitbase_http_request {
     size_t header_count;
     const char *body;            /* text, up to 8192 bytes; NULL for none */
     uint32_t timeout_ms;         /* 1000 to 15000; 0 means 10000 */
+    /* Since SDK 0.16: send a photo from aitbase_camera_capture(), by its id, with POST, PUT or PATCH.
+     * photo_mode "raw" (NULL means raw): the photo is the body, as image/jpeg; leave body NULL.
+     * "multipart": multipart/form-data, the photo as the file field photo_field (NULL means "photo"),
+     * filename photo.jpg, and form's "name=value" strings (up to 8, values up to 512 bytes) as text
+     * fields; leave body NULL. The device sets the Content-Type for both. "base64": the photo,
+     * base64-encoded, replaces "{{photo}}" in body, which must contain it once; for JSON APIs.
+     * Errors: "no_photo" (unknown or expired id), "photo_token". */
+    const char *photo;
+    const char *photo_mode;
+    const char *photo_field;
+    const char *const *form;
+    size_t form_count;
 } aitbase_http_request_t;
 
 /* RESULT: code = the HTTP status, text = the body. */

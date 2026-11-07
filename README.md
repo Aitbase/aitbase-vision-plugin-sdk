@@ -133,7 +133,7 @@ Contributors: see [AGENTS.md](AGENTS.md).
 ## Roadmap
 
 These items are planned, not implemented:
-- **More capabilities:** camera, microphone and MCP tools, each behind explicit user permission. Storage, HTTP and sound are available ([docs/capabilities.md](docs/capabilities.md)); later they will also need the owner's approval.
+- **More capabilities:** microphone and MCP tools, each behind explicit user permission. Camera photos are available since 0.16, with the owner's Allow camera. Storage, HTTP and sound are available ([docs/capabilities.md](docs/capabilities.md)); later they will also need the owner's approval.
 - **More device tools:** installation from the device's web console, and finding devices on the network (`devices`). Signed packages, SD card installation, `pair`, `dev`, `logs`, `screenshot` and `press` are available.
 - **No Python or C toolchain to install:** the UI compiler built into the CLI, and the WASM toolchain downloaded automatically.
 - **Richer UI:** a larger UI schema (more widgets, styles and bindings).

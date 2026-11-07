@@ -8,7 +8,9 @@ protocol operations behind it, the limits the device enforces, and every error c
 ## Capabilities
 
 Every plugin may use every `community` capability: there is nothing to list or request (D32).
-`module` capabilities are for firmware feature modules only. What protects the device is in
+`module` capabilities are for firmware feature modules only. An `owner` capability works for a
+community plugin only once the device's owner allows it in the Device Console (D44); official
+plugins always have it. What protects the device is in
 the rules of each operation: sound only while the plugin's screen shows, HTTP never to the
 device itself, sizes and rate limits.
 
@@ -27,6 +29,7 @@ device itself, sizes and rate limits.
 | `net` | module | 1/s, bursts of 1 | Open the module's own TCP and TLS connections to public addresses, outside the broker (D30). Firmware feature modules only, on every target (D34). Firmware feature modules only. |
 | `assistant.tools` | community | 5/s, bursts of 10 | Answer the voice assistant through the tools the plugin declares in assistant_tools (D31). The assistant reads the reply, labelled as the plugin's output; the device may start the plugin without a screen to answer. |
 | `motor` | community | 10/s, bursts of 20 | Move the device's pan and tilt motors, also without a visible screen (D43). The device keeps moves inside the motors' range and stops a running move when the plugin ends. |
+| `camera` | owner | 1/s, bursts of 3 | Take photos with the camera, also without a visible screen (D44). A community plugin needs the owner's Allow camera in the Device Console; official plugins always may. Every photo shows a camera notice on the device's screen that the plugin can't hide. A photo stays on the device unless the plugin sends it with http.request. |
 
 ## Operations
 
@@ -102,7 +105,7 @@ Capability `storage`. Lists the stored keys. The result has keys, an array of st
 
 ### `http.request`
 
-Capability `http`. Makes one HTTP request and returns status, content_type, body (text, cut to fit) and truncated. Redirects are returned, not followed. One request at a time.
+Capability `http`. Makes one HTTP request and returns status, content_type, body (text, cut to fit) and truncated. Redirects are returned, not followed. One request at a time. With photo, it sends a photo from camera.capture without copying it through the plugin (D44). photo_mode raw (the default) sends the JPEG as the body, as image/jpeg. multipart sends multipart/form-data with the photo as the file field photo_field (photo by default) and form's string values as text fields. base64 puts the base64 JPEG in place of {{photo}} in body, for JSON APIs.
 
 | Argument | Type | Bounds |
 |---|---|---|
@@ -111,6 +114,10 @@ Capability `http`. Makes one HTTP request and returns status, content_type, body
 | `headers` | object | optional |
 | `body` | string | at most 8192 bytes; optional |
 | `timeout_ms` | int | 1000 to 15000; optional |
+| `photo` | string | at most 16 bytes; charset `name`; optional |
+| `photo_mode` | enum | `raw`, `multipart`, `base64`; optional |
+| `photo_field` | string | at most 32 bytes; charset `key`; optional |
+| `form` | object | optional |
 
 ### `audio.tone`
 
@@ -242,6 +249,10 @@ Capability `motor`. Stops a running move (D43). The motors slow down first, so t
 
 Capability `motor`. The result has the position x, y, the limits max_x, max_y, and whether the motors are moving (D43).
 
+### `camera.capture`
+
+Capability `camera`. Takes a photo (D44). The reply comes when the photo is ready: photo (an id for http.request), width, height, bytes (the JPEG's size) and time (Unix seconds). The device keeps the plugin's last camera_photos_kept photos for camera_photo_keep_s seconds in memory, never on the SD card, and forgets them when the plugin ends. One capture at a time.
+
 Charsets: `name` is `[a-z][a-z0-9_]*`; `key` is letters, digits, `.`, `_` and `-`; `text` is
 UTF-8 without control characters other than tab, newline and carriage return; `url` is printable
 ASCII without spaces; `label` is one line of UTF-8 text without control, bidirectional-override
@@ -320,6 +331,11 @@ or zero-width characters.
 | `no_motor` | -6 | This device has no motors the plugin can move (D43). |
 | `motor_not_ready` | -3 | The motors are still calibrating after boot; try again in a moment (D43). |
 | `motor_busy` | -3 | The device's own camera software is moving the motors; try again in a moment (D43). |
+| `no_camera` | -6 | This device has no camera that plugins may use (D44). |
+| `camera_not_allowed` | -5 | The owner hasn't allowed this plugin to use the camera: Device Console, Plugins, Allow camera (D44). |
+| `camera_failed` | -8 | The camera didn't give a photo; try again (D44). |
+| `no_photo` | -1 | No photo with that id: this plugin didn't take it, or it expired after camera_photo_keep_s (D44). |
+| `photo_token` | -1 | With photo_mode base64, body must contain {{photo}} exactly once; with raw or multipart, body must be empty (D44). |
 
 ## Limits
 
@@ -365,3 +381,8 @@ or zero-width characters.
 | `plugin_setting_key_max` | 32 |
 | `plugin_setting_label_max` | 48 |
 | `plugin_setting_value_max` | 1024 |
+| `camera_photo_max` | 262144 |
+| `camera_photos_kept` | 2 |
+| `camera_photo_keep_s` | 60 |
+| `http_form_fields_max` | 8 |
+| `http_form_value_max` | 512 |
